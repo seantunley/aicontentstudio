@@ -35,6 +35,7 @@ export async function POST(req) {
     }
   }
   if (!published.length) {
+    await notifyTelegram(`⚠️ Publish FAILED for "${job.topic}" after retries — ${failed.join('; ')}. It stays in Ready to publish; try again.`);
     return NextResponse.json({ error: `nothing published — ${failed.join('; ')}` }, { status: 502 });
   }
 

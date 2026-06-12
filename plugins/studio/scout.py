@@ -51,6 +51,7 @@ def _scout_prompt(niche):
         "fresh discussion, seasonal hooks) — not generic evergreen. Choose 2-3 SPECIFIC, distinct post "
         f"ideas. For EACH, call suggest_topic(brand={niche['brand']!r}, topic=<concrete idea>, "
         f"rationale=<one line grounded in what you found>, source_url=<real URL>, niche_id={niche['id']}). "
+        "Use METRIC units only (Celsius, km, kg, litres) — convert any imperial you find. "
         "Suggest ONLY — do NOT log_job, save_brief, create_draft, advance_job, or publish. Then stop."
     )
 

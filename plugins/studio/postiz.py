@@ -6,6 +6,7 @@ platform OAuth tokens and does the actual posting (§2c). Auth is `Authorization
 """
 import os
 import json
+import time
 import datetime
 import urllib.request
 import urllib.error
@@ -18,21 +19,34 @@ class PostizError(Exception):
     pass
 
 
-def _request(method, path, body=None):
+RETRY_STATUS = {429, 500, 502, 503, 504}
+
+
+def _request(method, path, body=None, retry=False):
     if not API_KEY:
         raise PostizError("POSTIZ_API_KEY is not configured")
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(f"{API_URL}{path}", data=data, method=method)
-    req.add_header("Authorization", API_KEY)
-    req.add_header("Content-Type", "application/json")
-    try:
-        with urllib.request.urlopen(req, timeout=20) as r:
-            raw = r.read().decode()
-            return json.loads(raw) if raw else {}
-    except urllib.error.HTTPError as e:
-        raise PostizError(f"Postiz API HTTP {e.code}: {e.read().decode()[:200]}")
-    except urllib.error.URLError as e:
-        raise PostizError(f"Postiz unreachable at {API_URL}: {e.reason}")
+    attempts = 3 if retry else 1  # §9b: retry transient failures with backoff (0.5s, 1s)
+    last = None
+    for i in range(attempts):
+        if i:
+            time.sleep(0.5 * (2 ** (i - 1)))
+        req = urllib.request.Request(f"{API_URL}{path}", data=data, method=method)
+        req.add_header("Authorization", API_KEY)
+        req.add_header("Content-Type", "application/json")
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                raw = r.read().decode()
+                return json.loads(raw) if raw else {}
+        except urllib.error.HTTPError as e:
+            if e.code in RETRY_STATUS:
+                last = PostizError(f"Postiz API HTTP {e.code}")
+                continue
+            raise PostizError(f"Postiz API HTTP {e.code}: {e.read().decode()[:200]}")
+        except urllib.error.URLError as e:
+            last = PostizError(f"Postiz unreachable at {API_URL}: {e.reason}")
+            continue
+    raise last
 
 
 def list_integrations():
@@ -47,36 +61,41 @@ def find_integration(platform):
     return None
 
 
-def upload_image(path):
-    """Upload a local image file to Postiz. Returns the media object {id, path, ...}."""
+def _upload_file(path, timeout, what="media"):
+    """Upload a local file to Postiz with retry/backoff on transient failures (§9b)."""
     import requests
     if not API_KEY:
         raise PostizError("POSTIZ_API_KEY is not configured")
-    try:
-        with open(path, "rb") as f:
-            r = requests.post(f"{API_URL}/upload", headers={"Authorization": API_KEY},
-                              files={"file": f}, timeout=60)
-    except OSError as e:
-        raise PostizError(f"cannot read image {path}: {e}")
-    if r.status_code >= 300:
-        raise PostizError(f"Postiz upload HTTP {r.status_code}: {r.text[:200]}")
-    return r.json()
+    last = None
+    for i in range(3):
+        if i:
+            time.sleep(0.5 * (2 ** (i - 1)))
+        try:
+            with open(path, "rb") as f:
+                r = requests.post(f"{API_URL}/upload", headers={"Authorization": API_KEY},
+                                  files={"file": f}, timeout=timeout)
+        except OSError as e:
+            raise PostizError(f"cannot read {what} {path}: {e}")  # not transient — don't retry
+        except requests.RequestException as e:
+            last = PostizError(f"Postiz upload error: {e}")
+            continue
+        if r.status_code < 300:
+            return r.json()
+        if r.status_code in RETRY_STATUS:
+            last = PostizError(f"Postiz {what} upload HTTP {r.status_code}")
+            continue
+        raise PostizError(f"Postiz {what} upload HTTP {r.status_code}: {r.text[:200]}")
+    raise last
+
+
+def upload_image(path):
+    """Upload a local image file to Postiz. Returns the media object {id, path, ...}."""
+    return _upload_file(path, 60, "image")
 
 
 def upload_video(path):
     """Upload a local video file to Postiz (same /upload endpoint; longer timeout)."""
-    import requests
-    if not API_KEY:
-        raise PostizError("POSTIZ_API_KEY is not configured")
-    try:
-        with open(path, "rb") as f:
-            r = requests.post(f"{API_URL}/upload", headers={"Authorization": API_KEY},
-                              files={"file": f}, timeout=180)
-    except OSError as e:
-        raise PostizError(f"cannot read video {path}: {e}")
-    if r.status_code >= 300:
-        raise PostizError(f"Postiz video upload HTTP {r.status_code}: {r.text[:200]}")
-    return r.json()
+    return _upload_file(path, 180, "video")
 
 
 def build_post(integration_id, content, platform, when="now", image=None, video=None):
@@ -99,4 +118,4 @@ def build_post(integration_id, content, platform, when="now", image=None, video=
 
 
 def create_post(integration_id, content, platform, when="now", image=None, video=None):
-    return _request("POST", "/posts", build_post(integration_id, content, platform, when, image, video))
+    return _request("POST", "/posts", build_post(integration_id, content, platform, when, image, video), retry=True)

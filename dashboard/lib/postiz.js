@@ -3,16 +3,37 @@
 const API_URL = (process.env.POSTIZ_API_URL || 'http://host.docker.internal:4007/api/public/v1').replace(/\/$/, '');
 const API_KEY = process.env.POSTIZ_API_KEY || '';
 
-async function req(method, path, body) {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// opts.retry: retry transient failures (network errors, 5xx, 429) with exponential backoff before
+// giving up (§9b). Only enabled for writes that should survive a platform hiccup. NOT retried on
+// 4xx — a client error won't succeed on retry. Backoff: 0.5s, 1s, 2s.
+async function req(method, path, body, opts = {}) {
   if (!API_KEY) throw new Error('POSTIZ_API_KEY not configured');
-  const r = await fetch(`${API_URL}${path}`, {
-    method,
-    headers: { Authorization: API_KEY, 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!r.ok) throw new Error(`Postiz API HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`);
-  const text = await r.text();
-  return text ? JSON.parse(text) : {};
+  const attempts = opts.retry ? (opts.attempts || 3) : 1;
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    if (i > 0) await sleep(500 * 2 ** (i - 1));
+    let r;
+    try {
+      r = await fetch(`${API_URL}${path}`, {
+        method,
+        headers: { Authorization: API_KEY, 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    } catch (e) {
+      lastErr = new Error(`Postiz unreachable: ${String(e?.message || e)}`); // network blip -> retryable
+      continue;
+    }
+    if (r.ok) {
+      const text = await r.text();
+      return text ? JSON.parse(text) : {};
+    }
+    const err = new Error(`Postiz API HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`);
+    if (r.status >= 500 || r.status === 429) { lastErr = err; continue; } // server/ratelimit -> retryable
+    throw err; // 4xx -> permanent, don't retry
+  }
+  throw lastErr;
 }
 
 export async function findIntegration(platform) {
@@ -56,5 +77,5 @@ export async function createPost(integrationId, content, platform, image, video,
       value: [{ content, image: media ? [{ id: media.id, path: media.path }] : [] }],
       settings: { __type: platform },
     }],
-  });
+  }, { retry: true }); // §9b: survive transient platform hiccups
 }

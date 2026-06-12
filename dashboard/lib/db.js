@@ -204,7 +204,13 @@ export function addNiche(brand, query) {
   return { ok: true, id: Number(r.lastInsertRowid) };
 }
 export function removeNiche(id) {
-  db().prepare('DELETE FROM scout_niches WHERE id=?').run(id);
+  const d = db();
+  const tx = d.transaction(() => {
+    // detach ideas first so the foreign key doesn't block the delete (they remain as suggestions)
+    d.prepare('UPDATE suggestions SET niche_id=NULL WHERE niche_id=?').run(id);
+    d.prepare('DELETE FROM scout_niches WHERE id=?').run(id);
+  });
+  tx();
   return { ok: true };
 }
 

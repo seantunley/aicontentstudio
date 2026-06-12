@@ -433,6 +433,8 @@ def list_niches(enabled_only=True):
 
 def remove_niche(niche_id):
     with _db() as conn:
+        # detach any ideas first so the FK doesn't block the delete (they stay as suggestions)
+        conn.execute("UPDATE suggestions SET niche_id=NULL WHERE niche_id=?", (niche_id,))
         conn.execute("DELETE FROM scout_niches WHERE id=?", (niche_id,))
 
 

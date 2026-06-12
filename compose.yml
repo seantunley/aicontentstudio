@@ -24,6 +24,7 @@ services:
       - STUDIO_DB_PATH=/opt/studio/studio.db
       - POSTIZ_API_URL=${POSTIZ_API_URL:-http://localhost:4007/api/public/v1}
       - POSTIZ_API_KEY=${POSTIZ_API_KEY}   # studio is a Postiz API client; Postiz holds the platform tokens (§2c)
+      - STUDIO_COCKPIT_URL=${STUDIO_COCKPIT_URL:-http://172.18.18.101:4008}  # for Telegram "Preview in cockpit" tap-throughs
       # Hermes' own dashboard on the LAN (operator's local network). Exposes config + API keys,
       # so it is gated by basic auth (dashboard.basic_auth in ~/.hermes/config.yaml). Interim —
       # plan §7a wants this on Tailscale, not the LAN; move it there before any wider exposure.

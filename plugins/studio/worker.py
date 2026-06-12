@@ -21,8 +21,9 @@ import db  # same directory
 LOCK = "/tmp/studio_worker.lock"
 
 
-def _telegram_notify(text):
-    """DM the operator on Telegram (two-way loop) — best effort, reads creds from the volume .env."""
+def _telegram_notify(text, button=None):
+    """DM the operator on Telegram (two-way loop) — best effort, reads creds from the volume .env.
+    Optional `button` = {text, url} renders an inline tap-through (e.g. open the post in the cockpit)."""
     env = {}
     try:
         with open("/opt/data/.env") as f:
@@ -37,13 +38,21 @@ def _telegram_notify(text):
     chat = env.get("TELEGRAM_ALLOWED_USERS", "").split(",")[0]
     if not tok or not chat:
         return
+    payload = {"chat_id": chat, "text": text}
+    if button and button.get("url"):
+        payload["reply_markup"] = {"inline_keyboard": [[{"text": button.get("text", "Open"), "url": button["url"]}]]}
     try:
-        data = json.dumps({"chat_id": chat, "text": text}).encode()
+        data = json.dumps(payload).encode()
         req = urllib.request.Request(f"https://api.telegram.org/bot{tok}/sendMessage",
                                      data=data, headers={"Content-Type": "application/json"})
         urllib.request.urlopen(req, timeout=10)
     except Exception:  # noqa: BLE001
         pass
+
+
+def _cockpit_button(job_id, text="\U0001f50d Preview in cockpit"):
+    base = os.environ.get("STUDIO_COCKPIT_URL", "").rstrip("/")
+    return {"text": text, "url": f"{base}/job/{job_id}"} if base else None
 LOCK_STALE_SECONDS = 1800
 RUN_TIMEOUT_SECONDS = 600
 
@@ -61,7 +70,8 @@ def _agent_prompt(job, with_image, with_video=False):
         f"Work on the EXISTING job {job['id']} — do NOT create a new job. "
         f"Topic: {job['topic']!r}. Brand: {job['brand']}. "
         "Step 1 — research: search the web, read real sources, then call save_brief with cited facts "
-        "(each a real source_url + snippet) and 2-3 distinct angles. "
+        "(each a real source_url + snippet) and 2-3 distinct angles. Use METRIC units only (Celsius, "
+        "km, kg, litres) — convert any imperial. "
         + step2
     )
     if with_image:
@@ -89,7 +99,8 @@ def process_one(job):
         if state == "preview":
             db.clear_queued(jid)
             db.record_event(jid, "worker: done — draft ready for review", actor="system")
-            _telegram_notify(f'\U0001f4dd Draft ready to review: "{job["topic"]}" — it\'s in your approval queue.')
+            _telegram_notify(f'\U0001f4dd Draft ready to review: "{job["topic"]}" — it\'s in your approval queue.',
+                             button=_cockpit_button(jid))
         else:
             db.enqueue_action(jid, "failed")
             db.record_event(jid, f"worker: did not reach preview (state={state}, rc={r.returncode})", actor="system")
@@ -110,12 +121,30 @@ def _locked():
     return False
 
 
+def _maybe_run_scout():
+    """If the cockpit requested an on-demand scout run (marker file), honour it once."""
+    marker = os.path.join(os.path.dirname(db.DB_PATH), ".scout-request")
+    if not os.path.exists(marker):
+        return
+    try:
+        os.remove(marker)
+    except OSError:
+        pass
+    try:
+        import scout  # same dir
+        print("worker: running on-demand scout")
+        scout.run_once()
+    except Exception as e:  # noqa: BLE001
+        print(f"worker: scout run error: {e}")
+
+
 def main():
     db.init_db()
     if _locked():
         print("worker: another run is in progress, skipping")
         return
     try:
+        _maybe_run_scout()
         jobs = db.get_queued_jobs()
         if not jobs:
             return

@@ -243,6 +243,19 @@ export function UploadMediaButton({ jobId }) {
   );
 }
 
+export function RunScoutButton() {
+  const ui = useUI();
+  const [busy, setBusy] = useState(false);
+  async function go() {
+    setBusy(true);
+    const { ok, data } = await post('/api/scout/run', {});
+    if (ok) ui.toast('Scout queued — new ideas land within ~2 min');
+    else ui.toast(data.error || 'Failed', 'err');
+    setBusy(false);
+  }
+  return <button className="btn btn--ghost btn--sm" disabled={busy} onClick={go}>{busy ? 'Queuing…' : '⟳ Run scout now'}</button>;
+}
+
 export function SuggestionActions({ id }) {
   const ui = useUI();
   const [busy, setBusy] = useState(false);
@@ -278,12 +291,16 @@ export function NicheManager({ niches }) {
     ui.toast(data.error || 'Failed', 'err'); setBusy(false);
   }
   async function remove(id) {
-    const { ok } = await post('/api/niches', { action: 'remove', id });
-    if (ok) window.location.reload();
+    const { ok, data } = await post('/api/niches', { action: 'remove', id });
+    if (ok) { window.location.reload(); return; }
+    ui.toast(data.error || 'Failed to remove', 'err');
   }
   return (
     <div className="card">
-      <div className="card-foot" style={{ marginBottom: 8 }}>SCOUT NICHES — what the scout looks for</div>
+      <div className="row-between" style={{ marginBottom: 8 }}>
+        <span className="card-foot">SCOUT NICHES — what the scout looks for (runs daily, or now)</span>
+        <RunScoutButton />
+      </div>
       {niches.length === 0 ? <div className="empty" style={{ marginBottom: 10 }}>No niches yet. Add one and the scout will hunt ideas for it.</div> : (
         <div className="field-stack" style={{ marginBottom: 12 }}>
           {niches.map((n) => (
