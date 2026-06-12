@@ -1,6 +1,6 @@
 import { getSession } from '@/lib/session';
 
-// Same-origin image proxy. The Polotno canvas would be CORS-tainted by cross-origin Postiz images
+// Same-origin image proxy. The editor's canvas would be CORS-tainted by cross-origin Postiz images
 // (breaking export), so the editor loads images through here. Restricted to the Postiz media host.
 const ALLOWED = new Set(['172.18.18.101', 'host.docker.internal', 'localhost', '127.0.0.1']);
 

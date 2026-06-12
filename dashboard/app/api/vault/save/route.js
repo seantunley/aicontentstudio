@@ -3,7 +3,7 @@ import { getSession } from '@/lib/session';
 import { uploadMedia } from '@/lib/postiz';
 import { addMediaAsset } from '@/lib/db';
 
-// Save an edited canvas (data URL from Polotno) as a NEW Vault asset (uploads to Postiz, catalogues).
+// Save an edited canvas (data URL from the Studio Editor) as a NEW Vault asset (uploads to Postiz, catalogues).
 export async function POST(req) {
   const session = await getSession();
   if (!session.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });

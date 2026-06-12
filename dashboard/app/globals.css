@@ -367,7 +367,7 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .vtag--add { color: var(--accent); border-color: rgba(227,167,63,0.3); border-style: dashed; }
 .vault-tagedit { margin-top: 9px; }
 
-/* ── studio editor (polotno) ───────────────────────────────────────────── */
+/* ── studio editor (filerobot) ─────────────────────────────────────────── */
 .editor-root { display: flex; flex-direction: column; height: 100vh; background: var(--bg); }
 .editor-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 14px;
   border-bottom: 1px solid var(--line-2); background: var(--bg-1); flex: none; }
