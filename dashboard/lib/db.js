@@ -131,6 +131,18 @@ export function getDraftsFor(jobId) {
   return db().prepare('SELECT * FROM drafts WHERE job_id=? ORDER BY id').all(jobId);
 }
 
+// Attach operator-uploaded media to a draft (mirrors the studio plugin's setters).
+export function setDraftImageById(draftId, mediaId, path) {
+  db().prepare('UPDATE drafts SET image_id=?, image_path=? WHERE id=?').run(mediaId, path, draftId);
+}
+export function setDraftVideoById(draftId, mediaId, path) {
+  db().prepare('UPDATE drafts SET video_id=?, video_path=? WHERE id=?').run(mediaId, path, draftId);
+}
+export function logEvent(jobId, detail, actor = 'human') {
+  db().prepare('INSERT INTO job_events (job_id,from_state,to_state,actor,at,detail) VALUES (?,?,?,?,?,?)')
+    .run(jobId, null, null, actor, new Date().toISOString(), detail);
+}
+
 export function getEvents(jobId) {
   return db().prepare('SELECT from_state,to_state,actor,detail,at FROM job_events WHERE job_id=? ORDER BY id').all(jobId);
 }

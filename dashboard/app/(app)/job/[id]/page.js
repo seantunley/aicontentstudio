@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { getJobById, getBrief, getDraftsFor, getEvents } from '@/lib/db';
-import { ApprovalActions, PublishButton, EditableDraft, RetryButton } from '@/app/components/actions';
+import { ApprovalActions, PublishButton, EditableDraft, RetryButton, UploadMediaButton } from '@/app/components/actions';
 
 export const dynamic = 'force-dynamic';
 const when = (s) => (s ? s.replace('T', ' ').slice(0, 16) : '');
@@ -37,7 +37,7 @@ export default async function JobPage({ params }) {
       </section>
 
       <section className="section reveal r2">
-        <div className="section-head"><span className="idx">01</span><h2>Drafts</h2><span className="rule" /></div>
+        <div className="section-head"><span className="idx">01</span><h2>Drafts</h2><span className="rule" />{drafts.length ? <UploadMediaButton jobId={job.id} /> : null}</div>
         {drafts.length === 0 ? <div className="empty">No drafts yet.</div> : drafts.map((d) => (
           <div className="card" key={d.id} style={{ marginBottom: 10 }}>
             <div className="card-meta">{d.platform} · angle {d.angle || '—'} · {d.char_count} chars{d.video_id ? ' · video' : d.image_id ? ' · image' : ''}</div>

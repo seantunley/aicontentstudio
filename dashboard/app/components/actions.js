@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useUI } from './ui';
 
 async function post(url, body) {
@@ -171,6 +171,35 @@ export function EditableDraft({ draftId, body, limit }) {
         <button className="btn btn--primary" disabled={busy || over} onClick={save}>Save</button>
         <button className="btn btn--ghost" onClick={() => { setText(body); setEditing(false); }}>Cancel</button>
       </div>
+    </>
+  );
+}
+
+export function UploadMediaButton({ jobId }) {
+  const ui = useUI();
+  const [busy, setBusy] = useState(false);
+  const ref = useRef(null);
+  async function onPick(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const r = await fetch(`/api/jobs/${jobId}/media`, { method: 'POST', body: fd });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok) { ui.toast(`Your ${data.kind} is attached — sized per platform`); window.location.reload(); return; }
+      ui.toast(data.error || 'Upload failed', 'err');
+    } catch { ui.toast('Upload failed', 'err'); }
+    setBusy(false);
+    if (ref.current) ref.current.value = '';
+  }
+  return (
+    <>
+      <input ref={ref} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={onPick} />
+      <button className="btn btn--ghost" disabled={busy} onClick={() => ref.current?.click()}>
+        {busy ? 'Uploading…' : '↑ Use your own media'}
+      </button>
     </>
   );
 }

@@ -30,6 +30,16 @@ export async function listIntegrations() {
   }
 }
 
+// Upload a raw media buffer (operator's own photo/clip) to Postiz. Returns {id, path}.
+export async function uploadMedia(buffer, filename, mime) {
+  if (!API_KEY) throw new Error('POSTIZ_API_KEY not configured');
+  const fd = new FormData();
+  fd.append('file', new Blob([buffer], { type: mime || 'application/octet-stream' }), filename);
+  const r = await fetch(`${API_URL}/upload`, { method: 'POST', headers: { Authorization: API_KEY }, body: fd });
+  if (!r.ok) throw new Error(`Postiz upload HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  return r.json();
+}
+
 export async function createPost(integrationId, content, platform, image, video) {
   // `image`/`video` are already-uploaded Postiz media refs {id, path} stored on the draft.
   // Postiz carries both in the same per-post media array; a video takes precedence when present.
