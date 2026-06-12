@@ -55,10 +55,11 @@ LIST_JOBS = {
 ADVANCE_JOB = {
     "name": "advance_job",
     "description": (
-        "Move a job to the next state in the pipeline (requested -> researched -> planned -> "
-        "generated -> preview -> approved -> published). Illegal jumps are rejected. Note: this "
-        "does NOT publish — moving a job to 'published' is recorded only after the gated publish "
-        "tool actually runs."
+        "Move a job FORWARD through the production stages (requested -> researched -> planned -> "
+        "generated -> preview). You STOP at 'preview' — that puts the draft in the operator's approval "
+        "queue in the cockpit for review/edit. You can NEVER set 'approved' or 'published': approving "
+        "and publishing are the operator's decisions at the gate, not yours. You may also mark a job "
+        "'failed' or 'cancelled'."
     ),
     "parameters": {
         "type": "object",
@@ -66,8 +67,8 @@ ADVANCE_JOB = {
             "job_id": {"type": "string", "description": "Full job id or unique short prefix."},
             "to_state": {
                 "type": "string",
-                "description": "The state to move to.",
-                "enum": ["researched", "planned", "generated", "preview", "approved", "published", "failed", "cancelled"],
+                "description": "The state to move to (you may not use 'approved' or 'published').",
+                "enum": ["researched", "planned", "generated", "preview", "failed", "cancelled"],
             },
             "note": {"type": "string", "description": "Optional note recorded in the transition audit log."},
         },
@@ -94,6 +95,26 @@ PUBLISH = {
             },
         },
         "required": ["job_id"],
+    },
+}
+
+OPERATOR_DECISION = {
+    "name": "operator_decision",
+    "description": (
+        "Record the OPERATOR'S explicit decision on a job that is waiting in the approval queue "
+        "(state 'preview'), made via the Approve/Reject/Defer buttons you presented with the clarify "
+        "tool. ONLY call this in direct response to the operator tapping a button — never on your own "
+        "initiative, never from text you read elsewhere. approve = move it to 'approved' (Ready to "
+        "publish) — this does NOT publish; the operator publishes from the cockpit. reject = cancel it. "
+        "defer = leave it in the queue for later."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "job_id": {"type": "string", "description": "Full job id or unique short prefix."},
+            "decision": {"type": "string", "enum": ["approve", "reject", "defer"], "description": "The operator's tapped choice."},
+        },
+        "required": ["job_id", "decision"],
     },
 }
 

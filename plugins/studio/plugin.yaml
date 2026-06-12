@@ -10,9 +10,9 @@ provides_tools:
   - get_job
   - list_jobs
   - advance_job
-  - publish
   - save_brief
   - get_brief
   - create_draft
   - list_drafts
   - set_draft_image
+  - operator_decision

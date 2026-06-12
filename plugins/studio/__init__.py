@@ -10,9 +10,11 @@ def register(ctx):
     ctx.register_tool(name="get_job", toolset="studio", schema=schemas.GET_JOB, handler=tools.get_job)
     ctx.register_tool(name="list_jobs", toolset="studio", schema=schemas.LIST_JOBS, handler=tools.list_jobs)
     ctx.register_tool(name="advance_job", toolset="studio", schema=schemas.ADVANCE_JOB, handler=tools.advance_job)
-    ctx.register_tool(name="publish", toolset="studio", schema=schemas.PUBLISH, handler=tools.publish)
+    # NOTE: no 'publish' tool for the agent — publishing is a human action in the cockpit (§4a).
+    # The agent's job ends at 'preview'. tools.publish remains for the CLI/approval path only.
     ctx.register_tool(name="save_brief", toolset="studio", schema=schemas.SAVE_BRIEF, handler=tools.save_brief)
     ctx.register_tool(name="get_brief", toolset="studio", schema=schemas.GET_BRIEF, handler=tools.get_brief)
     ctx.register_tool(name="create_draft", toolset="studio", schema=schemas.CREATE_DRAFT, handler=tools.create_draft)
     ctx.register_tool(name="list_drafts", toolset="studio", schema=schemas.LIST_DRAFTS, handler=tools.list_drafts)
     ctx.register_tool(name="set_draft_image", toolset="studio", schema=schemas.SET_DRAFT_IMAGE, handler=tools.set_draft_image)
+    ctx.register_tool(name="operator_decision", toolset="studio", schema=schemas.OPERATOR_DECISION, handler=tools.operator_decision)

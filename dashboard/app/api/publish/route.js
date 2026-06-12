@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '../../../lib/session';
 import { getJobById, latestDraft, markPublished } from '../../../lib/db';
 import { findIntegration, createPost } from '../../../lib/postiz';
+import { notifyTelegram } from '../../../lib/notify';
 
 // Human-clicked publish: the authenticated operator IS the approval (§7a). Posts an approved
 // job's draft live via Postiz, then marks it published with an audit trail.
@@ -25,7 +26,14 @@ export async function POST(req) {
     const image = draft.image_id ? { id: draft.image_id, path: draft.image_path } : null;
     await createPost(ig.id, draft.body, draft.platform, image);
     markPublished(job.id, session.user.name, ig.profile);
-    return NextResponse.json({ ok: true, platform: draft.platform, channel: ig.profile, state: 'published' });
+
+    const link = draft.platform === 'bluesky' && ig.profile ? `https://bsky.app/profile/${ig.profile}` : '';
+    await notifyTelegram(
+      `✅ Published — "${job.topic}" is now live on ${ig.profile || draft.platform}` +
+      `${image ? ' (with image)' : ''}.${link ? `\n${link}` : ''}`,
+    );
+
+    return NextResponse.json({ ok: true, platform: draft.platform, channel: ig.profile, with_image: !!image, state: 'published' });
   } catch (e) {
     return NextResponse.json({ error: String(e?.message || e) }, { status: 502 });
   }

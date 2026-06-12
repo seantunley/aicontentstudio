@@ -52,6 +52,8 @@ services:
       - COOKIE_SECURE=false                        # over HTTP/LAN; flip true behind HTTPS/Tailscale
       - POSTIZ_API_KEY=${POSTIZ_API_KEY}           # publish approved drafts via Postiz (human-clicked)
       - POSTIZ_API_URL=http://host.docker.internal:4007/api/public/v1
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}   # DM the operator when a post goes live (two-way loop)
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     extra_hosts:
       - "host.docker.internal:host-gateway"        # reach Postiz's host-published port from this bridge container
     volumes:

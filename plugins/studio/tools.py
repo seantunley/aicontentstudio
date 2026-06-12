@@ -65,6 +65,11 @@ def advance_job(args, **kwargs):
     to_state = (args.get("to_state") or "").strip()
     if not jid or not to_state:
         return _err("job_id and to_state are required")
+    if to_state in ("approved", "published"):
+        return _err(
+            "REFUSED: you cannot approve or publish — those are the operator's actions at the gate "
+            "(in the cockpit). Take the job to 'preview' and stop, then tell the operator it's ready to review."
+        )
     job = db.find_job(jid)
     if not job:
         return _err(f"no job matching '{jid}'")
@@ -207,6 +212,41 @@ def list_drafts(args, **kwargs):
         return _err(f"no job matching '{jid}'")
     drafts = db.list_drafts(job["id"])
     return _ok(job_id=job["id"], count=len(drafts), drafts=drafts)
+
+
+def operator_decision(args, **kwargs):
+    """The operator's explicit Approve/Reject/Defer on a previewed job (from a Telegram button tap).
+    approve -> publish live; reject -> cancel; defer -> leave it. This is a HUMAN decision surface."""
+    jid = (args.get("job_id") or "").strip()
+    decision = (args.get("decision") or "").strip().lower()
+    if not jid or decision not in ("approve", "reject", "defer"):
+        return _err("job_id and decision (approve|reject|defer) are required")
+    job = db.find_job(jid)
+    if not job:
+        return _err(f"no job matching '{jid}'")
+
+    if decision == "defer":
+        db.record_event(job["id"], "operator deferred — left in the queue", actor="human")
+        return _ok(job_id=job["id"], decision="defer", message=f"Left {job['id'][:8]} in the queue.")
+
+    if job["state"] != "preview":
+        return _err(f"job is '{job['state']}', not awaiting approval — only previewed jobs can be approved/rejected.")
+
+    if decision == "reject":
+        try:
+            db.advance_job(job["id"], "cancelled", actor="human", detail="operator rejected via Telegram")
+        except Exception as e:  # noqa: BLE001
+            return _err(str(e))
+        return _ok(job_id=job["id"], decision="reject", message=f"Rejected {job['id'][:8]} — cancelled.")
+
+    # approve -> advance preview -> approved. Does NOT publish: publishing stays a cockpit-only
+    # human action (§4a). The job now sits in 'Ready to publish' for the operator to ship there.
+    try:
+        db.advance_job(job["id"], "approved", actor="human", detail="operator approved via Telegram")
+    except Exception as e:  # noqa: BLE001
+        return _err(str(e))
+    return _ok(job_id=job["id"], decision="approve", state="approved",
+               message=f"Approved {job['id'][:8]} — it's now in 'Ready to publish' in the cockpit; publish it there.")
 
 
 def set_draft_image(args, **kwargs):

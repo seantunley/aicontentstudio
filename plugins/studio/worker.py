@@ -13,9 +13,37 @@ import sys
 import time
 import subprocess
 
+import json
+import urllib.request
+
 import db  # same directory
 
 LOCK = "/tmp/studio_worker.lock"
+
+
+def _telegram_notify(text):
+    """DM the operator on Telegram (two-way loop) — best effort, reads creds from the volume .env."""
+    env = {}
+    try:
+        with open("/opt/data/.env") as f:
+            for line in f:
+                line = line.strip()
+                if "=" in line and not line.startswith("#"):
+                    k, v = line.split("=", 1)
+                    env[k] = v
+    except OSError:
+        return
+    tok = env.get("TELEGRAM_BOT_TOKEN", "")
+    chat = env.get("TELEGRAM_ALLOWED_USERS", "").split(",")[0]
+    if not tok or not chat:
+        return
+    try:
+        data = json.dumps({"chat_id": chat, "text": text}).encode()
+        req = urllib.request.Request(f"https://api.telegram.org/bot{tok}/sendMessage",
+                                     data=data, headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=10)
+    except Exception:  # noqa: BLE001
+        pass
 LOCK_STALE_SECONDS = 1800
 RUN_TIMEOUT_SECONDS = 600
 
@@ -48,6 +76,7 @@ def process_one(job):
         if state == "preview":
             db.clear_queued(jid)
             db.record_event(jid, "worker: done — draft ready for review", actor="system")
+            _telegram_notify(f'\U0001f4dd Draft ready to review: "{job["topic"]}" — it\'s in your approval queue.')
         else:
             db.enqueue_action(jid, "failed")
             db.record_event(jid, f"worker: did not reach preview (state={state}, rc={r.returncode})", actor="system")
