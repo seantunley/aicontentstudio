@@ -188,3 +188,20 @@ LIST_DRAFTS = {
         "required": ["job_id"],
     },
 }
+
+SET_DRAFT_IMAGE = {
+    "name": "set_draft_image",
+    "description": (
+        "Attach an AI-generated image to a job's latest draft so the post goes out WITH the image. "
+        "First call the image_gen tool to create a relevant, on-brand, safe image for the topic, then "
+        "pass the file path it returns here. The image is uploaded to the publisher at publish time."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "job_id": {"type": "string", "description": "Full job id or unique short prefix."},
+            "image_path": {"type": "string", "description": "The file path returned by image_gen (e.g. /opt/data/cache/images/....jpg)."},
+        },
+        "required": ["job_id", "image_path"],
+    },
+}

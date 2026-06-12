@@ -96,6 +96,7 @@ export function PublishButton({ jobId, channel }) {
 export function NewJobForm() {
   const [topic, setTopic] = useState('');
   const [brand, setBrand] = useState('');
+  const [withImage, setWithImage] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   async function submit(e) {
@@ -105,7 +106,7 @@ export function NewJobForm() {
     try {
       const r = await fetch('/api/jobs/new', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, brand }),
+        body: JSON.stringify({ topic, brand, withImage }),
       });
       if (r.ok) { window.location.reload(); return; }
       const d = await r.json().catch(() => ({}));
@@ -119,6 +120,9 @@ export function NewJobForm() {
              placeholder="topic — e.g. 'latch tips for newborns'" value={topic} onChange={(e) => setTopic(e.target.value)} />
       <input className="inp" style={{ flex: '1 1 120px', margin: 0 }}
              placeholder="brand (optional)" value={brand} onChange={(e) => setBrand(e.target.value)} />
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--muted)' }}>
+        <input type="checkbox" checked={withImage} onChange={(e) => setWithImage(e.target.checked)} /> image
+      </label>
       <button className="btn primary" style={{ width: 'auto' }} disabled={busy} type="submit">
         {busy ? 'Queuing…' : 'Start job'}
       </button>

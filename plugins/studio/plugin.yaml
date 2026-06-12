@@ -15,3 +15,4 @@ provides_tools:
   - get_brief
   - create_draft
   - list_drafts
+  - set_draft_image

@@ -81,13 +81,14 @@ export function getJobById(id) {
 }
 
 // Originate a job from the cockpit: create it + queue research+draft for the worker to pick up.
-export function createAndQueueJob(topic, brand, who) {
+export function createAndQueueJob(topic, brand, who, withImage) {
   const d = db();
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
+  const action = withImage ? 'research_draft_image' : 'research_draft';
   const tx = d.transaction(() => {
     d.prepare('INSERT INTO jobs (id,brand,topic,state,source,created_by,created_at,updated_at,meta,queued_action) VALUES (?,?,?,?,?,?,?,?,?,?)')
-      .run(id, brand || 'unassigned', topic, 'requested', 'dashboard', who, now, now, '{}', 'research_draft');
+      .run(id, brand || 'unassigned', topic, 'requested', 'dashboard', who, now, now, '{}', action);
     d.prepare('INSERT INTO job_events (job_id,from_state,to_state,actor,at,detail) VALUES (?,?,?,?,?,?)')
       .run(id, null, 'requested', 'human', now, `job created + queued via dashboard by ${who}`);
   });

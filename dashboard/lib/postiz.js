@@ -20,7 +20,8 @@ export async function findIntegration(platform) {
   return (Array.isArray(list) ? list : []).find((i) => i.identifier === platform && !i.disabled) || null;
 }
 
-export async function createPost(integrationId, content, platform) {
+export async function createPost(integrationId, content, platform, image) {
+  // `image` is the already-uploaded Postiz media reference {id, path} stored on the draft.
   return req('POST', '/posts', {
     type: 'now',
     date: new Date().toISOString(),
@@ -28,7 +29,7 @@ export async function createPost(integrationId, content, platform) {
     tags: [],
     posts: [{
       integration: { id: integrationId },
-      value: [{ content, image: [] }],
+      value: [{ content, image: image && image.id ? [{ id: image.id, path: image.path }] : [] }],
       settings: { __type: platform },
     }],
   });

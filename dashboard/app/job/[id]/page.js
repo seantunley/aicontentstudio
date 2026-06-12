@@ -53,6 +53,7 @@ export default async function JobPage({ params }) {
             <div className="card" key={d.id} style={{ marginBottom: 10 }}>
               <div className="meta">{d.platform} · angle {d.angle || '—'} · {d.char_count} chars</div>
               <EditableDraft draftId={d.id} body={d.body} limit={300} />
+              {d.image_path ? <img className="draft-img" src={d.image_path} alt="" /> : null}
             </div>
           ))
         )}

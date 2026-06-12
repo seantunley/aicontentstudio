@@ -1,0 +1,24 @@
+{
+  "unlocks": {
+    "config_surgeon": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1781263545
+    },
+    "model_sommelier": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1781263545
+    },
+    "provider_polyglot": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1781263545
+    },
+    "toolset_cartographer": {
+      "evidence": null,
+      "first_tier": "Silver",
+      "unlocked_at": 1781263545
+    }
+  }
+}

@@ -75,6 +75,7 @@ export default async function Home() {
                 {j.draft ? (
                   <>
                     <div className="draft">{j.draft.body}</div>
+                    {j.draft.image_path ? <img className="draft-img" src={j.draft.image_path} alt="" /> : null}
                     <div className="chars">{j.draft.char_count} chars · angle: {j.draft.angle || '—'}</div>
                   </>
                 ) : (
@@ -103,6 +104,7 @@ export default async function Home() {
                 {j.draft ? (
                   <>
                     <div className="draft">{j.draft.body}</div>
+                    {j.draft.image_path ? <img className="draft-img" src={j.draft.image_path} alt="" /> : null}
                     <div className="chars">{j.draft.char_count} chars</div>
                     <PublishButton jobId={j.id} channel={j.draft.platform} />
                   </>

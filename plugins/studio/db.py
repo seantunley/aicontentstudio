@@ -122,6 +122,13 @@ def init_db():
         cols = [r[1] for r in conn.execute("PRAGMA table_info(jobs)").fetchall()]
         if "queued_action" not in cols:
             conn.execute("ALTER TABLE jobs ADD COLUMN queued_action TEXT")
+        # an AI-generated image can be attached to a draft (Phase 2). Uploaded to the publisher at
+        # attach-time, so we store the publisher's media reference (id + url), not the local file.
+        dcols = [r[1] for r in conn.execute("PRAGMA table_info(drafts)").fetchall()]
+        if "image_path" not in dcols:
+            conn.execute("ALTER TABLE drafts ADD COLUMN image_path TEXT")  # publisher media URL
+        if "image_id" not in dcols:
+            conn.execute("ALTER TABLE drafts ADD COLUMN image_id TEXT")    # publisher media id
 
 
 # --- work queue (dashboard-originated jobs, processed by worker.py) ---
@@ -317,9 +324,20 @@ def create_draft(job_id, platform, body, angle=None, variant=1):
 def list_drafts(job_id):
     with _db() as conn:
         return [dict(r) for r in conn.execute(
-            "SELECT id, platform, angle, body, char_count, variant, created_at FROM drafts"
+            "SELECT id, platform, angle, body, char_count, variant, image_path, image_id, created_at FROM drafts"
             " WHERE job_id=? ORDER BY id", (job_id,)
         ).fetchall()]
+
+
+def set_draft_image(job_id, image_id, image_path):
+    """Attach an already-uploaded publisher media reference (id + url) to the job's latest draft."""
+    with _db() as conn:
+        row = conn.execute("SELECT id FROM drafts WHERE job_id=? ORDER BY id DESC LIMIT 1", (job_id,)).fetchone()
+        if not row:
+            raise ValueError("no draft to attach an image to — create_draft first")
+        conn.execute("UPDATE drafts SET image_id=?, image_path=? WHERE id=?", (image_id, image_path, row["id"]))
+    record_event(job_id, "image attached to draft", actor="agent")
+    return image_path
 
 
 # --- §4a publish gate -------------------------------------------------------

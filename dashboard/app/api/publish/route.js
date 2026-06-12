@@ -22,7 +22,8 @@ export async function POST(req) {
   try {
     const ig = await findIntegration(draft.platform);
     if (!ig) return NextResponse.json({ error: `no connected ${draft.platform} channel in Postiz` }, { status: 400 });
-    await createPost(ig.id, draft.body, draft.platform);
+    const image = draft.image_id ? { id: draft.image_id, path: draft.image_path } : null;
+    await createPost(ig.id, draft.body, draft.platform, image);
     markPublished(job.id, session.user.name, ig.profile);
     return NextResponse.json({ ok: true, platform: draft.platform, channel: ig.profile, state: 'published' });
   } catch (e) {

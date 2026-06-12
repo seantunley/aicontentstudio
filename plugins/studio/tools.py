@@ -128,15 +128,18 @@ def publish(args, **kwargs):
         ig = postiz.find_integration(platform)
         if not ig:
             return _err(f"no connected {platform} channel in Postiz — connect one first")
-        postiz.create_post(ig["id"], draft["body"], platform, when="now")
+        image = {"id": draft["image_id"], "path": draft["image_path"]} if draft.get("image_id") else None
+        postiz.create_post(ig["id"], draft["body"], platform, when="now", image=image)
     except postiz.PostizError as e:
         db.record_event(job["id"], f"publish FAILED via Postiz: {e}", actor="system")
         return _err(f"publish failed: {e}")
     db._advance_to(job["id"], "published", actor="system",
-                   detail=f"published to {platform} via Postiz ({ig.get('profile')})")
+                   detail=f"published to {platform} via Postiz ({ig.get('profile')})"
+                          + (" with image" if draft.get("image_id") else ""))
     return _ok(published=True, job_id=job["id"], short_id=job["id"][:8], platform=platform,
-               channel=ig.get("profile"), state="published",
-               message=f"Published job {job['id'][:8]} to {platform} ({ig.get('profile')}) via Postiz.")
+               channel=ig.get("profile"), with_image=bool(draft.get("image_id")), state="published",
+               message=f"Published job {job['id'][:8]} to {platform} ({ig.get('profile')}) via Postiz"
+                       + (" with image." if draft.get("image_id") else "."))
 
 
 def save_brief(args, **kwargs):
@@ -204,3 +207,24 @@ def list_drafts(args, **kwargs):
         return _err(f"no job matching '{jid}'")
     drafts = db.list_drafts(job["id"])
     return _ok(job_id=job["id"], count=len(drafts), drafts=drafts)
+
+
+def set_draft_image(args, **kwargs):
+    jid = (args.get("job_id") or "").strip()
+    path = (args.get("image_path") or "").strip()
+    if not jid or not path:
+        return _err("job_id and image_path are required")
+    job = db.find_job(jid)
+    if not job:
+        return _err(f"no job matching '{jid}'")
+    if not db.list_drafts(job["id"]):
+        return _err("no draft to attach an image to — create_draft first")
+    try:
+        media = postiz.upload_image(path)  # upload the local file to the publisher now
+        db.set_draft_image(job["id"], media.get("id"), media.get("path"))
+    except postiz.PostizError as e:
+        return _err(f"image upload failed: {e}")
+    except Exception as e:  # noqa: BLE001
+        return _err(str(e))
+    return _ok(job_id=job["id"], short_id=job["id"][:8],
+               message=f"Image uploaded + attached to {job['id'][:8]}'s draft; it will post with the image.")

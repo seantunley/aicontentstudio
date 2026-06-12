@@ -20,23 +20,29 @@ LOCK_STALE_SECONDS = 1800
 RUN_TIMEOUT_SECONDS = 600
 
 
-def _agent_prompt(job):
-    return (
+def _agent_prompt(job, with_image):
+    p = (
         f"Work on the EXISTING job {job['id']} — do NOT create a new job. "
         f"Topic: {job['topic']!r}. Brand: {job['brand']}. "
         "Research it properly: search the web, read real sources, then call save_brief with cited "
         "facts (each with a real source_url and a snippet) and 2-3 distinct angles. Then write a "
         "Bluesky post under 300 characters, grounded only in the brief, and call create_draft "
-        "(platform bluesky). Then stop. Do not publish."
+        "(platform bluesky). "
     )
+    if with_image:
+        p += ("Then use the image_gen tool to create ONE relevant, on-brand, safe image for this "
+              "post, and call set_draft_image with the file path image_gen returns. ")
+    p += "Then stop. Do not publish."
+    return p
 
 
 def process_one(job):
     jid = job["id"]
+    with_image = (job.get("queued_action") or "") == "research_draft_image"
     db.clear_queued(jid)  # claim it so it isn't picked up twice
-    db.record_event(jid, "worker: starting research + draft", actor="system")
+    db.record_event(jid, "worker: starting research + draft" + (" + image" if with_image else ""), actor="system")
     try:
-        r = subprocess.run(["hermes", "-z", _agent_prompt(job)],
+        r = subprocess.run(["hermes", "-z", _agent_prompt(job, with_image)],
                            capture_output=True, text=True, timeout=RUN_TIMEOUT_SECONDS)
         state = db.get_job(jid)["state"]
         db.record_event(jid, f"worker: agent run finished (rc={r.returncode}, state={state})", actor="system")

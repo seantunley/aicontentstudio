@@ -15,3 +15,4 @@ def register(ctx):
     ctx.register_tool(name="get_brief", toolset="studio", schema=schemas.GET_BRIEF, handler=tools.get_brief)
     ctx.register_tool(name="create_draft", toolset="studio", schema=schemas.CREATE_DRAFT, handler=tools.create_draft)
     ctx.register_tool(name="list_drafts", toolset="studio", schema=schemas.LIST_DRAFTS, handler=tools.list_drafts)
+    ctx.register_tool(name="set_draft_image", toolset="studio", schema=schemas.SET_DRAFT_IMAGE, handler=tools.set_draft_image)

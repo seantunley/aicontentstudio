@@ -10,7 +10,7 @@ export async function POST(req) {
   const topic = (body.topic || '').trim();
   if (!topic) return NextResponse.json({ error: 'topic is required' }, { status: 400 });
   try {
-    return NextResponse.json(createAndQueueJob(topic, (body.brand || '').trim(), session.user.name));
+    return NextResponse.json(createAndQueueJob(topic, (body.brand || '').trim(), session.user.name, !!body.withImage));
   } catch (e) {
     return NextResponse.json({ error: String(e?.message || e) }, { status: 400 });
   }

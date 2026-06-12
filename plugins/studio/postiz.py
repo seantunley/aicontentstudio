@@ -47,8 +47,26 @@ def find_integration(platform):
     return None
 
 
-def build_post(integration_id, content, platform, when="now"):
-    """Construct the POST /posts payload (also used to preview in dry-run)."""
+def upload_image(path):
+    """Upload a local image file to Postiz. Returns the media object {id, path, ...}."""
+    import requests
+    if not API_KEY:
+        raise PostizError("POSTIZ_API_KEY is not configured")
+    try:
+        with open(path, "rb") as f:
+            r = requests.post(f"{API_URL}/upload", headers={"Authorization": API_KEY},
+                              files={"file": f}, timeout=60)
+    except OSError as e:
+        raise PostizError(f"cannot read image {path}: {e}")
+    if r.status_code >= 300:
+        raise PostizError(f"Postiz upload HTTP {r.status_code}: {r.text[:200]}")
+    return r.json()
+
+
+def build_post(integration_id, content, platform, when="now", image=None):
+    """Construct the POST /posts payload (also used to preview in dry-run). `image` is a Postiz
+    media object {id, path} from upload_image()."""
+    images = [{"id": image["id"], "path": image["path"]}] if image else []
     return {
         "type": when,                       # "now" (immediate) or "schedule"
         "date": datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -56,11 +74,11 @@ def build_post(integration_id, content, platform, when="now"):
         "tags": [],
         "posts": [{
             "integration": {"id": integration_id},
-            "value": [{"content": content, "image": []}],
+            "value": [{"content": content, "image": images}],
             "settings": {"__type": platform},
         }],
     }
 
 
-def create_post(integration_id, content, platform, when="now"):
-    return _request("POST", "/posts", build_post(integration_id, content, platform, when))
+def create_post(integration_id, content, platform, when="now", image=None):
+    return _request("POST", "/posts", build_post(integration_id, content, platform, when, image))
