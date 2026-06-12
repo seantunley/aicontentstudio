@@ -11,7 +11,11 @@ export async function POST(req) {
   const id = (body.id || '').trim();
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
   try {
-    if (body.action === 'promote') return NextResponse.json(promoteSuggestion(id, session.user.name));
+    if (body.action === 'promote') {
+      return NextResponse.json(promoteSuggestion(id, session.user.name, {
+        platforms: body.platforms, withImage: body.withImage, withVideo: body.withVideo,
+      }));
+    }
     if (body.action === 'dismiss') return NextResponse.json(dismissSuggestion(id));
     return NextResponse.json({ error: 'unknown action' }, { status: 400 });
   } catch (e) {

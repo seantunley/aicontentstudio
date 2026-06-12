@@ -179,14 +179,17 @@ export function logEvent(jobId, detail, actor = 'human') {
 
 // --- Trend scout (§3b): suggestions + niches ---
 export function listSuggestions(status = 'new') {
-  return db().prepare('SELECT * FROM suggestions WHERE status=? ORDER BY created_at DESC').all(status);
+  return db().prepare(
+    "SELECT * FROM suggestions WHERE status=? ORDER BY CASE heat WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 WHEN 'cool' THEN 2 ELSE 3 END, created_at DESC",
+  ).all(status);
 }
-export function promoteSuggestion(sid, who) {
+export function promoteSuggestion(sid, who, opts = {}) {
   const d = db();
   const s = d.prepare('SELECT * FROM suggestions WHERE id=?').get(sid);
   if (!s) throw new Error('no such suggestion');
   if (s.status !== 'new') throw new Error(`already ${s.status}`);
-  const res = createAndQueueJob(s.topic, s.brand, who, false, []); // research+draft, operator picks media/platforms on the job
+  const platforms = Array.isArray(opts.platforms) ? opts.platforms.filter(Boolean) : [];
+  const res = createAndQueueJob(s.topic, s.brand, who, !!opts.withImage || !!opts.withVideo, platforms, !!opts.withVideo);
   d.prepare("UPDATE suggestions SET status='promoted', job_id=? WHERE id=?").run(res.jobId, sid);
   return { ok: true, jobId: res.jobId };
 }

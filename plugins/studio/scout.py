@@ -47,12 +47,17 @@ def _telegram_notify(text):
 def _scout_prompt(niche):
     return (
         f"You are the studio's trend scout. Brand: {niche['brand']!r}. Niche: {niche['query']!r}. "
-        "Search the web for what's genuinely CURRENT and relevant in this niche right now (recent news, "
-        "fresh discussion, seasonal hooks) — not generic evergreen. Choose 2-3 SPECIFIC, distinct post "
-        f"ideas. For EACH, call suggest_topic(brand={niche['brand']!r}, topic=<concrete idea>, "
-        f"rationale=<one line grounded in what you found>, source_url=<real URL>, niche_id={niche['id']}). "
-        "Use METRIC units only (Celsius, km, kg, litres) — convert any imperial you find. "
-        "Suggest ONLY — do NOT log_job, save_brief, create_draft, advance_job, or publish. Then stop."
+        "Scan WIDELY for what's genuinely CURRENT and gaining attention in this niche right now — search "
+        "across news, Reddit and forums, X/social chatter, YouTube, blogs and the open web. Prefer things "
+        "surfacing in the LAST 1-2 WEEKS over evergreen. Choose 3-5 SPECIFIC, distinct ideas. "
+        f"For EACH, call suggest_topic(brand={niche['brand']!r}, topic=<concrete idea>, "
+        "rationale=<one line, grounded in what you actually read>, source_url=<real URL>, "
+        "source=<WHERE you found it, e.g. 'Reddit r/beyondthebump', 'BBC News', 'X', 'YouTube'>, "
+        "heat=<'hot' if surging/very timely right now, 'warm' if solidly relevant, 'cool' if mild>, "
+        f"niche_id={niche['id']}). Judge heat HONESTLY from how much fresh recent attention it has — do "
+        "not mark everything hot. Use METRIC units only (Celsius, km, kg, litres); convert any imperial. "
+        "De-duplicate against ideas already raised. Suggest ONLY — do NOT log_job, save_brief, "
+        "create_draft, advance_job, or publish. Then stop."
     )
 
 

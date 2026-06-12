@@ -105,6 +105,8 @@ CREATE TABLE IF NOT EXISTS suggestions (
     topic      TEXT NOT NULL,
     rationale  TEXT,                 -- why it's timely/relevant (grounded)
     source_url TEXT,
+    source     TEXT,                 -- WHERE it was found (e.g. 'Reddit r/...', 'BBC News', 'X')
+    heat       TEXT DEFAULT 'warm',  -- trend strength: hot | warm | cool
     niche_id   INTEGER REFERENCES scout_niches(id),
     status     TEXT NOT NULL DEFAULT 'new',   -- new | promoted | dismissed
     job_id     TEXT,                 -- set when promoted to a real job
@@ -154,6 +156,13 @@ def init_db():
             conn.execute("ALTER TABLE drafts ADD COLUMN video_path TEXT")  # publisher media URL (video)
         if "video_id" not in dcols:
             conn.execute("ALTER TABLE drafts ADD COLUMN video_id TEXT")    # publisher media id (video)
+        # scout suggestions: where it was found + trend heat (§3b score/flag)
+        scols = [r[1] for r in conn.execute("PRAGMA table_info(suggestions)").fetchall()]
+        if scols:  # table exists
+            if "source" not in scols:
+                conn.execute("ALTER TABLE suggestions ADD COLUMN source TEXT")
+            if "heat" not in scols:
+                conn.execute("ALTER TABLE suggestions ADD COLUMN heat TEXT DEFAULT 'warm'")
 
 
 # --- work queue (dashboard-originated jobs, processed by worker.py) ---
@@ -444,12 +453,20 @@ def get_niche(niche_id):
         return dict(row) if row else None
 
 
-def create_suggestion(brand, topic, rationale=None, source_url=None, niche_id=None):
+_HEAT = {"hot", "warm", "cool"}
+# hot-first, then most recent
+_HEAT_ORDER = "CASE heat WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 WHEN 'cool' THEN 2 ELSE 3 END, created_at DESC"
+
+
+def create_suggestion(brand, topic, rationale=None, source_url=None, niche_id=None, source=None, heat="warm"):
     """Record a scout idea for the operator to promote or dismiss. Dedupes on (brand, topic) among
     still-open suggestions so repeated scout runs don't pile duplicates."""
     topic = (topic or "").strip()
     if not topic:
         raise ValueError("topic is required")
+    heat = (heat or "warm").strip().lower()
+    if heat not in _HEAT:
+        heat = "warm"
     sid = str(uuid.uuid4())
     now = _utcnow()
     with _db() as conn:
@@ -459,18 +476,18 @@ def create_suggestion(brand, topic, rationale=None, source_url=None, niche_id=No
         if dup:
             return {"id": dup["id"], "duplicate": True, "topic": topic}
         conn.execute(
-            "INSERT INTO suggestions (id, brand, topic, rationale, source_url, niche_id, status, created_at)"
-            " VALUES (?,?,?,?,?,?, 'new', ?)",
-            (sid, brand or "unassigned", topic, rationale, source_url, niche_id, now))
-    return {"id": sid, "duplicate": False, "topic": topic}
+            "INSERT INTO suggestions (id, brand, topic, rationale, source_url, source, heat, niche_id, status, created_at)"
+            " VALUES (?,?,?,?,?,?,?,?, 'new', ?)",
+            (sid, brand or "unassigned", topic, rationale, source_url, source, heat, niche_id, now))
+    return {"id": sid, "duplicate": False, "topic": topic, "heat": heat}
 
 
 def list_suggestions(status="new"):
     with _db() as conn:
         if status:
-            rows = conn.execute("SELECT * FROM suggestions WHERE status=? ORDER BY created_at DESC", (status,)).fetchall()
+            rows = conn.execute(f"SELECT * FROM suggestions WHERE status=? ORDER BY {_HEAT_ORDER}", (status,)).fetchall()
         else:
-            rows = conn.execute("SELECT * FROM suggestions ORDER BY created_at DESC").fetchall()
+            rows = conn.execute(f"SELECT * FROM suggestions ORDER BY {_HEAT_ORDER}").fetchall()
         return [dict(r) for r in rows]
 
 

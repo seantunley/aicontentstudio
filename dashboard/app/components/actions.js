@@ -1,6 +1,7 @@
 'use client';
 import { useState, useRef } from 'react';
 import { useUI } from './ui';
+import { SUPPORTED } from '@/lib/platforms';
 
 async function post(url, body) {
   const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
@@ -258,22 +259,60 @@ export function RunScoutButton() {
 
 export function SuggestionActions({ id }) {
   const ui = useUI();
+  const [open, setOpen] = useState(false);
+  const [sel, setSel] = useState({});
+  const [withImage, setWithImage] = useState(false);
+  const [withVideo, setWithVideo] = useState(false);
   const [busy, setBusy] = useState(false);
-  async function act(action) {
-    if (action === 'dismiss') {
-      const ok = await ui.confirm({ title: 'Dismiss this idea?', message: 'It leaves your ideas list.', confirmLabel: 'Dismiss', danger: true, tag: 'dismiss' });
-      if (!ok) return;
-    }
+  const toggle = (p) => setSel((s) => ({ ...s, [p]: !s[p] }));
+
+  async function promote() {
     setBusy(true);
-    const { ok, data } = await post('/api/suggestions', { id, action });
-    if (ok) { ui.toast(action === 'promote' ? 'Promoted — researching now' : 'Dismissed'); window.location.reload(); return; }
+    const platforms = Object.keys(sel).filter((p) => sel[p]);
+    const { ok, data } = await post('/api/suggestions', { id, action: 'promote', platforms, withImage: withImage || withVideo, withVideo });
+    if (ok) { ui.toast('Promoted — researching now'); window.location.reload(); return; }
     ui.toast(data.error || 'Failed', 'err'); setBusy(false);
   }
+  async function dismiss() {
+    const ok = await ui.confirm({ title: 'Dismiss this idea?', message: 'It leaves your ideas list.', confirmLabel: 'Dismiss', danger: true, tag: 'dismiss' });
+    if (!ok) return;
+    setBusy(true);
+    const { ok: done, data } = await post('/api/suggestions', { id, action: 'dismiss' });
+    if (done) { ui.toast('Dismissed'); window.location.reload(); return; }
+    ui.toast(data.error || 'Failed', 'err'); setBusy(false);
+  }
+
   return (
-    <div className="actions">
-      <button className="btn btn--approve" disabled={busy} onClick={() => act('promote')}>Promote to job</button>
-      <button className="btn btn--ghost" disabled={busy} onClick={() => act('dismiss')}>Dismiss</button>
-    </div>
+    <>
+      <div className="actions">
+        <button className="btn btn--approve" onClick={() => setOpen(true)}>Promote to job</button>
+        <button className="btn btn--ghost" onClick={dismiss}>Dismiss</button>
+      </div>
+      {open && (
+        <div className="modal-back" onClick={() => setOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-bar"><span className="led" /> promote</div>
+            <div className="modal-body">
+              <h3>Promote to a job</h3>
+              <p>Researches + drafts this idea. Pick platforms — tick <b>youtube</b> for a long-form post. Leave all unticked to use your connected channels. (Publishing needs the channel connected in Postiz; drafting doesn&apos;t.)</p>
+              <div className="field-row" style={{ marginBottom: 10 }}>
+                {SUPPORTED.map((p) => (
+                  <label key={p} className="check"><input type="checkbox" checked={!!sel[p]} onChange={() => toggle(p)} /> {p}</label>
+                ))}
+              </div>
+              <div className="field-row">
+                <label className="check"><input type="checkbox" checked={withImage || withVideo} disabled={withVideo} onChange={(e) => setWithImage(e.target.checked)} /> + image</label>
+                <label className="check"><input type="checkbox" checked={withVideo} onChange={(e) => setWithVideo(e.target.checked)} /> + video</label>
+              </div>
+              <div className="modal-acts">
+                <button type="button" className="btn btn--ghost" onClick={() => setOpen(false)}>Cancel</button>
+                <button className="btn btn--primary" disabled={busy} onClick={promote}>{busy ? 'Promoting…' : 'Promote'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

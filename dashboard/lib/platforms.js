@@ -11,3 +11,6 @@ export const PLATFORM_IMAGE = {
   youtube: [1280, 720],
   tiktok: [1080, 1920],
 };
+
+// All platforms the studio can draft for (publish needs the channel connected in Postiz).
+export const SUPPORTED = Object.keys(PLATFORM_IMAGE);

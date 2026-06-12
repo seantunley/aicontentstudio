@@ -247,6 +247,8 @@ SUGGEST_TOPIC = {
             "topic": {"type": "string", "description": "A concrete, specific post idea (not generic evergreen)."},
             "rationale": {"type": "string", "description": "One line on why it's timely/relevant right now."},
             "source_url": {"type": "string", "description": "A real source URL backing the idea."},
+            "source": {"type": "string", "description": "WHERE you found it — e.g. 'Reddit r/beyondthebump', 'BBC News', 'X', 'YouTube'."},
+            "heat": {"type": "string", "enum": ["hot", "warm", "cool"], "description": "Trend strength: hot = surging/very timely now, warm = relevant, cool = mild/evergreen-ish."},
             "niche_id": {"type": "integer", "description": "The scout niche id this came from (passed in the scout prompt)."},
         },
         "required": ["topic"],
