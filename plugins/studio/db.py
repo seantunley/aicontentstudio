@@ -138,9 +138,11 @@ def enqueue_action(job_id, action="research_draft"):
 
 
 def get_queued_jobs():
+    # Only the actionable queue values; 'processing'/'failed' are status markers, not work to pick up.
     with _db() as conn:
         return [dict(r) for r in conn.execute(
-            "SELECT * FROM jobs WHERE queued_action IS NOT NULL ORDER BY created_at").fetchall()]
+            "SELECT * FROM jobs WHERE queued_action IN ('research_draft','research_draft_image')"
+            " ORDER BY created_at").fetchall()]
 
 
 def clear_queued(job_id):

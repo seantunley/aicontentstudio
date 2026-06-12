@@ -20,6 +20,16 @@ export async function findIntegration(platform) {
   return (Array.isArray(list) ? list : []).find((i) => i.identifier === platform && !i.disabled) || null;
 }
 
+// All connected channels, for the accounts-health panel. Returns null if Postiz is unreachable.
+export async function listIntegrations() {
+  try {
+    const list = await req('GET', '/integrations');
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return null;
+  }
+}
+
 export async function createPost(integrationId, content, platform, image) {
   // `image` is the already-uploaded Postiz media reference {id, path} stored on the draft.
   return req('POST', '/posts', {

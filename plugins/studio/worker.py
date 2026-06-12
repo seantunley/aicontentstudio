@@ -39,16 +39,23 @@ def _agent_prompt(job, with_image):
 def process_one(job):
     jid = job["id"]
     with_image = (job.get("queued_action") or "") == "research_draft_image"
-    db.clear_queued(jid)  # claim it so it isn't picked up twice
+    db.enqueue_action(jid, "processing")  # claim + mark running (status the cockpit shows)
     db.record_event(jid, "worker: starting research + draft" + (" + image" if with_image else ""), actor="system")
     try:
         r = subprocess.run(["hermes", "-z", _agent_prompt(job, with_image)],
                            capture_output=True, text=True, timeout=RUN_TIMEOUT_SECONDS)
         state = db.get_job(jid)["state"]
-        db.record_event(jid, f"worker: agent run finished (rc={r.returncode}, state={state})", actor="system")
+        if state == "preview":
+            db.clear_queued(jid)
+            db.record_event(jid, "worker: done — draft ready for review", actor="system")
+        else:
+            db.enqueue_action(jid, "failed")
+            db.record_event(jid, f"worker: did not reach preview (state={state}, rc={r.returncode})", actor="system")
     except subprocess.TimeoutExpired:
-        db.record_event(jid, "worker: agent run timed out", actor="system")
+        db.enqueue_action(jid, "failed")
+        db.record_event(jid, "worker: timed out", actor="system")
     except Exception as e:  # noqa: BLE001
+        db.enqueue_action(jid, "failed")
         db.record_event(jid, f"worker: error: {e}", actor="system")
 
 

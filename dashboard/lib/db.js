@@ -80,6 +80,26 @@ export function getJobById(id) {
   return db().prepare('SELECT * FROM jobs WHERE id=?').get(id) || null;
 }
 
+// Jobs the worker is queued on / working / failed (queued_action carries the status).
+export function inProgress() {
+  return db().prepare("SELECT * FROM jobs WHERE queued_action IS NOT NULL ORDER BY created_at DESC").all();
+}
+
+export function retryJob(jobId) {
+  const d = db();
+  const job = d.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
+  if (!job) throw new Error('no such job');
+  if (job.queued_action !== 'failed') throw new Error(`job is '${job.queued_action || 'idle'}', not failed`);
+  const now = new Date().toISOString();
+  const tx = d.transaction(() => {
+    d.prepare('UPDATE jobs SET queued_action=?, updated_at=? WHERE id=?').run('research_draft', now, jobId);
+    d.prepare('INSERT INTO job_events (job_id,from_state,to_state,actor,at,detail) VALUES (?,?,?,?,?,?)')
+      .run(jobId, null, null, 'human', now, 'retry requested via dashboard');
+  });
+  tx();
+  return { ok: true };
+}
+
 // Originate a job from the cockpit: create it + queue research+draft for the worker to pick up.
 export function createAndQueueJob(topic, brand, who, withImage) {
   const d = db();

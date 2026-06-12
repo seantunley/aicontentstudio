@@ -12,32 +12,27 @@ export default function Login() {
     setErr(''); setBusy(true);
     try {
       const r = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
       if (r.ok) { window.location.href = '/'; return; }
       setErr('Invalid credentials');
-    } catch {
-      setErr('Network error');
-    }
+    } catch { setErr('Network error'); }
     setBusy(false);
   }
 
   return (
-    <main className="wrap">
-      <div className="panel auth">
-        <h1 style={{ fontSize: 18, marginTop: 0 }}>Studio Cockpit</h1>
-        <p className="empty" style={{ marginTop: 0 }}>Sign in to continue.</p>
+    <div className="auth-wrap">
+      <div className="auth">
+        <div className="brand"><span className="dot" /><span className="nm">STUDIO<span>·</span>CK</span></div>
+        <div className="empty" style={{ margin: '0 0 14px' }}>Operator console — sign in.</div>
         <form onSubmit={submit}>
-          <input className="inp" placeholder="username" autoComplete="username"
-                 value={username} onChange={(e) => setUsername(e.target.value)} />
-          <input className="inp" type="password" placeholder="password" autoComplete="current-password"
-                 value={password} onChange={(e) => setPassword(e.target.value)} />
-          <button className="btn primary" type="submit" disabled={busy}>{busy ? '…' : 'Sign in'}</button>
+          <input className="input" placeholder="username" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} />
+          <input className="input" type="password" placeholder="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <button className="btn btn--primary btn--block" type="submit" disabled={busy} style={{ marginTop: 4 }}>{busy ? '…' : 'Sign in'}</button>
         </form>
-        {err && <div className="err">{err}</div>}
+        {err && <div className="err" style={{ marginTop: 12 }}>{err}</div>}
       </div>
-    </main>
+    </div>
   );
 }
