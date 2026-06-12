@@ -49,18 +49,25 @@ RUN_TIMEOUT_SECONDS = 600
 
 
 def _agent_prompt(job, with_image):
+    targets = (job.get("target_platforms") or "").strip()
+    if targets:
+        step2 = (f"Step 2 — draft for ONLY these platforms: {targets}. For EACH, write a draft TAILORED "
+                 "to it (length/tone/hashtags, within its limit), grounded only in the brief, and call "
+                 "create_draft for that platform. ")
+    else:
+        step2 = ("Step 2 — call list_channels; for EACH connected platform write a tailored draft and "
+                 "call create_draft for it. ")
     p = (
         f"Work on the EXISTING job {job['id']} — do NOT create a new job. "
         f"Topic: {job['topic']!r}. Brand: {job['brand']}. "
-        "Research it properly: search the web, read real sources, then call save_brief with cited "
-        "facts (each with a real source_url and a snippet) and 2-3 distinct angles. Then write a "
-        "Bluesky post under 300 characters, grounded only in the brief, and call create_draft "
-        "(platform bluesky). "
+        "Step 1 — research: search the web, read real sources, then call save_brief with cited facts "
+        "(each a real source_url + snippet) and 2-3 distinct angles. "
+        + step2
     )
     if with_image:
-        p += ("Then use the image_gen tool to create ONE relevant, on-brand, safe image for this "
-              "post, and call set_draft_image with the file path image_gen returns. ")
-    p += "Then stop. Do not publish."
+        p += ("Step 3 — image: call image_gen ONCE for one relevant, on-brand, safe master image, then "
+              "call set_draft_image once with its path (it sizes the image for every platform's draft). ")
+    p += "Then stop. Do NOT approve or publish — leave it in preview for the operator to review."
     return p
 
 

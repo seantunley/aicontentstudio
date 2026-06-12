@@ -16,3 +16,5 @@ provides_tools:
   - list_drafts
   - set_draft_image
   - operator_decision
+  - present_for_review
+  - list_channels

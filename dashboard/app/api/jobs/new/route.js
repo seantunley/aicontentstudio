@@ -9,8 +9,9 @@ export async function POST(req) {
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'bad request' }, { status: 400 }); }
   const topic = (body.topic || '').trim();
   if (!topic) return NextResponse.json({ error: 'topic is required' }, { status: 400 });
+  const platforms = Array.isArray(body.platforms) ? body.platforms.filter(Boolean) : [];
   try {
-    return NextResponse.json(createAndQueueJob(topic, (body.brand || '').trim(), session.user.name, !!body.withImage));
+    return NextResponse.json(createAndQueueJob(topic, (body.brand || '').trim(), session.user.name, !!body.withImage, platforms));
   } catch (e) {
     return NextResponse.json({ error: String(e?.message || e) }, { status: 400 });
   }

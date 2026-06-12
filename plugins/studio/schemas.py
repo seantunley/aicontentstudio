@@ -192,7 +192,8 @@ CREATE_DRAFT = {
         "type": "object",
         "properties": {
             "job_id": {"type": "string", "description": "Full job id or unique short prefix."},
-            "platform": {"type": "string", "description": "Target platform.", "enum": ["bluesky"]},
+            "platform": {"type": "string", "description": "Target platform (draft for a CONNECTED channel — use list_channels to check).",
+                         "enum": ["bluesky", "x", "instagram", "facebook", "telegram", "vk", "linkedin", "youtube", "tiktok"]},
             "body": {"type": "string", "description": "The post text you wrote, grounded in the brief and within the platform limit."},
             "angle": {"type": "string", "description": "Which of the brief's angles this draft uses (its name)."},
         },
@@ -208,6 +209,27 @@ LIST_DRAFTS = {
         "properties": {"job_id": {"type": "string", "description": "Full job id or unique short prefix."}},
         "required": ["job_id"],
     },
+}
+
+PRESENT_FOR_REVIEW = {
+    "name": "present_for_review",
+    "description": (
+        "Push the CLEAN post preview (just the caption + the image, exactly as it will appear) to the "
+        "operator's Telegram. Do NOT paste the brief, sources, ids, angles or any behind-the-scenes "
+        "detail in chat — this tool shows them the post itself. Call this, THEN present the decision "
+        "with the clarify tool (choices: Approve, Reject, Defer)."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {"job_id": {"type": "string", "description": "Full job id or unique short prefix."}},
+        "required": ["job_id"],
+    },
+}
+
+LIST_CHANNELS = {
+    "name": "list_channels",
+    "description": "List the social channels actually connected in Postiz, so you draft for platforms that exist.",
+    "parameters": {"type": "object", "properties": {}, "required": []},
 }
 
 SET_DRAFT_IMAGE = {

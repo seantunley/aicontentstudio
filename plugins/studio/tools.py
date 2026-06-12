@@ -2,6 +2,7 @@
 (errors come back as {"error": ...}) — the Hermes plugin handler contract."""
 import os
 import json
+import subprocess
 
 from . import db, postiz
 
@@ -65,14 +66,19 @@ def advance_job(args, **kwargs):
     to_state = (args.get("to_state") or "").strip()
     if not jid or not to_state:
         return _err("job_id and to_state are required")
-    if to_state in ("approved", "published"):
-        return _err(
-            "REFUSED: you cannot approve or publish — those are the operator's actions at the gate "
-            "(in the cockpit). Take the job to 'preview' and stop, then tell the operator it's ready to review."
-        )
     job = db.find_job(jid)
     if not job:
         return _err(f"no job matching '{jid}'")
+    if to_state == job["state"]:
+        # already there — graceful no-op so the model doesn't loop trying to re-advance
+        return _ok(job_id=job["id"], short_id=job["id"][:8], state=job["state"],
+                   message=f"Job {job['id'][:8]} is already at '{job['state']}'. Nothing to do — stop here.")
+    if to_state in ("approved", "published"):
+        return _err(
+            "REFUSED — you cannot approve or publish; that is the operator's call in the cockpit. The "
+            "draft stops at 'preview'. Tell the operator it's ready to review and STOP. Do NOT call "
+            "advance_job again for this job."
+        )
     try:
         updated = db.advance_job(job["id"], to_state, actor="agent", detail=args.get("note"))
     except ValueError as e:
@@ -249,7 +255,77 @@ def operator_decision(args, **kwargs):
                message=f"Approved {job['id'][:8]} — it's now in 'Ready to publish' in the cockpit; publish it there.")
 
 
+def _telegram_creds():
+    env = {}
+    try:
+        with open("/opt/data/.env") as f:
+            for line in f:
+                line = line.strip()
+                if "=" in line and not line.startswith("#"):
+                    k, v = line.split("=", 1)
+                    env[k] = v
+    except OSError:
+        return None, None
+    return env.get("TELEGRAM_BOT_TOKEN"), env.get("TELEGRAM_ALLOWED_USERS", "").split(",")[0]
+
+
+def present_for_review(args, **kwargs):
+    """Push the CLEAN post preview (caption + image as it'll appear) to the operator's Telegram —
+    no brief, no sources, no ids. Call this, then present Approve/Reject/Defer via the clarify tool."""
+    import requests
+    jid = (args.get("job_id") or "").strip()
+    if not jid:
+        return _err("job_id is required")
+    job = db.find_job(jid)
+    if not job:
+        return _err(f"no job matching '{jid}'")
+    drafts = db.list_drafts(job["id"])
+    if not drafts:
+        return _err("no draft to preview yet")
+    draft = drafts[-1]
+    tok, chat = _telegram_creds()
+    if not tok or not chat:
+        return _err("Telegram not configured")
+    cap = draft["body"]
+    try:
+        if draft.get("image_path"):
+            img = requests.get(draft["image_path"], timeout=30).content
+            requests.post(f"https://api.telegram.org/bot{tok}/sendPhoto",
+                          data={"chat_id": chat, "caption": cap},
+                          files={"photo": ("post.jpg", img)}, timeout=30)
+        else:
+            requests.post(f"https://api.telegram.org/bot{tok}/sendMessage",
+                          data={"chat_id": chat, "text": cap}, timeout=15)
+    except Exception as e:  # noqa: BLE001
+        return _err(f"preview send failed: {e}")
+    return _ok(job_id=job["id"], short_id=job["id"][:8], platform=draft["platform"],
+               message=("Clean post preview sent to Telegram. NOW call the clarify tool with choices "
+                        "['Approve','Reject','Defer'] to give the operator tap buttons."))
+
+
+def list_channels(args, **kwargs):
+    """List the social channels actually connected in Postiz (so you draft for ones that exist)."""
+    try:
+        chans = postiz.list_integrations()
+    except Exception as e:  # noqa: BLE001
+        return _err(str(e))
+    out = [{"platform": c.get("identifier"), "name": c.get("name"), "handle": c.get("profile"),
+            "connected": not c.get("disabled")} for c in (chans or [])]
+    return _ok(count=len(out), channels=out)
+
+
+def _derive_image(master_path, tw, th):
+    """Center-crop the master to the target aspect ratio, scale to (tw, th). Returns the output path."""
+    out = f"{os.path.splitext(master_path)[0]}_{tw}x{th}.jpg"
+    vf = f"crop=w='min(iw,ih*{tw}/{th})':h='min(ih,iw*{th}/{tw})',scale={tw}:{th}"
+    subprocess.run(["ffmpeg", "-y", "-i", master_path, "-vf", vf, "-q:v", "3", out],
+                   check=True, capture_output=True, timeout=60)
+    return out
+
+
 def set_draft_image(args, **kwargs):
+    """Attach the generated MASTER image to the job's draft(s), each cropped to its platform's size.
+    One master in -> every platform variant out (plan §5/§7c master-asset derivation)."""
     jid = (args.get("job_id") or "").strip()
     path = (args.get("image_path") or "").strip()
     if not jid or not path:
@@ -257,14 +333,23 @@ def set_draft_image(args, **kwargs):
     job = db.find_job(jid)
     if not job:
         return _err(f"no job matching '{jid}'")
-    if not db.list_drafts(job["id"]):
+    drafts = db.list_drafts(job["id"])
+    if not drafts:
         return _err("no draft to attach an image to — create_draft first")
-    try:
-        media = postiz.upload_image(path)  # upload the local file to the publisher now
-        db.set_draft_image(job["id"], media.get("id"), media.get("path"))
-    except postiz.PostizError as e:
-        return _err(f"image upload failed: {e}")
-    except Exception as e:  # noqa: BLE001
-        return _err(str(e))
-    return _ok(job_id=job["id"], short_id=job["id"][:8],
-               message=f"Image uploaded + attached to {job['id'][:8]}'s draft; it will post with the image.")
+    if not os.path.exists(path):
+        return _err(f"image file not found: {path}")
+    done = []
+    for d in drafts:
+        tw, th = db.PLATFORM_IMAGE.get(d["platform"], (1080, 1080))
+        try:
+            derived = _derive_image(path, tw, th)
+            media = postiz.upload_image(derived)
+            db.set_draft_image_by_id(d["id"], media.get("id"), media.get("path"))
+            done.append(f"{d['platform']} {tw}x{th}")
+        except postiz.PostizError as e:
+            return _err(f"upload for {d['platform']} failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            return _err(f"derive/attach for {d['platform']} failed: {e}")
+    db.record_event(job["id"], f"master image derived + attached: {', '.join(done)}", actor="agent")
+    return _ok(job_id=job["id"], short_id=job["id"][:8], attached=done,
+               message=f"Image sized per platform and attached to {len(done)} draft(s): {', '.join(done)}.")

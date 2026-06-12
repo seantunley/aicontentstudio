@@ -122,6 +122,8 @@ def init_db():
         cols = [r[1] for r in conn.execute("PRAGMA table_info(jobs)").fetchall()]
         if "queued_action" not in cols:
             conn.execute("ALTER TABLE jobs ADD COLUMN queued_action TEXT")
+        if "target_platforms" not in cols:
+            conn.execute("ALTER TABLE jobs ADD COLUMN target_platforms TEXT")  # comma-sep platforms to draft for
         # an AI-generated image can be attached to a draft (Phase 2). Uploaded to the publisher at
         # attach-time, so we store the publisher's media reference (id + url), not the local file.
         dcols = [r[1] for r in conn.execute("PRAGMA table_info(drafts)").fetchall()]
@@ -280,7 +282,33 @@ def get_brief(job_id):
 
 
 # --- drafts (Phase 1, platform-specific posts/captions) ---------------------
-PLATFORM_LIMITS = {"bluesky": 300}  # grapheme/char ceiling per platform; extend as platforms are added
+# Character ceilings per platform (None = no hard limit). Postiz does the actual posting via the
+# channel identifier; these just guard draft length. Scoped to the platforms the operator wants.
+PLATFORM_LIMITS = {
+    "bluesky": 300,
+    "x": 280,
+    "instagram": 2200,
+    "facebook": 63206,
+    "telegram": 4096,
+    "vk": 16000,
+    "linkedin": 3000,
+    "youtube": 5000,    # description
+    "tiktok": 2200,
+}
+SUPPORTED_PLATFORMS = sorted(PLATFORM_LIMITS.keys())
+
+# Primary image size (w, h) per platform — the master image is cropped+scaled to this (June 2026 specs).
+PLATFORM_IMAGE = {
+    "bluesky":   (1080, 1080),   # 1:1
+    "x":         (1600, 900),    # 16:9
+    "instagram": (1080, 1350),   # 4:5 (Meta prioritises portrait)
+    "facebook":  (1080, 1350),   # 4:5
+    "telegram":  (1080, 1080),   # flexible
+    "vk":        (1080, 1080),   # flexible
+    "linkedin":  (1200, 1200),   # 1:1
+    "youtube":   (1280, 720),    # 16:9 thumbnail
+    "tiktok":    (1080, 1920),   # 9:16
+}
 PIPELINE_ORDER = ["requested", "researched", "planned", "generated", "preview", "approved", "published"]
 
 
@@ -340,6 +368,11 @@ def set_draft_image(job_id, image_id, image_path):
         conn.execute("UPDATE drafts SET image_id=?, image_path=? WHERE id=?", (image_id, image_path, row["id"]))
     record_event(job_id, "image attached to draft", actor="agent")
     return image_path
+
+
+def set_draft_image_by_id(draft_id, image_id, image_path):
+    with _db() as conn:
+        conn.execute("UPDATE drafts SET image_id=?, image_path=? WHERE id=?", (image_id, image_path, draft_id))
 
 
 # --- §4a publish gate -------------------------------------------------------
