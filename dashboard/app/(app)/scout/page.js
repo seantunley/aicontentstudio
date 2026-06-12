@@ -1,5 +1,5 @@
-import { listSuggestions, listNiches } from '@/lib/db';
-import { SuggestionActions, NicheManager } from '@/app/components/actions';
+import { listSuggestions, listNiches, getScoutSchedule } from '@/lib/db';
+import { SuggestionActions, NicheManager, ScoutSchedule } from '@/app/components/actions';
 
 export const dynamic = 'force-dynamic';
 const when = (s) => (s ? s.replace('T', ' ').slice(0, 16) : '');
@@ -7,8 +7,10 @@ const when = (s) => (s ? s.replace('T', ' ').slice(0, 16) : '');
 export default function Scout() {
   let ideas = [];
   let niches = [];
+  let schedule = null;
   try { ideas = listSuggestions('new'); } catch {}
   try { niches = listNiches(); } catch {}
+  try { schedule = getScoutSchedule(); } catch {}
   return (
     <>
       <div className="phead">
@@ -17,6 +19,7 @@ export default function Scout() {
       </div>
 
       <section className="section reveal r1">
+        <div className="card" style={{ marginBottom: 12 }}><ScoutSchedule schedule={schedule} /></div>
         <NicheManager niches={niches} />
       </section>
 

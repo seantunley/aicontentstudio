@@ -201,6 +201,20 @@ export function dismissSuggestion(sid) {
 export function listNiches() {
   return db().prepare('SELECT * FROM scout_niches ORDER BY id').all();
 }
+export function getScoutSchedule() {
+  const d = db();
+  d.prepare('INSERT OR IGNORE INTO scout_schedule (id, enabled) VALUES (1, 1)').run();
+  return d.prepare('SELECT * FROM scout_schedule WHERE id=1').get();
+}
+export function setScoutSchedule({ days, hour, minute, enabled } = {}) {
+  const d = db();
+  d.prepare('INSERT OR IGNORE INTO scout_schedule (id, enabled) VALUES (1, 1)').run();
+  if (days != null) d.prepare('UPDATE scout_schedule SET days=? WHERE id=1').run(Array.isArray(days) ? days.join(',') : String(days));
+  if (hour != null) d.prepare('UPDATE scout_schedule SET hour=? WHERE id=1').run(Math.max(0, Math.min(23, Number(hour))));
+  if (minute != null) d.prepare('UPDATE scout_schedule SET minute=? WHERE id=1').run(Math.max(0, Math.min(59, Number(minute))));
+  if (enabled != null) d.prepare('UPDATE scout_schedule SET enabled=? WHERE id=1').run(enabled ? 1 : 0);
+  return getScoutSchedule();
+}
 export function addNiche(brand, query) {
   const r = db().prepare('INSERT INTO scout_niches (brand, query, enabled, created_at) VALUES (?,?,1,?)')
     .run((brand || 'unassigned').trim() || 'unassigned', query.trim(), new Date().toISOString());
@@ -219,6 +233,29 @@ export function removeNiche(id) {
 
 export function getEvents(jobId) {
   return db().prepare('SELECT from_state,to_state,actor,detail,at FROM job_events WHERE job_id=? ORDER BY id').all(jobId);
+}
+
+// --- The Vault: catalogue of every generated/uploaded asset ---
+export function addMediaAsset({ kind, url, mediaId, source, jobId, draftId, platform, width, height, topic }) {
+  if (!url) return;
+  db().prepare(
+    'INSERT OR IGNORE INTO media_assets (kind,url,media_id,source,job_id,draft_id,platform,width,height,topic,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+  ).run(kind, url, mediaId || null, source || null, jobId || null, draftId || null, platform || null, width || null, height || null, topic || null, new Date().toISOString());
+}
+export function listMedia(kind, limit = 600) {
+  const d = db();
+  if (kind === 'image' || kind === 'video') return d.prepare('SELECT * FROM media_assets WHERE kind=? ORDER BY id DESC LIMIT ?').all(kind, limit);
+  return d.prepare('SELECT * FROM media_assets ORDER BY id DESC LIMIT ?').all(limit);
+}
+export function mediaCounts() {
+  const rows = db().prepare('SELECT kind, COUNT(*) n FROM media_assets GROUP BY kind').all();
+  const m = Object.fromEntries(rows.map((r) => [r.kind, r.n]));
+  return { image: m.image || 0, video: m.video || 0, total: (m.image || 0) + (m.video || 0) };
+}
+export function setMediaTags(id, tags) {
+  const r = db().prepare('UPDATE media_assets SET tags=? WHERE id=?').run(tags || null, Number(id));
+  if (!r.changes) throw new Error('no such asset');
+  return { ok: true };
 }
 
 const DRAFT_LIMITS = { bluesky: 300 };

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { getSession } from '@/lib/session';
-import { getJobById, getDraftsFor, setDraftImageById, setDraftVideoById, logEvent } from '@/lib/db';
+import { getJobById, getDraftsFor, setDraftImageById, setDraftVideoById, logEvent, addMediaAsset } from '@/lib/db';
 import { uploadMedia } from '@/lib/postiz';
 import { PLATFORM_IMAGE } from '@/lib/platforms';
 
@@ -33,6 +33,7 @@ export async function POST(req, { params }) {
     if (mime.startsWith('video/')) {
       const media = await uploadMedia(buf, base, mime);
       for (const d of drafts) setDraftVideoById(d.id, media.id, media.path);
+      addMediaAsset({ kind: 'video', url: media.path, mediaId: media.id, source: 'uploaded', jobId: job.id, platform: drafts[0]?.platform, topic: job.topic, tags: base.replace(/[._-]+/g, ' ').trim() });
       logEvent(job.id, `operator uploaded own video (${base}) — attached to ${drafts.length} draft(s)`);
       return NextResponse.json({ ok: true, kind: 'video', attached: drafts.length });
     }
@@ -45,6 +46,7 @@ export async function POST(req, { params }) {
           .jpeg({ quality: 88 }).toBuffer();
         const media = await uploadMedia(out, `${d.platform}_${base}.jpg`, 'image/jpeg');
         setDraftImageById(d.id, media.id, media.path);
+        addMediaAsset({ kind: 'image', url: media.path, mediaId: media.id, source: 'uploaded', jobId: job.id, draftId: d.id, platform: d.platform, width: w, height: h, topic: job.topic, tags: base.replace(/[._-]+/g, ' ').trim() });
         done.push(`${d.platform} ${w}x${h}`);
       }
       logEvent(job.id, `operator uploaded own image (${base}) — sized + attached: ${done.join(', ')}`);

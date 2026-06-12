@@ -330,6 +330,7 @@ def set_draft_image(args, **kwargs):
     One master in -> every platform variant out (plan §5/§7c master-asset derivation)."""
     jid = (args.get("job_id") or "").strip()
     path = (args.get("image_path") or "").strip()
+    tags = (args.get("tags") or "").strip() or None  # content keywords for the Vault search
     if not jid or not path:
         return _err("job_id and image_path are required")
     job = db.find_job(jid)
@@ -347,6 +348,8 @@ def set_draft_image(args, **kwargs):
             derived = _derive_image(path, tw, th)
             media = postiz.upload_image(derived)
             db.set_draft_image_by_id(d["id"], media.get("id"), media.get("path"))
+            db.add_media_asset("image", media.get("path"), media.get("id"), source="derived",
+                               job_id=job["id"], draft_id=d["id"], platform=d["platform"], width=tw, height=th, tags=tags)
             done.append(f"{d['platform']} {tw}x{th}")
         except postiz.PostizError as e:
             return _err(f"upload for {d['platform']} failed: {e}")
@@ -440,6 +443,9 @@ def make_video(args, **kwargs):
             finally:
                 os.unlink(tmp.name)
             db.set_draft_video_by_id(d["id"], media.get("id"), media.get("path"))
+            db.add_media_asset("video", media.get("path"), media.get("id"), source="rendered",
+                               job_id=job["id"], draft_id=d["id"], platform=d["platform"], width=w, height=h,
+                               tags=(args.get("caption") or "").strip() or None)
             done.append(f"{d['platform']} {w}x{h}")
         except requests.RequestException as e:
             failed.append(f"{d['platform']}: renderer unreachable ({e})")

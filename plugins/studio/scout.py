@@ -47,9 +47,10 @@ def _telegram_notify(text):
 def _scout_prompt(niche):
     return (
         f"You are the studio's trend scout. Brand: {niche['brand']!r}. Niche: {niche['query']!r}. "
-        "Scan WIDELY for what's genuinely CURRENT and gaining attention in this niche right now — search "
-        "across news, Reddit and forums, X/social chatter, YouTube, blogs and the open web. Prefer things "
-        "surfacing in the LAST 1-2 WEEKS over evergreen. Choose 3-5 SPECIFIC, distinct ideas. "
+        "Scan WIDELY for what's genuinely CURRENT and gaining attention in this niche right now. "
+        "USE YOUR REAL-TIME X (Twitter) ACCESS first — see what's actually being posted, discussed, and "
+        "trending on X this week — then also check news, Reddit and forums, YouTube, blogs and the open "
+        "web. Prefer things surfacing in the LAST 1-2 WEEKS over evergreen. Choose 3-5 SPECIFIC ideas. "
         f"For EACH, call suggest_topic(brand={niche['brand']!r}, topic=<concrete idea>, "
         "rationale=<one line, grounded in what you actually read>, source_url=<real URL>, "
         "source=<WHERE you found it, e.g. 'Reddit r/beyondthebump', 'BBC News', 'X', 'YouTube'>, "
@@ -61,12 +62,16 @@ def _scout_prompt(niche):
     )
 
 
-def run_once():
+def run_once(force=False):
     db.init_db()
+    if not force and not db.scout_due():
+        print("scout: not due yet (per schedule) — skipping")
+        return
     niches = db.list_niches(enabled_only=True)
     if not niches:
         print("scout: no enabled niches — nothing to do")
-        return
+        return  # don't stamp last_run, so it runs as soon as a niche is added and due
+    db.mark_scout_ran()
     before = len(db.list_suggestions("new"))
     for niche in niches:
         try:

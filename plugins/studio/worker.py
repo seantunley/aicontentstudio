@@ -76,7 +76,8 @@ def _agent_prompt(job, with_image, with_video=False):
     )
     if with_image:
         p += ("Step 3 — image: call image_gen ONCE for one relevant, on-brand, safe master image, then "
-              "call set_draft_image once with its path (it sizes the image for every platform's draft). ")
+              "call set_draft_image once with its path AND a `tags` list of visual keywords describing "
+              "what's in the image (subjects, setting, mood) for the media Vault search. ")
     if with_video:
         p += ("Step 4 — video: call make_video ONCE with the job id (it renders a branded short video "
               "per platform draft from that image and attaches it). ")
@@ -133,7 +134,7 @@ def _maybe_run_scout():
     try:
         import scout  # same dir
         print("worker: running on-demand scout")
-        scout.run_once()
+        scout.run_once(force=True)  # 'Run now' bypasses the schedule
     except Exception as e:  # noqa: BLE001
         print(f"worker: scout run error: {e}")
 

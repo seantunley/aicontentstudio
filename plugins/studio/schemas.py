@@ -288,6 +288,7 @@ SET_DRAFT_IMAGE = {
         "properties": {
             "job_id": {"type": "string", "description": "Full job id or unique short prefix."},
             "image_path": {"type": "string", "description": "The file path returned by image_gen (e.g. /opt/data/cache/images/....jpg)."},
+            "tags": {"type": "string", "description": "Comma-separated visual keywords describing what is IN the image (subjects, setting, colours, mood) — used to search the media Vault later. E.g. 'newborn, mother, breastfeeding, sunlit nursery, calm'."},
         },
         "required": ["job_id", "image_path"],
     },

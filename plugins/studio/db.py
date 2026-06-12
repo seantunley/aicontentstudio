@@ -112,6 +112,31 @@ CREATE TABLE IF NOT EXISTS suggestions (
     job_id     TEXT,                 -- set when promoted to a real job
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS media_assets (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind       TEXT NOT NULL,        -- image | video
+    url        TEXT NOT NULL UNIQUE, -- publisher (Postiz) media URL
+    media_id   TEXT,                 -- publisher media id
+    source     TEXT,                 -- generated | derived | rendered | uploaded
+    job_id     TEXT,
+    draft_id   INTEGER,
+    platform   TEXT,
+    width      INTEGER,
+    height     INTEGER,
+    topic      TEXT,                 -- the job topic, for context
+    tags       TEXT,                 -- content keywords for search (what's IN the image)
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS scout_schedule (
+    id            INTEGER PRIMARY KEY CHECK (id = 1),
+    enabled       INTEGER DEFAULT 1,
+    days          TEXT DEFAULT '1,2,3,4,5',  -- ISO weekdays to run on (1=Mon .. 7=Sun)
+    hour          INTEGER DEFAULT 7,         -- local time-of-day to run
+    minute        INTEGER DEFAULT 0,
+    tz_offset_min INTEGER DEFAULT 120,       -- operator TZ offset from UTC (SAST = +120)
+    cadence_hours INTEGER DEFAULT 24,        -- legacy, unused
+    last_run_at   TEXT
+);
 CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state);
 CREATE INDEX IF NOT EXISTS idx_events_job ON job_events(job_id);
 CREATE INDEX IF NOT EXISTS idx_suggestions_status ON suggestions(status);
@@ -163,6 +188,27 @@ def init_db():
                 conn.execute("ALTER TABLE suggestions ADD COLUMN source TEXT")
             if "heat" not in scols:
                 conn.execute("ALTER TABLE suggestions ADD COLUMN heat TEXT DEFAULT 'warm'")
+        # scout schedule: day-of-week + time-of-day (upgrade from the old cadence-only model)
+        schcols = [r[1] for r in conn.execute("PRAGMA table_info(scout_schedule)").fetchall()]
+        if schcols:
+            if "days" not in schcols:
+                conn.execute("ALTER TABLE scout_schedule ADD COLUMN days TEXT DEFAULT '1,2,3,4,5'")
+            if "hour" not in schcols:
+                conn.execute("ALTER TABLE scout_schedule ADD COLUMN hour INTEGER DEFAULT 7")
+            if "minute" not in schcols:
+                conn.execute("ALTER TABLE scout_schedule ADD COLUMN minute INTEGER DEFAULT 0")
+            if "tz_offset_min" not in schcols:
+                conn.execute("ALTER TABLE scout_schedule ADD COLUMN tz_offset_min INTEGER DEFAULT 120")
+        # one-time Vault backfill from media already attached to drafts (idempotent via UNIQUE url)
+        _now = _utcnow()
+        conn.execute(
+            "INSERT OR IGNORE INTO media_assets (kind,url,media_id,source,job_id,draft_id,platform,topic,created_at) "
+            "SELECT 'image', d.image_path, d.image_id, 'derived', d.job_id, d.id, d.platform, j.topic, ? "
+            "FROM drafts d LEFT JOIN jobs j ON j.id=d.job_id WHERE d.image_path IS NOT NULL", (_now,))
+        conn.execute(
+            "INSERT OR IGNORE INTO media_assets (kind,url,media_id,source,job_id,draft_id,platform,topic,created_at) "
+            "SELECT 'video', d.video_path, d.video_id, 'rendered', d.job_id, d.id, d.platform, j.topic, ? "
+            "FROM drafts d LEFT JOIN jobs j ON j.id=d.job_id WHERE d.video_path IS NOT NULL", (_now,))
 
 
 # --- work queue (dashboard-originated jobs, processed by worker.py) ---
@@ -425,6 +471,63 @@ def set_draft_video_by_id(draft_id, video_id, video_path):
         conn.execute("UPDATE drafts SET video_id=?, video_path=? WHERE id=?", (video_id, video_path, draft_id))
 
 
+# --- The Vault: every generated/uploaded asset, catalogued for reuse -------
+def add_media_asset(kind, url, media_id=None, source=None, job_id=None, draft_id=None,
+                    platform=None, width=None, height=None, topic=None, tags=None):
+    if not url:
+        return
+    if not topic and job_id:
+        j = get_job(job_id)
+        topic = j["topic"] if j else None
+    with _db() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO media_assets "
+            "(kind,url,media_id,source,job_id,draft_id,platform,width,height,topic,tags,created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (kind, url, media_id, source, job_id, draft_id, platform, width, height, topic, tags, _utcnow()))
+
+
+def set_media_tags(asset_id, tags):
+    with _db() as conn:
+        conn.execute("UPDATE media_assets SET tags=? WHERE id=?", (tags, asset_id))
+
+
+def search_media(q=None, kind=None, limit=600):
+    """Search the vault by free text across tags, topic, platform, source."""
+    clauses, args = [], []
+    if kind in ("image", "video"):
+        clauses.append("kind=?")
+        args.append(kind)
+    if q:
+        like = f"%{q.strip().lower()}%"
+        clauses.append("(lower(COALESCE(tags,'')) LIKE ? OR lower(COALESCE(topic,'')) LIKE ? "
+                       "OR lower(COALESCE(platform,'')) LIKE ? OR lower(COALESCE(source,'')) LIKE ?)")
+        args += [like, like, like, like]
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    with _db() as conn:
+        return [dict(r) for r in conn.execute(
+            f"SELECT * FROM media_assets{where} ORDER BY id DESC LIMIT ?", args + [limit]).fetchall()]
+
+
+def list_media(kind=None, limit=600):
+    q = "SELECT * FROM media_assets"
+    args = []
+    if kind in ("image", "video"):
+        q += " WHERE kind=?"
+        args.append(kind)
+    q += " ORDER BY id DESC LIMIT ?"
+    args.append(limit)
+    with _db() as conn:
+        return [dict(r) for r in conn.execute(q, args).fetchall()]
+
+
+def media_counts():
+    with _db() as conn:
+        rows = conn.execute("SELECT kind, COUNT(*) n FROM media_assets GROUP BY kind").fetchall()
+        m = {r["kind"]: r["n"] for r in rows}
+        return {"image": m.get("image", 0), "video": m.get("video", 0), "total": sum(m.values())}
+
+
 # --- Trend scout (§3b): niches + suggestions -------------------------------
 def add_niche(brand, query):
     now = _utcnow()
@@ -451,6 +554,90 @@ def get_niche(niche_id):
     with _db() as conn:
         row = conn.execute("SELECT * FROM scout_niches WHERE id=?", (niche_id,)).fetchone()
         return dict(row) if row else None
+
+
+def get_scout_schedule():
+    with _db() as conn:
+        conn.execute("INSERT OR IGNORE INTO scout_schedule (id, enabled) VALUES (1, 1)")
+        return dict(conn.execute("SELECT * FROM scout_schedule WHERE id=1").fetchone())
+
+
+def set_scout_schedule(days=None, hour=None, minute=None, enabled=None, tz_offset_min=None):
+    """days = list/iterable of ISO weekdays (1=Mon..7=Sun) or a comma string."""
+    if days is not None and not isinstance(days, str):
+        days = ",".join(str(int(d)) for d in days)
+    with _db() as conn:
+        conn.execute("INSERT OR IGNORE INTO scout_schedule (id, enabled) VALUES (1, 1)")
+        if days is not None:
+            conn.execute("UPDATE scout_schedule SET days=? WHERE id=1", (days,))
+        if hour is not None:
+            conn.execute("UPDATE scout_schedule SET hour=? WHERE id=1", (max(0, min(23, int(hour))),))
+        if minute is not None:
+            conn.execute("UPDATE scout_schedule SET minute=? WHERE id=1", (max(0, min(59, int(minute))),))
+        if tz_offset_min is not None:
+            conn.execute("UPDATE scout_schedule SET tz_offset_min=? WHERE id=1", (int(tz_offset_min),))
+        if enabled is not None:
+            conn.execute("UPDATE scout_schedule SET enabled=? WHERE id=1", (1 if enabled else 0,))
+    return get_scout_schedule()
+
+
+def mark_scout_ran():
+    with _db() as conn:
+        conn.execute("UPDATE scout_schedule SET last_run_at=? WHERE id=1", (_utcnow(),))
+
+
+def _sched_days(s):
+    return [int(d) for d in (s.get("days") or "").split(",") if d.strip().isdigit()]
+
+
+def _now_local(s):
+    off = datetime.timedelta(minutes=s.get("tz_offset_min") or 0)
+    return (datetime.datetime.now(datetime.timezone.utc) + off).replace(tzinfo=None)
+
+
+def scout_due():
+    """True if auto-scout is enabled, today (operator-local) is a scheduled day, the scheduled
+    time has passed, and it hasn't already run today."""
+    s = get_scout_schedule()
+    if not s.get("enabled"):
+        return False
+    days = _sched_days(s)
+    if not days:
+        return False
+    now_local = _now_local(s)
+    if now_local.isoweekday() not in days:
+        return False
+    sched = now_local.replace(hour=s.get("hour") or 0, minute=s.get("minute") or 0, second=0, microsecond=0)
+    if now_local < sched:
+        return False
+    if s.get("last_run_at"):  # already ran today (operator-local)?
+        try:
+            off = datetime.timedelta(minutes=s.get("tz_offset_min") or 0)
+            last_local = (datetime.datetime.fromisoformat(s["last_run_at"]) + off).replace(tzinfo=None)
+            if last_local.date() == now_local.date():
+                return False
+        except (ValueError, TypeError):
+            pass
+    return True
+
+
+def scout_next_run(s=None):
+    """ISO (operator-local) of the next scheduled run, or None if disabled/no days."""
+    s = s or get_scout_schedule()
+    if not s.get("enabled"):
+        return None
+    days = _sched_days(s)
+    if not days:
+        return None
+    now_local = _now_local(s)
+    for ahead in range(0, 8):
+        day = now_local + datetime.timedelta(days=ahead)
+        if day.isoweekday() not in days:
+            continue
+        run = day.replace(hour=s.get("hour") or 0, minute=s.get("minute") or 0, second=0, microsecond=0)
+        if run >= now_local:
+            return run.isoformat(timespec="minutes")
+    return None
 
 
 _HEAT = {"hot", "warm", "cool"}

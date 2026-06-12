@@ -1,12 +1,45 @@
 'use client';
 import { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useUI } from './ui';
-import { SUPPORTED } from '@/lib/platforms';
+import { SUPPORTED, PLATFORM_META } from '@/lib/platforms';
 
 async function post(url, body) {
   const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
   const data = await r.json().catch(() => ({}));
   return { ok: r.ok, data };
+}
+
+// Modal rendered via a portal to <body> so it always centres on screen — never trapped inside a
+// transformed/animated ancestor (which is what made the in-card popups "get lost").
+function Modal({ bar, danger, onClose, children }) {
+  if (typeof document === 'undefined') return null;
+  return createPortal(
+    <div className="modal-back" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className={`modal-bar ${danger ? 'danger' : ''}`}><span className="led" /> {bar}</div>
+        <div className="modal-body">{children}</div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// Selectable platform tiles with brand icon chips.
+function PlatformPicker({ selected, onToggle }) {
+  return (
+    <div className="ptiles">
+      {SUPPORTED.map((p) => {
+        const m = PLATFORM_META[p] || { label: p, color: '#555', glyph: p[0] };
+        return (
+          <button type="button" key={p} className={`ptile ${selected[p] ? 'on' : ''}`} onClick={() => onToggle(p)}>
+            <span className="pchip" style={{ background: m.color }}>{m.glyph}</span>
+            <span className="ptile-name">{m.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 export function NewJobButton({ block }) {
@@ -150,22 +183,17 @@ export function ScheduleButton({ jobId, channel }) {
     <>
       <button className="btn btn--ghost" onClick={() => setOpen(true)}>Schedule</button>
       {open && (
-        <div className="modal-back" onClick={() => setOpen(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-bar"><span className="led" /> schedule</div>
-            <div className="modal-body">
-              <h3>Schedule this post</h3>
-              <p>Hands it to Postiz's queue to post automatically to {channel || 'the connected channel'} at your chosen time.</p>
-              <form onSubmit={go} className="field-stack">
-                <input className="input" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
-                <div className="modal-acts">
-                  <button type="button" className="btn btn--ghost" onClick={() => setOpen(false)}>Cancel</button>
-                  <button type="submit" className="btn btn--primary" disabled={busy || !when}>{busy ? 'Scheduling…' : 'Schedule'}</button>
-                </div>
-              </form>
+        <Modal bar="schedule" onClose={() => setOpen(false)}>
+          <h3>Schedule this post</h3>
+          <p>Hands it to Postiz&apos;s queue to post automatically to {channel || 'the connected channel'} at your chosen time.</p>
+          <form onSubmit={go} className="field-stack">
+            <input className="input" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
+            <div className="modal-acts">
+              <button type="button" className="btn btn--ghost" onClick={() => setOpen(false)}>Cancel</button>
+              <button type="submit" className="btn btn--primary" disabled={busy || !when}>{busy ? 'Scheduling…' : 'Schedule'}</button>
             </div>
-          </div>
-        </div>
+          </form>
+        </Modal>
       )}
     </>
   );
@@ -289,30 +317,77 @@ export function SuggestionActions({ id }) {
         <button className="btn btn--ghost" onClick={dismiss}>Dismiss</button>
       </div>
       {open && (
-        <div className="modal-back" onClick={() => setOpen(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-bar"><span className="led" /> promote</div>
-            <div className="modal-body">
-              <h3>Promote to a job</h3>
-              <p>Researches + drafts this idea. Pick platforms — tick <b>youtube</b> for a long-form post. Leave all unticked to use your connected channels. (Publishing needs the channel connected in Postiz; drafting doesn&apos;t.)</p>
-              <div className="field-row" style={{ marginBottom: 10 }}>
-                {SUPPORTED.map((p) => (
-                  <label key={p} className="check"><input type="checkbox" checked={!!sel[p]} onChange={() => toggle(p)} /> {p}</label>
-                ))}
-              </div>
-              <div className="field-row">
-                <label className="check"><input type="checkbox" checked={withImage || withVideo} disabled={withVideo} onChange={(e) => setWithImage(e.target.checked)} /> + image</label>
-                <label className="check"><input type="checkbox" checked={withVideo} onChange={(e) => setWithVideo(e.target.checked)} /> + video</label>
-              </div>
-              <div className="modal-acts">
-                <button type="button" className="btn btn--ghost" onClick={() => setOpen(false)}>Cancel</button>
-                <button className="btn btn--primary" disabled={busy} onClick={promote}>{busy ? 'Promoting…' : 'Promote'}</button>
-              </div>
-            </div>
+        <Modal bar="promote" onClose={() => setOpen(false)}>
+          <h3>Promote to a job</h3>
+          <p>Researches + drafts this idea. Pick the platforms — tick <b>YouTube</b> for a long-form post. Leave all off to use your connected channels. <span className="dim">(Drafting works for any platform; publishing needs it connected in Postiz.)</span></p>
+          <PlatformPicker selected={sel} onToggle={toggle} />
+          <div className="field-row" style={{ marginTop: 12 }}>
+            <label className="check"><input type="checkbox" checked={withImage || withVideo} disabled={withVideo} onChange={(e) => setWithImage(e.target.checked)} /> + image</label>
+            <label className="check"><input type="checkbox" checked={withVideo} onChange={(e) => setWithVideo(e.target.checked)} /> + video</label>
           </div>
-        </div>
+          <div className="modal-acts">
+            <button type="button" className="btn btn--ghost" onClick={() => setOpen(false)}>Cancel</button>
+            <button className="btn btn--primary" disabled={busy} onClick={promote}>{busy ? 'Promoting…' : 'Promote'}</button>
+          </div>
+        </Modal>
       )}
     </>
+  );
+}
+
+const DOW = [['1', 'Mon'], ['2', 'Tue'], ['3', 'Wed'], ['4', 'Thu'], ['5', 'Fri'], ['6', 'Sat'], ['7', 'Sun']];
+const fmtWhen = (s) => (s ? s.replace('T', ' ').slice(0, 16) + ' UTC' : 'never');
+
+export function ScoutSchedule({ schedule }) {
+  const ui = useUI();
+  const [days, setDays] = useState(new Set((schedule?.days || '').split(',').filter(Boolean)));
+  const [time, setTime] = useState(`${String(schedule?.hour ?? 7).padStart(2, '0')}:${String(schedule?.minute ?? 0).padStart(2, '0')}`);
+  const [enabled, setEnabled] = useState(!!schedule?.enabled);
+  const [busy, setBusy] = useState(false);
+  const toggleDay = (d) => setDays((s) => { const n = new Set(s); n.has(d) ? n.delete(d) : n.add(d); return n; });
+
+  async function save() {
+    setBusy(true);
+    const [h, m] = time.split(':').map(Number);
+    const dayList = DOW.map(([d]) => d).filter((d) => days.has(d));
+    const { ok, data } = await post('/api/scout/schedule', { days: dayList, hour: h, minute: m, enabled: enabled && dayList.length > 0 });
+    if (ok) { ui.toast('Scout schedule saved'); window.location.reload(); return; }
+    ui.toast(data.error || 'Failed', 'err'); setBusy(false);
+  }
+
+  const nextRun = (() => {
+    const sel = DOW.map(([d]) => Number(d)).filter((d) => days.has(String(d)));
+    if (!enabled || !sel.length) return 'paused';
+    const [h, m] = time.split(':').map(Number);
+    const now = new Date();
+    for (let ahead = 0; ahead < 8; ahead++) {
+      const dt = new Date(now); dt.setDate(now.getDate() + ahead); dt.setHours(h, m, 0, 0);
+      const iso = dt.getDay() === 0 ? 7 : dt.getDay();
+      if (sel.includes(iso) && dt >= now) return `${DOW.find(([d]) => Number(d) === iso)[1]} ${time}`;
+    }
+    return '—';
+  })();
+
+  return (
+    <div>
+      <div className="row-between" style={{ marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+        <div className="card-foot">AUTO-SCOUT SCHEDULE</div>
+        <div className="actions" style={{ margin: 0 }}>
+          <label className="check"><input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> enabled</label>
+          <RunScoutButton />
+        </div>
+      </div>
+      <div className="dow">
+        {DOW.map(([d, label]) => (
+          <button type="button" key={d} className={`dow-pill ${days.has(d) ? 'on' : ''}`} onClick={() => toggleDay(d)}>{label}</button>
+        ))}
+      </div>
+      <div className="row-between" style={{ marginTop: 12, flexWrap: 'wrap', gap: 10 }}>
+        <label className="sched-time">at <input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} style={{ width: 'auto' }} /> <span className="dim">SAST</span></label>
+        <button className="btn btn--primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save schedule'}</button>
+      </div>
+      <div className="card-foot" style={{ marginTop: 12 }}>Next run: <b style={{ color: 'var(--text)' }}>{nextRun}</b> · last run {fmtWhen(schedule?.last_run_at)}</div>
+    </div>
   );
 }
 
@@ -336,10 +411,7 @@ export function NicheManager({ niches }) {
   }
   return (
     <div className="card">
-      <div className="row-between" style={{ marginBottom: 8 }}>
-        <span className="card-foot">SCOUT NICHES — what the scout looks for (runs daily, or now)</span>
-        <RunScoutButton />
-      </div>
+      <div className="card-foot" style={{ marginBottom: 8 }}>SCOUT NICHES — what the scout looks for</div>
       {niches.length === 0 ? <div className="empty" style={{ marginBottom: 10 }}>No niches yet. Add one and the scout will hunt ideas for it.</div> : (
         <div className="field-stack" style={{ marginBottom: 12 }}>
           {niches.map((n) => (
