@@ -11,18 +11,25 @@ export default function Upcoming() {
   return (
     <>
       <div className="phead">
-        <div><h1>Upcoming</h1><div className="lede">Scheduled posts handed to Postiz&apos;s queue. They post automatically at their time.</div></div>
+        <div><h1>Upcoming</h1><div className="lede">Handed to Postiz&rsquo;s queue — these post themselves at their slot.</div></div>
         <div className="crumbs">{r.length} scheduled</div>
       </div>
       {r.length === 0 ? (
-        <div className="panel"><div className="empty">Nothing scheduled. Approve a job, then choose Schedule instead of Publish.</div></div>
+        <div className="panel blank reveal">
+          <div className="fleuron">❧</div>
+          <div className="bt">No press runs booked.</div>
+          <div className="bd">Approve a job, then choose Schedule instead of Publish.</div>
+        </div>
       ) : (
         <div className="grid">
           {r.map((j) => (
             <div className="card reveal" key={j.id}>
-              <div className="card-foot" style={{ color: 'var(--accent)' }}>🗓 {when(j.scheduled_at)} UTC{j.scheduled_to ? ` · ${j.scheduled_to}` : ''}</div>
-              <div className="card-topic" style={{ marginTop: 4 }}><Link href={`/job/${j.id}`}>{j.topic}</Link></div>
-              <div className="card-meta">{short(j.id)} · brand {j.brand}{j.draft ? ` · ${j.draft.platform}` : ''}</div>
+              <div className="row-between" style={{ marginBottom: 7 }}>
+                <span className="badge badge--scheduled">{when(j.scheduled_at)} UTC</span>
+                {j.draft ? <span className="plat">{j.scheduled_to || j.draft.platform}</span> : <span />}
+              </div>
+              <div className="card-topic"><Link href={`/job/${j.id}`}>{j.topic}</Link></div>
+              <div className="card-meta">{short(j.id)} · brand {j.brand}</div>
               {j.draft ? (
                 <>
                   <div className="draft-body">{j.draft.body}</div>

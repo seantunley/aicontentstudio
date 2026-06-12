@@ -11,17 +11,24 @@ export default function Ready() {
   return (
     <>
       <div className="phead">
-        <div><h1>Ready to publish</h1><div className="lede">Approved jobs. Publish posts live to the connected channel via Postiz.</div></div>
+        <div><h1>Ready to publish</h1><div className="lede">Approved and cleared the gate. Publish live now, or hand it to Postiz&rsquo;s queue for later.</div></div>
         <div className="crumbs">{r.length} approved</div>
       </div>
       {r.length === 0 ? (
-        <div className="panel"><div className="empty">No approved jobs waiting. Approve something from the queue first.</div></div>
+        <div className="panel blank reveal">
+          <div className="fleuron">❧</div>
+          <div className="bt">Nothing cleared for press.</div>
+          <div className="bd">Approve something in the queue and it lands here, ready to go out.</div>
+        </div>
       ) : (
         <div className="grid">
           {r.map((j) => (
             <div className="card reveal" key={j.id}>
+              <div className="row-between" style={{ marginBottom: 7 }}>
+                {j.draft ? <span className="plat">{j.draft.platform}</span> : <span />}
+                <span className="card-foot" style={{ margin: 0 }}>{short(j.id)} · {j.brand}</span>
+              </div>
               <div className="card-topic"><Link href={`/job/${j.id}`}>{j.topic}</Link></div>
-              <div className="card-meta">{short(j.id)} · brand {j.brand}{j.draft ? ` · ${j.draft.platform}` : ''}</div>
               {j.draft ? (
                 <>
                   <div className="draft-body">{j.draft.body}</div>

@@ -38,6 +38,34 @@ export function costSummary() {
   return { entries: row.n, totalUsd: row.total };
 }
 
+// --- Cost ledger (§10): spend per brand / per job, recent entries ---
+export function costThisMonth() {
+  const start = new Date();
+  start.setUTCDate(1); start.setUTCHours(0, 0, 0, 0);
+  const row = db().prepare('SELECT COALESCE(SUM(cost_usd),0) total, COUNT(*) n FROM cost_ledger WHERE at >= ?')
+    .get(start.toISOString());
+  return { totalUsd: row.total, entries: row.n };
+}
+export function costByBrand() {
+  return db().prepare(
+    'SELECT brand, COUNT(*) entries, COALESCE(SUM(cost_usd),0) total FROM cost_ledger GROUP BY brand ORDER BY total DESC',
+  ).all();
+}
+export function costByOperation() {
+  return db().prepare(
+    'SELECT operation, provider, COUNT(*) entries, COALESCE(SUM(cost_usd),0) total FROM cost_ledger GROUP BY operation, provider ORDER BY total DESC',
+  ).all();
+}
+export function recentCosts(limit = 60) {
+  return db().prepare(
+    `SELECT c.*, j.topic FROM cost_ledger c LEFT JOIN jobs j ON j.id = c.job_id ORDER BY c.id DESC LIMIT ?`,
+  ).all(limit);
+}
+export function costForJob(jobId) {
+  const row = db().prepare('SELECT COALESCE(SUM(cost_usd),0) total, COUNT(*) n FROM cost_ledger WHERE job_id=?').get(jobId);
+  return { totalUsd: row.total, entries: row.n };
+}
+
 // --- write actions (the human gate, from the dashboard) ---
 // Approve = advance preview->approved AND mint a single-use publish token (the §4a human approval).
 // The studio publish tool later consumes a valid token for the job; the model can never mint one.
@@ -258,7 +286,7 @@ export function setMediaTags(id, tags) {
   return { ok: true };
 }
 
-const DRAFT_LIMITS = { bluesky: 300 };
+export const DRAFT_LIMITS = { bluesky: 300 };
 export function updateDraftBody(draftId, body) {
   const d = db();
   const draft = d.prepare('SELECT * FROM drafts WHERE id=?').get(draftId);

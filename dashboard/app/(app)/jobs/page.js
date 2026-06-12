@@ -14,14 +14,15 @@ export default function Jobs() {
         <div><h1>All jobs</h1><div className="lede">Every content job and where it sits in the pipeline.</div></div>
         <div className="crumbs">{jobs.length} total</div>
       </div>
-      <div className="panel" style={{ padding: 0 }}>
+      <div className="panel reveal" style={{ padding: 0 }}>
         <table className="table">
-          <thead><tr><th>ID</th><th>State</th><th>Brand</th><th>Topic</th><th className="hide-sm">Source</th><th className="hide-sm">Updated</th></tr></thead>
+          <thead><tr><th>ID</th><th>State</th><th className="hide-sm">Worker</th><th>Brand</th><th>Topic</th><th className="hide-sm">Source</th><th className="hide-sm">Updated</th></tr></thead>
           <tbody>
             {jobs.map((j) => (
               <tr key={j.id}>
                 <td className="id"><Link className="joblink" href={`/job/${j.id}`}>{short(j.id)}</Link></td>
                 <td><span className={`badge badge--${j.state}`}>{j.state}</span></td>
+                <td className="hide-sm id" style={j.queued_action === 'failed' ? { color: 'var(--red)' } : null}>{j.queued_action || ''}</td>
                 <td>{j.brand}</td>
                 <td><Link className="joblink" href={`/job/${j.id}`}>{j.topic}</Link></td>
                 <td className="hide-sm id">{j.source}</td>

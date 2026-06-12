@@ -12,7 +12,9 @@ import 'polotno/polotno.blueprint.css';
 // Polotno needs an API key (https://polotno.com/cabinet). The public demo key is fine for
 // local use (shows a small credit); set NEXT_PUBLIC_POLOTNO_KEY to a purchased key for production.
 const KEY = process.env.NEXT_PUBLIC_POLOTNO_KEY || 'nFA5H9elEytDyPyvKL7T';
-const store = createStore({ key: KEY, showCredit: true });
+// Local, non-commercial use only (operator confirmed). For any commercial/shipped use, obtain a
+// Polotno license key (polotno.com/cabinet) and this flag is the legitimate way to hide the credit.
+const store = createStore({ key: KEY, showCredit: false });
 
 export default function PolotnoEditor({ src, topic }) {
   const [saving, setSaving] = useState(false);
