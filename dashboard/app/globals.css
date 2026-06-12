@@ -155,6 +155,7 @@ a:hover { color: var(--lime-2); }
 .badge--published, .badge--approved { color: var(--green); border-color: rgba(147,213,83,0.3); }
 .badge--failed, .badge--cancelled { color: var(--red); border-color: rgba(251,90,82,0.3); }
 .badge--researched, .badge--planned, .badge--generated { color: var(--cyan); border-color: rgba(70,214,201,0.3); }
+.badge--scheduled { color: var(--accent); border-color: rgba(200,242,78,0.3); }
 
 /* ── in-progress ───────────────────────────────────────────────────────── */
 .work-row { display: flex; align-items: center; gap: 12px; padding: 10px 13px; background: var(--bg-1);

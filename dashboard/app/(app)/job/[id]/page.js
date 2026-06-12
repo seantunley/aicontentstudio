@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { getJobById, getBrief, getDraftsFor, getEvents } from '@/lib/db';
-import { ApprovalActions, PublishButton, EditableDraft, RetryButton, UploadMediaButton } from '@/app/components/actions';
+import { ApprovalActions, PublishButton, ScheduleButton, EditableDraft, RetryButton, UploadMediaButton } from '@/app/components/actions';
 
 export const dynamic = 'force-dynamic';
 const when = (s) => (s ? s.replace('T', ' ').slice(0, 16) : '');
@@ -31,7 +31,15 @@ export default async function JobPage({ params }) {
         <div className="card">
           <div className="card-meta">brand {job.brand} · via {job.source} · created {when(job.created_at)}{job.queued_action ? ` · worker: ${job.queued_action}` : ''}</div>
           {job.state === 'preview' && <ApprovalActions jobId={job.id} />}
-          {job.state === 'approved' && <PublishButton jobId={job.id} channel={latestPlatform} />}
+          {job.state === 'approved' && (
+            <div className="actions">
+              <PublishButton jobId={job.id} channel={latestPlatform} />
+              <ScheduleButton jobId={job.id} channel={latestPlatform} />
+            </div>
+          )}
+          {job.state === 'scheduled' && (() => { let m = {}; try { m = JSON.parse(job.meta || '{}'); } catch {} return (
+            <div className="card-meta">🗓 Scheduled for {when(m.scheduled_at)} UTC{m.scheduled_to ? ` · ${m.scheduled_to}` : ''}</div>
+          ); })()}
           {job.queued_action === 'failed' && <div className="actions"><RetryButton jobId={job.id} /></div>}
         </div>
       </section>

@@ -40,13 +40,15 @@ export async function uploadMedia(buffer, filename, mime) {
   return r.json();
 }
 
-export async function createPost(integrationId, content, platform, image, video) {
+export async function createPost(integrationId, content, platform, image, video, opts = {}) {
   // `image`/`video` are already-uploaded Postiz media refs {id, path} stored on the draft.
   // Postiz carries both in the same per-post media array; a video takes precedence when present.
+  // opts.when: 'now' (default) or 'schedule'; opts.date: ISO time for a scheduled post.
   const media = video && video.id ? video : image && image.id ? image : null;
+  const when = opts.when === 'schedule' ? 'schedule' : 'now';
   return req('POST', '/posts', {
-    type: 'now',
-    date: new Date().toISOString(),
+    type: when,
+    date: opts.date || new Date().toISOString(),
     shortLink: false,
     tags: [],
     posts: [{

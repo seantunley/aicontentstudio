@@ -5,7 +5,7 @@ import Database from 'better-sqlite3';
 import crypto from 'crypto';
 
 const DB_PATH = process.env.STUDIO_DB_PATH || '/opt/studio/studio.db';
-const STATES = ['requested', 'researched', 'planned', 'generated', 'preview', 'approved', 'published'];
+const STATES = ['requested', 'researched', 'planned', 'generated', 'preview', 'approved', 'scheduled', 'published'];
 
 let _db;
 function db() {
@@ -78,6 +78,40 @@ export function rejectJob(jobId, who) {
 
 export function getJobById(id) {
   return db().prepare('SELECT * FROM jobs WHERE id=?').get(id) || null;
+}
+
+// Schedule an approved job for a future time (handed to Postiz's queue). approved -> scheduled.
+// The chosen time + channels are stored in jobs.meta so the Upcoming view can show them.
+export function markScheduled(jobId, who, whenISO, where) {
+  const d = db();
+  const job = d.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
+  if (!job) throw new Error('no such job');
+  if (job.state !== 'approved') throw new Error(`job is '${job.state}', not approved`);
+  const now = new Date().toISOString();
+  let meta = {};
+  try { meta = JSON.parse(job.meta || '{}'); } catch { meta = {}; }
+  meta.scheduled_at = whenISO;
+  meta.scheduled_to = where;
+  const tx = d.transaction(() => {
+    d.prepare('UPDATE jobs SET state=?, meta=?, updated_at=? WHERE id=?').run('scheduled', JSON.stringify(meta), now, jobId);
+    d.prepare('INSERT INTO job_events (job_id,from_state,to_state,actor,at,detail) VALUES (?,?,?,?,?,?)')
+      .run(jobId, 'approved', 'scheduled', 'human', now, `scheduled for ${whenISO} on ${where} by ${who}`);
+  });
+  tx();
+  return { ok: true, jobId, state: 'scheduled', scheduledAt: whenISO };
+}
+
+// Upcoming scheduled jobs (+ their latest draft), soonest first.
+export function scheduledJobs() {
+  const jobs = db().prepare("SELECT * FROM jobs WHERE state='scheduled' ORDER BY updated_at DESC").all();
+  const latestDraft = db().prepare('SELECT * FROM drafts WHERE job_id=? ORDER BY id DESC LIMIT 1');
+  return jobs
+    .map((j) => {
+      let m = {};
+      try { m = JSON.parse(j.meta || '{}'); } catch { m = {}; }
+      return { ...j, scheduled_at: m.scheduled_at || null, scheduled_to: m.scheduled_to || null, draft: latestDraft.get(j.id) || null };
+    })
+    .sort((a, b) => (a.scheduled_at || '').localeCompare(b.scheduled_at || ''));
 }
 
 // Jobs the worker is queued on / working / failed (queued_action carries the status).

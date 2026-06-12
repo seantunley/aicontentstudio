@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { publishable } from '@/lib/db';
-import { PublishButton } from '@/app/components/actions';
+import { PublishButton, ScheduleButton } from '@/app/components/actions';
 
 export const dynamic = 'force-dynamic';
 const short = (id) => (id ? id.slice(0, 8) : '');
@@ -29,7 +29,10 @@ export default function Ready() {
                     ? <video className="draft-img" src={j.draft.video_path} controls muted playsInline />
                     : j.draft.image_path ? <img className="draft-img" src={j.draft.image_path} alt="" /> : null}
                   <div className="card-foot">{j.draft.char_count} chars{j.draft.video_id ? ' · with video' : j.draft.image_id ? ' · with image' : ''}</div>
-                  <PublishButton jobId={j.id} channel={j.draft.platform} />
+                  <div className="actions">
+                    <PublishButton jobId={j.id} channel={j.draft.platform} />
+                    <ScheduleButton jobId={j.id} channel={j.draft.platform} />
+                  </div>
                 </>
               ) : <div className="empty">No draft to publish.</div>}
             </div>

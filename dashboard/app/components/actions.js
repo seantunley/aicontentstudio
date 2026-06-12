@@ -131,6 +131,45 @@ export function PublishButton({ jobId, channel }) {
   return <div className="actions"><button className="btn btn--primary" disabled={busy} onClick={go}>{busy ? 'Publishing…' : 'Publish live'}</button></div>;
 }
 
+export function ScheduleButton({ jobId, channel }) {
+  const ui = useUI();
+  const [open, setOpen] = useState(false);
+  const [when, setWhen] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function go(e) {
+    e?.preventDefault();
+    if (!when) { ui.toast('Pick a date & time', 'err'); return; }
+    setBusy(true);
+    const iso = new Date(when).toISOString(); // datetime-local is browser-local -> ISO/UTC
+    const { ok, data } = await post('/api/schedule', { jobId, when: iso });
+    if (ok) { ui.toast(`Scheduled for ${data.scheduledAt.replace('T', ' ').slice(0, 16)} UTC`); window.location.reload(); return; }
+    ui.toast(data.error || 'Schedule failed', 'err'); setBusy(false);
+  }
+  return (
+    <>
+      <button className="btn btn--ghost" onClick={() => setOpen(true)}>Schedule</button>
+      {open && (
+        <div className="modal-back" onClick={() => setOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-bar"><span className="led" /> schedule</div>
+            <div className="modal-body">
+              <h3>Schedule this post</h3>
+              <p>Hands it to Postiz's queue to post automatically to {channel || 'the connected channel'} at your chosen time.</p>
+              <form onSubmit={go} className="field-stack">
+                <input className="input" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
+                <div className="modal-acts">
+                  <button type="button" className="btn btn--ghost" onClick={() => setOpen(false)}>Cancel</button>
+                  <button type="submit" className="btn btn--primary" disabled={busy || !when}>{busy ? 'Scheduling…' : 'Schedule'}</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export function RetryButton({ jobId }) {
   const ui = useUI();
   const [busy, setBusy] = useState(false);
