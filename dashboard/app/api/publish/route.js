@@ -27,8 +27,9 @@ export async function POST(req) {
       const ig = await findIntegration(draft.platform);
       if (!ig) { failed.push(`${draft.platform} (not connected)`); continue; }
       const image = draft.image_id ? { id: draft.image_id, path: draft.image_path } : null;
-      await createPost(ig.id, draft.body, draft.platform, image);
-      published.push({ platform: draft.platform, channel: ig.profile });
+      const video = draft.video_id ? { id: draft.video_id, path: draft.video_path } : null;
+      await createPost(ig.id, draft.body, draft.platform, image, video);
+      published.push({ platform: draft.platform, channel: ig.profile, media: video ? 'video' : image ? 'image' : null });
     } catch (e) {
       failed.push(`${draft.platform}: ${String(e?.message || e)}`);
     }

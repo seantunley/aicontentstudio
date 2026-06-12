@@ -131,6 +131,10 @@ def init_db():
             conn.execute("ALTER TABLE drafts ADD COLUMN image_path TEXT")  # publisher media URL
         if "image_id" not in dcols:
             conn.execute("ALTER TABLE drafts ADD COLUMN image_id TEXT")    # publisher media id
+        if "video_path" not in dcols:
+            conn.execute("ALTER TABLE drafts ADD COLUMN video_path TEXT")  # publisher media URL (video)
+        if "video_id" not in dcols:
+            conn.execute("ALTER TABLE drafts ADD COLUMN video_id TEXT")    # publisher media id (video)
 
 
 # --- work queue (dashboard-originated jobs, processed by worker.py) ---
@@ -309,6 +313,19 @@ PLATFORM_IMAGE = {
     "youtube":   (1280, 720),    # 16:9 thumbnail
     "tiktok":    (1080, 1920),   # 9:16
 }
+# Primary video frame per platform (short-form social). Vertical 9:16 dominates;
+# YouTube landscape, LinkedIn/Bluesky square-ish for safe in-feed playback.
+PLATFORM_VIDEO = {
+    "bluesky":   (1080, 1080),   # 1:1 (limited video support — keep safe)
+    "x":         (1080, 1920),   # 9:16
+    "instagram": (1080, 1920),   # 9:16 Reels
+    "facebook":  (1080, 1920),   # 9:16 Reels
+    "telegram":  (1080, 1920),   # 9:16
+    "vk":        (1080, 1920),   # 9:16 Clips
+    "linkedin":  (1080, 1350),   # 4:5
+    "youtube":   (1920, 1080),   # 16:9
+    "tiktok":    (1080, 1920),   # 9:16
+}
 PIPELINE_ORDER = ["requested", "researched", "planned", "generated", "preview", "approved", "published"]
 
 
@@ -354,7 +371,7 @@ def create_draft(job_id, platform, body, angle=None, variant=1):
 def list_drafts(job_id):
     with _db() as conn:
         return [dict(r) for r in conn.execute(
-            "SELECT id, platform, angle, body, char_count, variant, image_path, image_id, created_at FROM drafts"
+            "SELECT id, platform, angle, body, char_count, variant, image_path, image_id, video_path, video_id, created_at FROM drafts"
             " WHERE job_id=? ORDER BY id", (job_id,)
         ).fetchall()]
 
@@ -373,6 +390,11 @@ def set_draft_image(job_id, image_id, image_path):
 def set_draft_image_by_id(draft_id, image_id, image_path):
     with _db() as conn:
         conn.execute("UPDATE drafts SET image_id=?, image_path=? WHERE id=?", (image_id, image_path, draft_id))
+
+
+def set_draft_video_by_id(draft_id, video_id, video_path):
+    with _db() as conn:
+        conn.execute("UPDATE drafts SET video_id=?, video_path=? WHERE id=?", (video_id, video_path, draft_id))
 
 
 # --- §4a publish gate -------------------------------------------------------

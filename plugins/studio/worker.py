@@ -48,7 +48,7 @@ LOCK_STALE_SECONDS = 1800
 RUN_TIMEOUT_SECONDS = 600
 
 
-def _agent_prompt(job, with_image):
+def _agent_prompt(job, with_image, with_video=False):
     targets = (job.get("target_platforms") or "").strip()
     if targets:
         step2 = (f"Step 2 — draft for ONLY these platforms: {targets}. For EACH, write a draft TAILORED "
@@ -67,17 +67,23 @@ def _agent_prompt(job, with_image):
     if with_image:
         p += ("Step 3 — image: call image_gen ONCE for one relevant, on-brand, safe master image, then "
               "call set_draft_image once with its path (it sizes the image for every platform's draft). ")
+    if with_video:
+        p += ("Step 4 — video: call make_video ONCE with the job id (it renders a branded short video "
+              "per platform draft from that image and attaches it). ")
     p += "Then stop. Do NOT approve or publish — leave it in preview for the operator to review."
     return p
 
 
 def process_one(job):
     jid = job["id"]
-    with_image = (job.get("queued_action") or "") == "research_draft_image"
+    qa = job.get("queued_action") or ""
+    with_video = "video" in qa
+    with_image = "image" in qa or with_video  # video needs an image to animate
     db.enqueue_action(jid, "processing")  # claim + mark running (status the cockpit shows)
-    db.record_event(jid, "worker: starting research + draft" + (" + image" if with_image else ""), actor="system")
+    db.record_event(jid, "worker: starting research + draft"
+                    + (" + image" if with_image else "") + (" + video" if with_video else ""), actor="system")
     try:
-        r = subprocess.run(["hermes", "-z", _agent_prompt(job, with_image)],
+        r = subprocess.run(["hermes", "-z", _agent_prompt(job, with_image, with_video)],
                            capture_output=True, text=True, timeout=RUN_TIMEOUT_SECONDS)
         state = db.get_job(jid)["state"]
         if state == "preview":

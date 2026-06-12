@@ -232,6 +232,27 @@ LIST_CHANNELS = {
     "parameters": {"type": "object", "properties": {}, "required": []},
 }
 
+MAKE_VIDEO = {
+    "name": "make_video",
+    "description": (
+        "Render a branded SHORT VIDEO for the job's platform drafts and attach it (Remotion + ffmpeg). "
+        "The draft's already-attached image becomes a slow-zoom background with an animated on-screen "
+        "caption, sized per platform (9:16 for TikTok/Reels, 16:9 for YouTube, etc.). Call this AFTER "
+        "set_draft_image, only when the operator asked for a video. No voiceover (TTS deferred). "
+        "Publishing still requires the human gate — this only prepares the video."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "job_id": {"type": "string", "description": "Full job id or unique short prefix."},
+            "caption": {"type": "string", "description": "Optional short on-screen caption (about 12 words). Defaults to a hook from the post body."},
+            "kicker": {"type": "string", "description": "Optional small label above the caption (e.g. the brand or topic)."},
+            "duration_sec": {"type": "number", "description": "Optional clip length in seconds (4-15, default 6)."},
+        },
+        "required": ["job_id"],
+    },
+}
+
 SET_DRAFT_IMAGE = {
     "name": "set_draft_image",
     "description": (

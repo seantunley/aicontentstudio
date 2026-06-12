@@ -61,3 +61,14 @@ services:
       - ./studio-data:/opt/studio      # the shared studio job store (same file the plugin writes)
     ports:
       - "4008:3000"                    # LAN cockpit at http://<box-LAN-IP>:4008
+
+  # Video render service (§7b) — Remotion (branded composition, headless Chromium) +
+  # ffmpeg. Turns a draft's image + caption into a per-platform vertical/landscape
+  # video. Internal only: bound to loopback; the studio plugin (host net) POSTs to it.
+  renderer:
+    build: ./renderer
+    container_name: studio-renderer
+    restart: unless-stopped
+    shm_size: "1gb"                    # Chromium needs shared memory for rendering
+    ports:
+      - "127.0.0.1:3100:3100"          # loopback only; reached by the host-net hermes container

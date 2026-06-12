@@ -30,8 +30,10 @@ export async function listIntegrations() {
   }
 }
 
-export async function createPost(integrationId, content, platform, image) {
-  // `image` is the already-uploaded Postiz media reference {id, path} stored on the draft.
+export async function createPost(integrationId, content, platform, image, video) {
+  // `image`/`video` are already-uploaded Postiz media refs {id, path} stored on the draft.
+  // Postiz carries both in the same per-post media array; a video takes precedence when present.
+  const media = video && video.id ? video : image && image.id ? image : null;
   return req('POST', '/posts', {
     type: 'now',
     date: new Date().toISOString(),
@@ -39,7 +41,7 @@ export async function createPost(integrationId, content, platform, image) {
     tags: [],
     posts: [{
       integration: { id: integrationId },
-      value: [{ content, image: image && image.id ? [{ id: image.id, path: image.path }] : [] }],
+      value: [{ content, image: media ? [{ id: media.id, path: media.path }] : [] }],
       settings: { __type: platform },
     }],
   });

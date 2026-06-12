@@ -63,10 +63,28 @@ def upload_image(path):
     return r.json()
 
 
-def build_post(integration_id, content, platform, when="now", image=None):
-    """Construct the POST /posts payload (also used to preview in dry-run). `image` is a Postiz
-    media object {id, path} from upload_image()."""
-    images = [{"id": image["id"], "path": image["path"]}] if image else []
+def upload_video(path):
+    """Upload a local video file to Postiz (same /upload endpoint; longer timeout)."""
+    import requests
+    if not API_KEY:
+        raise PostizError("POSTIZ_API_KEY is not configured")
+    try:
+        with open(path, "rb") as f:
+            r = requests.post(f"{API_URL}/upload", headers={"Authorization": API_KEY},
+                              files={"file": f}, timeout=180)
+    except OSError as e:
+        raise PostizError(f"cannot read video {path}: {e}")
+    if r.status_code >= 300:
+        raise PostizError(f"Postiz video upload HTTP {r.status_code}: {r.text[:200]}")
+    return r.json()
+
+
+def build_post(integration_id, content, platform, when="now", image=None, video=None):
+    """Construct the POST /posts payload (also used to preview in dry-run). `image`/`video` are
+    Postiz media objects {id, path}. Postiz carries both in the same per-post media array; when a
+    video is present it takes precedence (a post is video OR image, not both)."""
+    media = video or image
+    images = [{"id": media["id"], "path": media["path"]}] if media else []
     return {
         "type": when,                       # "now" (immediate) or "schedule"
         "date": datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -80,5 +98,5 @@ def build_post(integration_id, content, platform, when="now", image=None):
     }
 
 
-def create_post(integration_id, content, platform, when="now", image=None):
-    return _request("POST", "/posts", build_post(integration_id, content, platform, when, image))
+def create_post(integration_id, content, platform, when="now", image=None, video=None):
+    return _request("POST", "/posts", build_post(integration_id, content, platform, when, image, video))

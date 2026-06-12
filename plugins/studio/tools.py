@@ -140,17 +140,19 @@ def publish(args, **kwargs):
         if not ig:
             return _err(f"no connected {platform} channel in Postiz — connect one first")
         image = {"id": draft["image_id"], "path": draft["image_path"]} if draft.get("image_id") else None
-        postiz.create_post(ig["id"], draft["body"], platform, when="now", image=image)
+        video = {"id": draft["video_id"], "path": draft["video_path"]} if draft.get("video_id") else None
+        postiz.create_post(ig["id"], draft["body"], platform, when="now", image=image, video=video)
     except postiz.PostizError as e:
         db.record_event(job["id"], f"publish FAILED via Postiz: {e}", actor="system")
         return _err(f"publish failed: {e}")
+    media = "video" if video else ("image" if image else None)
     db._advance_to(job["id"], "published", actor="system",
                    detail=f"published to {platform} via Postiz ({ig.get('profile')})"
-                          + (" with image" if draft.get("image_id") else ""))
+                          + (f" with {media}" if media else ""))
     return _ok(published=True, job_id=job["id"], short_id=job["id"][:8], platform=platform,
-               channel=ig.get("profile"), with_image=bool(draft.get("image_id")), state="published",
+               channel=ig.get("profile"), media=media, with_image=bool(image), state="published",
                message=f"Published job {job['id'][:8]} to {platform} ({ig.get('profile')}) via Postiz"
-                       + (" with image." if draft.get("image_id") else "."))
+                       + (f" with {media}." if media else "."))
 
 
 def save_brief(args, **kwargs):
@@ -353,3 +355,77 @@ def set_draft_image(args, **kwargs):
     db.record_event(job["id"], f"master image derived + attached: {', '.join(done)}", actor="agent")
     return _ok(job_id=job["id"], short_id=job["id"][:8], attached=done,
                message=f"Image sized per platform and attached to {len(done)} draft(s): {', '.join(done)}.")
+
+
+RENDER_URL = os.environ.get("STUDIO_RENDER_URL", "http://127.0.0.1:3100").rstrip("/")
+
+
+def _video_caption(body, limit=120):
+    """A short on-screen hook from the post body — first sentence, else a trimmed lead."""
+    body = (body or "").strip().replace("\n", " ")
+    for sep in (". ", "! ", "? "):
+        i = body.find(sep)
+        if 0 < i <= limit:
+            return body[: i + 1].strip()
+    if len(body) <= limit:
+        return body
+    return body[:limit].rsplit(" ", 1)[0].strip() + "…"
+
+
+def make_video(args, **kwargs):
+    """Render a branded short video for each of the job's platform drafts (Remotion + ffmpeg) and
+    attach it. The draft's image becomes the moving background; a short on-screen caption is drawn.
+    Sizes per platform (§7b master-asset derivation). No TTS/voiceover yet."""
+    import tempfile
+    import requests
+    jid = (args.get("job_id") or "").strip()
+    if not jid:
+        return _err("job_id is required")
+    job = db.find_job(jid)
+    if not job:
+        return _err(f"no job matching '{jid}'")
+    drafts = db.list_drafts(job["id"])
+    if not drafts:
+        return _err("no drafts — create_draft first")
+    kicker = (args.get("kicker") or job.get("brand") or "").strip()
+    if kicker.lower() == "unassigned":
+        kicker = ""
+    try:
+        dur = max(4.0, min(15.0, float(args.get("duration_sec") or 6)))
+    except (TypeError, ValueError):
+        dur = 6.0
+    done, failed = [], []
+    for d in drafts:
+        w, h = db.PLATFORM_VIDEO.get(d["platform"], (1080, 1920))
+        caption = (args.get("caption") or _video_caption(d["body"])).strip()
+        payload = {"imageUrl": d.get("image_path") or "", "caption": caption,
+                   "kicker": kicker, "width": w, "height": h, "durationSec": dur, "id": d["id"]}
+        try:
+            r = requests.post(f"{RENDER_URL}/render", json=payload, timeout=300)
+            if r.status_code >= 300 or not r.headers.get("Content-Type", "").startswith("video") or not r.content:
+                detail = r.text[:140] if r.content else f"HTTP {r.status_code}"
+                failed.append(f"{d['platform']}: render failed ({detail})")
+                continue
+            tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+            tmp.write(r.content)
+            tmp.close()
+            try:
+                media = postiz.upload_video(tmp.name)
+            finally:
+                os.unlink(tmp.name)
+            db.set_draft_video_by_id(d["id"], media.get("id"), media.get("path"))
+            done.append(f"{d['platform']} {w}x{h}")
+        except requests.RequestException as e:
+            failed.append(f"{d['platform']}: renderer unreachable ({e})")
+        except postiz.PostizError as e:
+            failed.append(f"{d['platform']}: upload failed ({e})")
+        except Exception as e:  # noqa: BLE001 — handler contract: never raise
+            failed.append(f"{d['platform']}: {e}")
+    if done:
+        db.record_event(job["id"], f"video rendered + attached: {', '.join(done)}", actor="agent")
+    if not done:
+        return _err("no videos produced. " + "; ".join(failed))
+    msg = f"Rendered + attached video to {len(done)} draft(s): {', '.join(done)}."
+    if failed:
+        msg += " Failed: " + "; ".join(failed)
+    return _ok(job_id=job["id"], short_id=job["id"][:8], rendered=done, failed=failed, message=msg)

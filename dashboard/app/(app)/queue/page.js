@@ -25,7 +25,9 @@ export default function Queue() {
               {j.draft ? (
                 <>
                   <div className="draft-body">{j.draft.body}</div>
-                  {j.draft.image_path ? <img className="draft-img" src={j.draft.image_path} alt="" /> : null}
+                  {j.draft.video_path
+                    ? <video className="draft-img" src={j.draft.video_path} controls muted playsInline />
+                    : j.draft.image_path ? <img className="draft-img" src={j.draft.image_path} alt="" /> : null}
                   <div className="card-foot">{j.draft.char_count} chars · angle {j.draft.angle || '—'}</div>
                 </>
               ) : <div className="empty">No draft yet.</div>}

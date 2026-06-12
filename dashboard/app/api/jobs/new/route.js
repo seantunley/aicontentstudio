@@ -11,7 +11,7 @@ export async function POST(req) {
   if (!topic) return NextResponse.json({ error: 'topic is required' }, { status: 400 });
   const platforms = Array.isArray(body.platforms) ? body.platforms.filter(Boolean) : [];
   try {
-    return NextResponse.json(createAndQueueJob(topic, (body.brand || '').trim(), session.user.name, !!body.withImage, platforms));
+    return NextResponse.json(createAndQueueJob(topic, (body.brand || '').trim(), session.user.name, !!body.withImage || !!body.withVideo, platforms, !!body.withVideo));
   } catch (e) {
     return NextResponse.json({ error: String(e?.message || e) }, { status: 400 });
   }

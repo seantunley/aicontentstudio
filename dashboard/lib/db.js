@@ -101,11 +101,11 @@ export function retryJob(jobId) {
 }
 
 // Originate a job from the cockpit: create it + queue research+draft for the worker to pick up.
-export function createAndQueueJob(topic, brand, who, withImage, platforms) {
+export function createAndQueueJob(topic, brand, who, withImage, platforms, withVideo) {
   const d = db();
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
-  const action = withImage ? 'research_draft_image' : 'research_draft';
+  const action = withVideo ? 'research_draft_image_video' : withImage ? 'research_draft_image' : 'research_draft';
   const targets = platforms && platforms.length ? platforms.join(',') : null;
   const tx = d.transaction(() => {
     d.prepare('INSERT INTO jobs (id,brand,topic,state,source,created_by,created_at,updated_at,meta,queued_action,target_platforms) VALUES (?,?,?,?,?,?,?,?,?,?,?)')

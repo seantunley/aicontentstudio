@@ -14,6 +14,7 @@ export function NewJobButton({ block }) {
   const [topic, setTopic] = useState('');
   const [brand, setBrand] = useState('');
   const [withImage, setWithImage] = useState(false);
+  const [withVideo, setWithVideo] = useState(false);
   const [channels, setChannels] = useState(null); // null = loading
   const [selected, setSelected] = useState({});
   const [busy, setBusy] = useState(false);
@@ -39,7 +40,7 @@ export function NewJobButton({ block }) {
     const platforms = Object.keys(selected).filter((p) => selected[p]);
     if (channels && channels.length && !platforms.length) { ui.toast('Pick at least one platform', 'err'); return; }
     setBusy(true);
-    const { ok, data } = await post('/api/jobs/new', { topic, brand, withImage, platforms });
+    const { ok, data } = await post('/api/jobs/new', { topic, brand, withImage: withImage || withVideo, withVideo, platforms });
     if (ok) { ui.toast('Job queued — researching in the background'); window.location.href = '/'; return; }
     ui.toast(data.error || 'Failed to queue', 'err'); setBusy(false);
   }
@@ -74,7 +75,10 @@ export function NewJobButton({ block }) {
                     </div>
                   )}
                 </div>
-                <label className="check"><input type="checkbox" checked={withImage} onChange={(e) => setWithImage(e.target.checked)} /> + image</label>
+                <div className="field-row">
+                  <label className="check"><input type="checkbox" checked={withImage || withVideo} disabled={withVideo} onChange={(e) => setWithImage(e.target.checked)} /> + image</label>
+                  <label className="check"><input type="checkbox" checked={withVideo} onChange={(e) => setWithVideo(e.target.checked)} /> + video <span className="empty" style={{ marginLeft: 4 }}>(branded clip)</span></label>
+                </div>
                 <div className="modal-acts">
                   <button type="button" className="btn btn--ghost" onClick={() => setOpen(false)}>Cancel</button>
                   <button type="submit" className="btn btn--primary" disabled={busy || !topic.trim()}>{busy ? 'Queuing…' : 'Start job'}</button>

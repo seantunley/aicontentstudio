@@ -40,9 +40,10 @@ export default async function JobPage({ params }) {
         <div className="section-head"><span className="idx">01</span><h2>Drafts</h2><span className="rule" /></div>
         {drafts.length === 0 ? <div className="empty">No drafts yet.</div> : drafts.map((d) => (
           <div className="card" key={d.id} style={{ marginBottom: 10 }}>
-            <div className="card-meta">{d.platform} · angle {d.angle || '—'} · {d.char_count} chars{d.image_id ? ' · image' : ''}</div>
+            <div className="card-meta">{d.platform} · angle {d.angle || '—'} · {d.char_count} chars{d.video_id ? ' · video' : d.image_id ? ' · image' : ''}</div>
             <EditableDraft draftId={d.id} body={d.body} limit={300} />
             {d.image_path ? <img className="draft-img" src={d.image_path} alt="" /> : null}
+            {d.video_path ? <video className="draft-img" src={d.video_path} controls muted playsInline /> : null}
           </div>
         ))}
       </section>
