@@ -243,6 +243,66 @@ export function UploadMediaButton({ jobId }) {
   );
 }
 
+export function SuggestionActions({ id }) {
+  const ui = useUI();
+  const [busy, setBusy] = useState(false);
+  async function act(action) {
+    if (action === 'dismiss') {
+      const ok = await ui.confirm({ title: 'Dismiss this idea?', message: 'It leaves your ideas list.', confirmLabel: 'Dismiss', danger: true, tag: 'dismiss' });
+      if (!ok) return;
+    }
+    setBusy(true);
+    const { ok, data } = await post('/api/suggestions', { id, action });
+    if (ok) { ui.toast(action === 'promote' ? 'Promoted — researching now' : 'Dismissed'); window.location.reload(); return; }
+    ui.toast(data.error || 'Failed', 'err'); setBusy(false);
+  }
+  return (
+    <div className="actions">
+      <button className="btn btn--approve" disabled={busy} onClick={() => act('promote')}>Promote to job</button>
+      <button className="btn btn--ghost" disabled={busy} onClick={() => act('dismiss')}>Dismiss</button>
+    </div>
+  );
+}
+
+export function NicheManager({ niches }) {
+  const ui = useUI();
+  const [brand, setBrand] = useState('');
+  const [query, setQuery] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function add(e) {
+    e?.preventDefault();
+    if (!query.trim()) return;
+    setBusy(true);
+    const { ok, data } = await post('/api/niches', { action: 'add', brand, query });
+    if (ok) { ui.toast('Niche added'); window.location.reload(); return; }
+    ui.toast(data.error || 'Failed', 'err'); setBusy(false);
+  }
+  async function remove(id) {
+    const { ok } = await post('/api/niches', { action: 'remove', id });
+    if (ok) window.location.reload();
+  }
+  return (
+    <div className="card">
+      <div className="card-foot" style={{ marginBottom: 8 }}>SCOUT NICHES — what the scout looks for</div>
+      {niches.length === 0 ? <div className="empty" style={{ marginBottom: 10 }}>No niches yet. Add one and the scout will hunt ideas for it.</div> : (
+        <div className="field-stack" style={{ marginBottom: 12 }}>
+          {niches.map((n) => (
+            <div key={n.id} className="row-between">
+              <span><b>{n.brand}</b> · {n.query}</span>
+              <button className="btn btn--ghost btn--sm" onClick={() => remove(n.id)}>Remove</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <form onSubmit={add} className="field-row">
+        <input className="input" style={{ flex: '0 1 140px' }} placeholder="brand" value={brand} onChange={(e) => setBrand(e.target.value)} />
+        <input className="input" style={{ flex: '1 1 200px' }} placeholder="niche / topic area — e.g. 'newborn sleep'" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <button type="submit" className="btn btn--primary" disabled={busy || !query.trim()}>Add</button>
+      </form>
+    </div>
+  );
+}
+
 export function LogoutButton() {
   async function out() { await fetch('/api/logout', { method: 'POST' }); window.location.href = '/login'; }
   return <button className="btn btn--ghost" onClick={out}>Sign out</button>;

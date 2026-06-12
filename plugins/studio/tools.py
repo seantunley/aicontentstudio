@@ -357,6 +357,30 @@ def set_draft_image(args, **kwargs):
                message=f"Image sized per platform and attached to {len(done)} draft(s): {', '.join(done)}.")
 
 
+def suggest_topic(args, **kwargs):
+    """Record a timely content idea for the operator to review (trend scout, §3b). SUGGEST ONLY —
+    does NOT create a job, research, or publish. The operator promotes it later if they want it."""
+    topic = (args.get("topic") or "").strip()
+    if not topic:
+        return _err("topic is required")
+    brand = (args.get("brand") or "unassigned").strip() or "unassigned"
+    rationale = (args.get("rationale") or "").strip() or None
+    source_url = (args.get("source_url") or "").strip() or None
+    niche_id = args.get("niche_id")
+    if brand == "unassigned" and niche_id:  # backfill the brand from the scout niche
+        n = db.get_niche(niche_id)
+        if n:
+            brand = n["brand"]
+    try:
+        r = db.create_suggestion(brand, topic, rationale, source_url, niche_id)
+    except Exception as e:  # noqa: BLE001 — handler contract: never raise
+        return _err(str(e))
+    if r.get("duplicate"):
+        return _ok(duplicate=True, message=f"'{topic}' was already suggested — skipped the duplicate.")
+    return _ok(suggestion_id=r["id"], topic=topic, brand=brand,
+               message=f"Suggested '{topic}' for {brand} — it's in the operator's ideas list.")
+
+
 RENDER_URL = os.environ.get("STUDIO_RENDER_URL", "http://127.0.0.1:3100").rstrip("/")
 
 

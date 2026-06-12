@@ -18,10 +18,12 @@ const ICONS = {
   jobs: <><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></>,
   accounts: <><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" /></>,
   upcoming: <><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></>,
+  scout: <><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></>,
 };
 
 const NAV = [
   { href: '/', key: 'overview', label: 'Overview' },
+  { href: '/scout', key: 'scout', label: 'Scout', countKey: 'scout' },
   { href: '/queue', key: 'queue', label: 'Approval queue', countKey: 'queue' },
   { href: '/ready', key: 'ready', label: 'Ready to publish', countKey: 'ready' },
   { href: '/upcoming', key: 'upcoming', label: 'Upcoming', countKey: 'upcoming' },

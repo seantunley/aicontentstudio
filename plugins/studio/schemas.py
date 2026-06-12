@@ -232,6 +232,27 @@ LIST_CHANNELS = {
     "parameters": {"type": "object", "properties": {}, "required": []},
 }
 
+SUGGEST_TOPIC = {
+    "name": "suggest_topic",
+    "description": (
+        "Trend scout (§3b): record ONE timely, specific content idea for the operator to review later. "
+        "Suggest only — this does NOT create a job, research, draft, or publish. Use it during a scout "
+        "run after you've found something genuinely current and relevant. Ground the rationale in a real "
+        "source you found."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "brand": {"type": "string", "description": "The brand this idea is for."},
+            "topic": {"type": "string", "description": "A concrete, specific post idea (not generic evergreen)."},
+            "rationale": {"type": "string", "description": "One line on why it's timely/relevant right now."},
+            "source_url": {"type": "string", "description": "A real source URL backing the idea."},
+            "niche_id": {"type": "integer", "description": "The scout niche id this came from (passed in the scout prompt)."},
+        },
+        "required": ["topic"],
+    },
+}
+
 MAKE_VIDEO = {
     "name": "make_video",
     "description": (

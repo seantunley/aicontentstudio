@@ -177,6 +177,37 @@ export function logEvent(jobId, detail, actor = 'human') {
     .run(jobId, null, null, actor, new Date().toISOString(), detail);
 }
 
+// --- Trend scout (§3b): suggestions + niches ---
+export function listSuggestions(status = 'new') {
+  return db().prepare('SELECT * FROM suggestions WHERE status=? ORDER BY created_at DESC').all(status);
+}
+export function promoteSuggestion(sid, who) {
+  const d = db();
+  const s = d.prepare('SELECT * FROM suggestions WHERE id=?').get(sid);
+  if (!s) throw new Error('no such suggestion');
+  if (s.status !== 'new') throw new Error(`already ${s.status}`);
+  const res = createAndQueueJob(s.topic, s.brand, who, false, []); // research+draft, operator picks media/platforms on the job
+  d.prepare("UPDATE suggestions SET status='promoted', job_id=? WHERE id=?").run(res.jobId, sid);
+  return { ok: true, jobId: res.jobId };
+}
+export function dismissSuggestion(sid) {
+  const r = db().prepare("UPDATE suggestions SET status='dismissed' WHERE id=? AND status='new'").run(sid);
+  if (!r.changes) throw new Error('not an open suggestion');
+  return { ok: true };
+}
+export function listNiches() {
+  return db().prepare('SELECT * FROM scout_niches ORDER BY id').all();
+}
+export function addNiche(brand, query) {
+  const r = db().prepare('INSERT INTO scout_niches (brand, query, enabled, created_at) VALUES (?,?,1,?)')
+    .run((brand || 'unassigned').trim() || 'unassigned', query.trim(), new Date().toISOString());
+  return { ok: true, id: Number(r.lastInsertRowid) };
+}
+export function removeNiche(id) {
+  db().prepare('DELETE FROM scout_niches WHERE id=?').run(id);
+  return { ok: true };
+}
+
 export function getEvents(jobId) {
   return db().prepare('SELECT from_state,to_state,actor,detail,at FROM job_events WHERE job_id=? ORDER BY id').all(jobId);
 }

@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+"""Trend scout (§3b) — scheduled discovery. For each enabled niche, drive the agent to find a few
+timely, specific ideas and record them as SUGGESTIONS (suggest-only). Nothing here researches deeply,
+drafts, or publishes — the operator promotes a suggestion to a real job later.
+
+Run in-container, one pass, via host cron (e.g. daily):
+  cd /home/hermes/aicontentstudio && docker compose exec -T hermes python /opt/data/plugins/studio/scout.py --once
+"""
+import os
+import time
+import json
+import subprocess
+import urllib.request
+
+import db  # same directory
+
+LOCK = "/tmp/studio_scout.lock"
+LOCK_STALE_SECONDS = 1800
+RUN_TIMEOUT_SECONDS = int(os.environ.get("STUDIO_SCOUT_TIMEOUT", "300"))
+
+
+def _telegram_notify(text):
+    """DM the operator on Telegram — best effort, reads creds from the volume .env."""
+    env = {}
+    try:
+        with open("/opt/data/.env") as f:
+            for line in f:
+                line = line.strip()
+                if "=" in line and not line.startswith("#"):
+                    k, v = line.split("=", 1)
+                    env[k] = v
+    except OSError:
+        return
+    tok = env.get("TELEGRAM_BOT_TOKEN", "")
+    chat = env.get("TELEGRAM_ALLOWED_USERS", "").split(",")[0]
+    if not tok or not chat:
+        return
+    try:
+        data = json.dumps({"chat_id": chat, "text": text}).encode()
+        req = urllib.request.Request(f"https://api.telegram.org/bot{tok}/sendMessage",
+                                     data=data, headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=10)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _scout_prompt(niche):
+    return (
+        f"You are the studio's trend scout. Brand: {niche['brand']!r}. Niche: {niche['query']!r}. "
+        "Search the web for what's genuinely CURRENT and relevant in this niche right now (recent news, "
+        "fresh discussion, seasonal hooks) — not generic evergreen. Choose 2-3 SPECIFIC, distinct post "
+        f"ideas. For EACH, call suggest_topic(brand={niche['brand']!r}, topic=<concrete idea>, "
+        f"rationale=<one line grounded in what you found>, source_url=<real URL>, niche_id={niche['id']}). "
+        "Suggest ONLY — do NOT log_job, save_brief, create_draft, advance_job, or publish. Then stop."
+    )
+
+
+def run_once():
+    db.init_db()
+    niches = db.list_niches(enabled_only=True)
+    if not niches:
+        print("scout: no enabled niches — nothing to do")
+        return
+    before = len(db.list_suggestions("new"))
+    for niche in niches:
+        try:
+            subprocess.run(["hermes", "-z", _scout_prompt(niche)],
+                           capture_output=True, text=True, timeout=RUN_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            print(f"scout: niche {niche['id']} timed out")
+        except Exception as e:  # noqa: BLE001
+            print(f"scout: niche {niche['id']} error: {e}")
+    new = len(db.list_suggestions("new")) - before
+    print(f"scout: {len(niches)} niche(s), {new} new suggestion(s)")
+    if new > 0:
+        _telegram_notify(f"\U0001f50d Scout found {new} new idea(s) — review them in the cockpit's Scout tab.")
+
+
+def _locked():
+    if os.path.exists(LOCK):
+        if time.time() - os.path.getmtime(LOCK) < LOCK_STALE_SECONDS:
+            return True
+    with open(LOCK, "w") as f:
+        f.write(str(os.getpid()))
+    return False
+
+
+def main():
+    if _locked():
+        print("scout: another run in progress, skipping")
+        return
+    try:
+        run_once()
+    finally:
+        try:
+            os.remove(LOCK)
+        except OSError:
+            pass
+
+
+if __name__ == "__main__":
+    main()

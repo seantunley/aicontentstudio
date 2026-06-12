@@ -124,7 +124,9 @@ a:hover { color: var(--lime-2); }
 .btn--reject:hover { background: var(--red-bg); }
 .btn--ghost { background: transparent; }
 .btn--block { width: 100%; justify-content: center; }
+.btn--sm { padding: 4px 9px; font-size: 12px; }
 .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 11px; }
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; }
 
 /* ── pipeline ──────────────────────────────────────────────────────────── */
 .pipeline { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid var(--line); background: var(--bg-1); }

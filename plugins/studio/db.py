@@ -92,8 +92,27 @@ CREATE TABLE IF NOT EXISTS drafts (
     variant    INTEGER DEFAULT 1,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS scout_niches (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    brand      TEXT NOT NULL,
+    query      TEXT NOT NULL,        -- what to scout for (a niche/topic area)
+    enabled    INTEGER DEFAULT 1,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS suggestions (
+    id         TEXT PRIMARY KEY,
+    brand      TEXT NOT NULL,
+    topic      TEXT NOT NULL,
+    rationale  TEXT,                 -- why it's timely/relevant (grounded)
+    source_url TEXT,
+    niche_id   INTEGER REFERENCES scout_niches(id),
+    status     TEXT NOT NULL DEFAULT 'new',   -- new | promoted | dismissed
+    job_id     TEXT,                 -- set when promoted to a real job
+    created_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state);
 CREATE INDEX IF NOT EXISTS idx_events_job ON job_events(job_id);
+CREATE INDEX IF NOT EXISTS idx_suggestions_status ON suggestions(status);
 """
 
 
@@ -395,6 +414,74 @@ def set_draft_image_by_id(draft_id, image_id, image_path):
 def set_draft_video_by_id(draft_id, video_id, video_path):
     with _db() as conn:
         conn.execute("UPDATE drafts SET video_id=?, video_path=? WHERE id=?", (video_id, video_path, draft_id))
+
+
+# --- Trend scout (§3b): niches + suggestions -------------------------------
+def add_niche(brand, query):
+    now = _utcnow()
+    with _db() as conn:
+        cur = conn.execute("INSERT INTO scout_niches (brand, query, enabled, created_at) VALUES (?,?,1,?)",
+                           (brand or "unassigned", query, now))
+        return {"id": cur.lastrowid, "brand": brand or "unassigned", "query": query}
+
+
+def list_niches(enabled_only=True):
+    q = "SELECT * FROM scout_niches" + (" WHERE enabled=1" if enabled_only else "") + " ORDER BY id"
+    with _db() as conn:
+        return [dict(r) for r in conn.execute(q).fetchall()]
+
+
+def remove_niche(niche_id):
+    with _db() as conn:
+        conn.execute("DELETE FROM scout_niches WHERE id=?", (niche_id,))
+
+
+def get_niche(niche_id):
+    with _db() as conn:
+        row = conn.execute("SELECT * FROM scout_niches WHERE id=?", (niche_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def create_suggestion(brand, topic, rationale=None, source_url=None, niche_id=None):
+    """Record a scout idea for the operator to promote or dismiss. Dedupes on (brand, topic) among
+    still-open suggestions so repeated scout runs don't pile duplicates."""
+    topic = (topic or "").strip()
+    if not topic:
+        raise ValueError("topic is required")
+    sid = str(uuid.uuid4())
+    now = _utcnow()
+    with _db() as conn:
+        dup = conn.execute(
+            "SELECT id FROM suggestions WHERE brand=? AND lower(topic)=lower(?) AND status='new'",
+            (brand or "unassigned", topic)).fetchone()
+        if dup:
+            return {"id": dup["id"], "duplicate": True, "topic": topic}
+        conn.execute(
+            "INSERT INTO suggestions (id, brand, topic, rationale, source_url, niche_id, status, created_at)"
+            " VALUES (?,?,?,?,?,?, 'new', ?)",
+            (sid, brand or "unassigned", topic, rationale, source_url, niche_id, now))
+    return {"id": sid, "duplicate": False, "topic": topic}
+
+
+def list_suggestions(status="new"):
+    with _db() as conn:
+        if status:
+            rows = conn.execute("SELECT * FROM suggestions WHERE status=? ORDER BY created_at DESC", (status,)).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM suggestions ORDER BY created_at DESC").fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_suggestion(sid):
+    with _db() as conn:
+        row = conn.execute("SELECT * FROM suggestions WHERE id=?", (sid,)).fetchone()
+        return dict(row) if row else None
+
+
+def set_suggestion_status(sid, status, job_id=None):
+    with _db() as conn:
+        conn.execute("UPDATE suggestions SET status=?, job_id=COALESCE(?, job_id) WHERE id=?",
+                     (status, job_id, sid))
 
 
 # --- §4a publish gate -------------------------------------------------------
