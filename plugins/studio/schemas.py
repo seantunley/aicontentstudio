@@ -15,11 +15,28 @@ LOG_JOB = {
                 "type": "string",
                 "description": (
                     "Which brand this is for. OMIT if the operator did not specify — it will be "
-                    "stored as 'unassigned' and you should ask which brand it's for rather than guess."
+                    "stored as 'unassigned' and the tool result tells you to ask via the `clarify` "
+                    "tool (tappable brand buttons), then record it with `set_brand`. Never guess."
                 ),
             },
         },
         "required": ["topic"],
+    },
+}
+
+SET_BRAND = {
+    "name": "set_brand",
+    "description": (
+        "Record which brand a job belongs to — use after asking the operator with the `clarify` "
+        "tool. Updates the job and logs the change. Call this once you have their brand answer."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "job_id": {"type": "string", "description": "Full job id or its unique short prefix."},
+            "brand": {"type": "string", "description": "The brand name the operator chose or typed."},
+        },
+        "required": ["job_id", "brand"],
     },
 }
 

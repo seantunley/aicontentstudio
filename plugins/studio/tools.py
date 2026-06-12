@@ -30,11 +30,42 @@ def log_job(args, **kwargs):
         job = db.create_job(topic=topic, brand=brand, created_by=created_by)
     except Exception as e:  # noqa: BLE001 — handler contract: never raise
         return _err(str(e))
-    tail = (" Brand is unassigned — ask the operator which brand this is for."
-            if brand == "unassigned" else f" Brand: {brand}.")
+    if brand == "unassigned":
+        # Offer brands already in use + the plan's primary/template brand (§1a); 'Other' is auto-added
+        # by the clarify UI. On Telegram these render as tappable buttons.
+        choices = []
+        for b in db.known_brands(4) + ["breastfeeding-support"]:
+            if b not in choices:
+                choices.append(b)
+        choices = choices[:4]
+        tail = (f" Brand is unassigned. Call the `clarify` tool NOW — question \"Which brand is this for?\","
+                f" choices {choices} (the operator taps one, or picks 'Other' to type a new brand)."
+                f" Then call `set_brand` with job_id '{job['id']}' and their answer BEFORE researching.")
+    else:
+        tail = f" Brand: {brand}."
     return _ok(
         job_id=job["id"], short_id=job["id"][:8], state=job["state"], brand=job["brand"], topic=job["topic"],
         message=f"Logged job {job['id'][:8]} ('{topic}') in state 'requested'.{tail}",
+    )
+
+
+def set_brand(args, **kwargs):
+    jid = (args.get("job_id") or "").strip()
+    brand = (args.get("brand") or "").strip()
+    if not jid:
+        return _err("job_id is required")
+    if not brand:
+        return _err("brand is required")
+    job = db.find_job(jid)
+    if not job:
+        return _err(f"no job matching '{jid}'")
+    try:
+        updated = db.set_job_brand(job["id"], brand, actor=str(kwargs.get("user_id") or "human"))
+    except Exception as e:  # noqa: BLE001 — handler contract: never raise
+        return _err(str(e))
+    return _ok(
+        job_id=updated["id"], short_id=updated["id"][:8], brand=updated["brand"],
+        message=f"Brand set to '{updated['brand']}' for job {updated['id'][:8]}.",
     )
 
 

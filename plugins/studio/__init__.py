@@ -7,6 +7,7 @@ def register(ctx):
     db.init_db()
 
     ctx.register_tool(name="log_job", toolset="studio", schema=schemas.LOG_JOB, handler=tools.log_job)
+    ctx.register_tool(name="set_brand", toolset="studio", schema=schemas.SET_BRAND, handler=tools.set_brand)
     ctx.register_tool(name="get_job", toolset="studio", schema=schemas.GET_JOB, handler=tools.get_job)
     ctx.register_tool(name="list_jobs", toolset="studio", schema=schemas.LIST_JOBS, handler=tools.list_jobs)
     ctx.register_tool(name="advance_job", toolset="studio", schema=schemas.ADVANCE_JOB, handler=tools.advance_job)

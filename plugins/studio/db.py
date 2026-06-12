@@ -306,6 +306,40 @@ def record_event(job_id, detail, actor="system", from_state=None, to_state=None)
         )
 
 
+def set_job_brand(job_id, brand, actor="human"):
+    """Record the brand for a job (e.g. after the operator answers the brand clarify on Telegram)."""
+    brand = (brand or "").strip()
+    if not brand:
+        raise ValueError("brand is required")
+    job = get_job(job_id)
+    if not job:
+        raise ValueError(f"no job {job_id}")
+    prev = job.get("brand") or "unassigned"
+    now = _utcnow()
+    with _db() as conn:
+        conn.execute("UPDATE jobs SET brand=?, updated_at=? WHERE id=?", (brand, now, job_id))
+        detail = f"brand set to '{brand}'" + (f" (was '{prev}')" if prev != brand else "")
+        conn.execute(
+            "INSERT INTO job_events (job_id, from_state, to_state, actor, at, detail) VALUES (?,?,?,?,?,?)",
+            (job_id, None, None, actor, now, detail),
+        )
+    return get_job(job_id)
+
+
+def known_brands(limit=4):
+    """Distinct brands already seen in the job store (excludes 'unassigned'), most-recently-used first.
+    Used to offer the operator tappable brand choices via the clarify tool. Self-populating: a brand
+    typed once via clarify's 'Other' shows up as a button next time."""
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT brand, MAX(created_at) mx FROM jobs"
+            " WHERE brand IS NOT NULL AND brand!='unassigned' AND TRIM(brand)!=''"
+            " GROUP BY brand ORDER BY mx DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [r["brand"] for r in rows]
+
+
 # --- cost ledger (plan §10) — scaffolded; populated once generation exists ---
 def record_cost(job_id, provider, model, operation, units, cost_usd, brand=None, detail=None):
     with _db() as conn:

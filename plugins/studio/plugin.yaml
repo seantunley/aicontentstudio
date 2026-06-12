@@ -7,6 +7,7 @@ description: >-
 author: AI Content Studio
 provides_tools:
   - log_job
+  - set_brand
   - get_job
   - list_jobs
   - advance_job
