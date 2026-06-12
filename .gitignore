@@ -1,0 +1,17 @@
+# --- Secrets (never commit) ---
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets/
+**/credentials*.json
+
+# --- Local studio state (Phase 0: SQLite job store) ---
+studio-data/
+
+# --- Build artifacts ---
+__pycache__/
+node_modules/
+.next/
+.DS_Store

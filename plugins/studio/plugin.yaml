@@ -1,0 +1,17 @@
+name: studio
+version: 0.1.0
+description: >-
+  AI Content Studio — job store, content state machine, cost ledger, and the
+  hard-gated dry-run publish tool (Phase 0 spine). The publish action requires a
+  human-minted confirmation token the model cannot create (plan §4a).
+author: AI Content Studio
+provides_tools:
+  - log_job
+  - get_job
+  - list_jobs
+  - advance_job
+  - publish
+  - save_brief
+  - get_brief
+  - create_draft
+  - list_drafts

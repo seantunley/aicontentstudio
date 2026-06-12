@@ -1,0 +1,60 @@
+# AI Content Studio — Phase 0 spine.
+# Hermes Agent (brain + Telegram gateway) + a local SQLite studio job store.
+# Goal: text a topic -> it logs a job -> it replies in persona. NOTHING publishes yet.
+#
+#   Bring up:   docker compose up -d
+#   Configure:  docker compose exec -it hermes hermes setup        # personality, Telegram token + your user-ID allowlist
+#               docker compose exec -it hermes hermes model        # -> OpenAI Codex (ChatGPT Plus/Pro device-code login)
+#   Logs:       docker compose logs -f hermes
+#
+# Image is PINNED to a specific stable release (plan §4a, §12) — never :latest.
+# Compose-level vars (tag, UID/GID) come from .env (gitignored); see .env.example.
+
+services:
+  hermes:
+    image: nousresearch/hermes-agent:${HERMES_IMAGE_TAG:-v2026.6.5}
+    container_name: hermes
+    restart: unless-stopped              # auto-restart after crash/reboot (plan §9b)
+    command: ["gateway", "run"]
+    network_mode: host                   # per official Hermes compose; Telegram is outbound long-poll, no inbound port
+    environment:
+      - HERMES_UID=${HERMES_UID:-1000}   # own files written into the volumes as the host user
+      - HERMES_GID=${HERMES_GID:-1000}
+      - STUDIO_DRY_RUN=true              # §4 dry-run: true = no real post (logs only); false = publish via Postiz
+      - STUDIO_DB_PATH=/opt/studio/studio.db
+      - POSTIZ_API_URL=${POSTIZ_API_URL:-http://localhost:4007/api/public/v1}
+      - POSTIZ_API_KEY=${POSTIZ_API_KEY}   # studio is a Postiz API client; Postiz holds the platform tokens (§2c)
+      # Hermes' own dashboard on the LAN (operator's local network). Exposes config + API keys,
+      # so it is gated by basic auth (dashboard.basic_auth in ~/.hermes/config.yaml). Interim —
+      # plan §7a wants this on Tailscale, not the LAN; move it there before any wider exposure.
+      - HERMES_DASHBOARD=1
+      - HERMES_DASHBOARD_HOST=0.0.0.0    # bind all interfaces -> reachable at http://<box-LAN-IP>:9119
+      - HERMES_DASHBOARD_INSECURE=1      # required to bind non-localhost (auth above is the guard)
+    volumes:
+      - ${HOME}/.hermes:/opt/data        # Hermes: config.yaml, SOUL.md, memories/, skills/, auth.json, .env, logs/
+      - ./studio-data:/opt/studio        # studio job store (SQLite) — separate from Hermes's own memory
+      - ./plugins:/opt/data/plugins      # studio plugin source (version-controlled in repo)
+    # Phase 0 deliberately omits: HERMES_DASHBOARD (that is Hermes's own dash, not our §7a cockpit),
+    # the gateway API server (loopback-only is fine), and resource limits. Added later only when needed.
+
+  # §7a custom studio cockpit (Phase 1) — Next.js, reads the shared studio SQLite DB directly.
+  # Separate bridge-network service with a published LAN port; talks to the same ./studio-data file.
+  dashboard:
+    build: ./dashboard
+    container_name: studio-dashboard
+    restart: unless-stopped
+    user: "1000:1000"                  # match host hermes uid so the shared studio.db stays writable
+    environment:
+      - STUDIO_DB_PATH=/opt/studio/studio.db
+      - DASH_USER=${DASH_USER}                          # single-operator login (Phase 1 thin auth, §7a)
+      - DASH_PASSWORD_HASH_B64=${DASH_PASSWORD_HASH_B64} # base64 of the bcrypt hash ($ breaks compose interpolation)
+      - SESSION_SECRET=${SESSION_SECRET}                # iron-session cookie encryption key
+      - COOKIE_SECURE=false                        # over HTTP/LAN; flip true behind HTTPS/Tailscale
+      - POSTIZ_API_KEY=${POSTIZ_API_KEY}           # publish approved drafts via Postiz (human-clicked)
+      - POSTIZ_API_URL=http://host.docker.internal:4007/api/public/v1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"        # reach Postiz's host-published port from this bridge container
+    volumes:
+      - ./studio-data:/opt/studio      # the shared studio job store (same file the plugin writes)
+    ports:
+      - "4008:3000"                    # LAN cockpit at http://<box-LAN-IP>:4008
