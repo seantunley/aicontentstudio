@@ -195,6 +195,11 @@ a:hover { color: var(--lime-2); }
 .vtag { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: rgba(255,255,255,0.04); border: 1px solid var(--line); color: var(--muted); }
 .vtag--add { color: var(--lime); border-color: rgba(200,242,78,0.3); border-style: dashed; }
 .vault-tagedit { margin-top: 9px; }
+/* Studio Editor (Polotno) */
+.editor-root { display: flex; flex-direction: column; height: 100vh; background: var(--bg-0, #0b0d0e); }
+.editor-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 14px; border-bottom: 1px solid var(--line-2); background: var(--bg-1); flex: none; }
+.editor-title { font-family: var(--mono); font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.editor-canvas { flex: 1; position: relative; min-height: 0; }
 
 /* ── in-progress ───────────────────────────────────────────────────────── */
 .work-row { display: flex; align-items: center; gap: 12px; padding: 10px 13px; background: var(--bg-1);

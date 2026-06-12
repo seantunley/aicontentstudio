@@ -528,6 +528,14 @@ def media_counts():
         return {"image": m.get("image", 0), "video": m.get("video", 0), "total": sum(m.values())}
 
 
+def untagged_media(limit=5):
+    """Image assets with no tags yet — fed to the vision auto-tagger."""
+    with _db() as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT id, url, job_id FROM media_assets WHERE kind='image' AND (tags IS NULL OR trim(tags)='') "
+            "ORDER BY id DESC LIMIT ?", (limit,)).fetchall()]
+
+
 # --- Trend scout (§3b): niches + suggestions -------------------------------
 def add_niche(brand, query):
     now = _utcnow()

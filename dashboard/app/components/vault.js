@@ -58,7 +58,12 @@ function VaultTile({ a, onSave }) {
         <span className={`vault-kind vault-kind--${a.kind}`}>{a.kind === 'video' ? '▶ video' : 'image'}</span>
       </div>
       <div className="vault-meta">
-        <div className="vault-topic" title={a.topic || ''}>{a.topic || '—'}</div>
+        <div className="row-between">
+          <div className="vault-topic" title={a.topic || ''}>{a.topic || '—'}</div>
+          {a.kind === 'image' && (
+            <a className="btn btn--ghost btn--sm" href={`/editor?src=${encodeURIComponent(a.url)}&topic=${encodeURIComponent(a.topic || '')}`}>Edit</a>
+          )}
+        </div>
         <div className="card-foot">{a.source}{a.platform ? ` · ${a.platform}` : ''}{a.width ? ` · ${a.width}×${a.height}` : ''}</div>
         {editing ? (
           <div className="vault-tagedit">
@@ -71,7 +76,7 @@ function VaultTile({ a, onSave }) {
         ) : (
           <div className="vault-tags" onClick={() => setEditing(true)} title="click to edit tags">
             {tagList.map((t, i) => <span key={i} className="vtag">{t}</span>)}
-            {!tagList.length && <span className="vtag vtag--add">+ add tags</span>}
+            {!tagList.length && <span className="vtag vtag--add">auto-tagging… · click to add</span>}
           </div>
         )}
       </div>

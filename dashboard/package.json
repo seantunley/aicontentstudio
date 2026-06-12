@@ -14,6 +14,9 @@
     "better-sqlite3": "11.8.1",
     "iron-session": "8.0.4",
     "bcryptjs": "2.4.3",
-    "sharp": "0.33.5"
+    "sharp": "0.33.5",
+    "polotno": "3.0.0-9",
+    "mobx": "6.13.5",
+    "mobx-react-lite": "4.0.7"
   }
 }

@@ -2,4 +2,6 @@
 export default {
   // better-sqlite3 is a native module — keep it out of the bundle, load at runtime.
   serverExternalPackages: ['better-sqlite3'],
+  // Polotno (the Canva-style editor) needs React StrictMode off.
+  reactStrictMode: false,
 };

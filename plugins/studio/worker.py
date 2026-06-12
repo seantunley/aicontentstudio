@@ -139,6 +139,29 @@ def _maybe_run_scout():
         print(f"worker: scout run error: {e}")
 
 
+def _clean_tags(out):
+    lines = [ln.strip() for ln in (out or "").splitlines() if ln.strip()]
+    for ln in reversed(lines):  # prefer the last comma-separated line
+        if "," in ln and len(ln) < 300:
+            return ln.strip().strip('."\'')
+    return lines[-1].strip()[:200] if lines else ""
+
+
+def _autotag_media(limit=5):
+    """Vision auto-tag any untagged Vault images (grok sees the image URL and lists content tags)."""
+    for a in db.untagged_media(limit):
+        prompt = ("Look at this image and reply with ONLY 6-10 short content tags describing what is IN it "
+                  f"(objects, people, setting, mood, colours), comma-separated, nothing else. Image: {a['url']}")
+        try:
+            r = subprocess.run(["hermes", "-z", prompt], capture_output=True, text=True, timeout=120)
+            tags = _clean_tags(r.stdout)
+            if tags and "," in tags:
+                db.set_media_tags(a["id"], tags)
+                print(f"worker: auto-tagged asset {a['id']}: {tags[:60]}")
+        except Exception as e:  # noqa: BLE001
+            print(f"worker: autotag asset {a['id']} failed: {e}")
+
+
 def main():
     db.init_db()
     if _locked():
@@ -146,6 +169,7 @@ def main():
         return
     try:
         _maybe_run_scout()
+        _autotag_media()
         jobs = db.get_queued_jobs()
         if not jobs:
             return
