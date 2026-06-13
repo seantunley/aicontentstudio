@@ -263,6 +263,12 @@ Replies follow the brand's safety policy (§6a). For the **breastfeeding brand**
 ### Scope control
 Start with **triage-and-notify only** (no drafted replies) and add reply-drafting per brand once trusted. Volume cap on notifications — engagement summaries belong in the digest, not as one ping per comment.
 
+### Built (v1 — 13 Jun 2026)
+- **Chatwoot engine** stood up (own stack, pinned v4.14.2) on :4009 — see [[engagement-layer]].
+- **Native inbox mirror** in the studio (Desk-styled, like the Postiz calendar): `/engagement` is a two-pane inbox — conversation list (open/pending/resolved) + message thread + reply composer — backed by Chatwoot's API (`lib/chatwoot.js`, `/api/engagement[/messages|/reply]`). Two-way: the operator's reviewed reply posts back via Chatwoot.
+- **Gated AI reply-drafting:** "✦ Draft with AI" → a `reply_drafts` request → `worker._process_reply_drafts` drafts an on-brand reply via `hermes -z` with the brand voice + safety block (never medical advice, gentle on distress) → composer fills it in → operator edits + Sends. Never auto-sends (the human gate, §4a). Brand-safety verified (declined medical advice, pointed to an IBCLC).
+- **Deferred:** the triage tiers (routine→digest / question→draft / red-flag→escalate) as automatic routing, the volume-capped digest line, and per-brand inbox→brand mapping (today the active brand sets reply context). Lights up fully once a production channel is connected in Chatwoot (Bluesky is test-only).
+
 ---
 
 ## 3e. Real-content ingestion (my own photos & clips)
