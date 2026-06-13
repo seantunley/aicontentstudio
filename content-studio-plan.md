@@ -606,6 +606,13 @@ Holidays are country-specific and audience region varies per brand (§1a), so ea
 ### Sequencing
 Phase 5 (with campaigns/pillars) — a manual occasions list can exist earlier; the auto-populate-yearly, sensitivity routing, and country-research are the polished version.
 
+### Built (v1 — 13 Jun 2026)
+- **Recurring-rule occasions** stored as rules, not fixed dates (`{fixed: month/day}` and `{nth_weekday: month/weekday/n}`, n=-1=last), so moveable days (Mother's/Father's Day, Black Friday) recompute every year. Resolver implemented + verified on both sides (Python worker, JS dashboard — they agree).
+- **Seeded built-ins** (brand `all`, region-aware for the SA operator) populate the calendar immediately; auto-draft is **off by default** so nothing surprises.
+- **Dashboard `/occasions`** page: upcoming list with computed SAST date + countdown, inline auto-draft / sensitive toggles, add/edit (rule builder), per-active-brand + shared scoping (§1b).
+- **Lead-time auto-draft scheduler** in the worker: when an enabled, auto-draft occasion's window opens it queues a draft job (for the occasion's brand, or every enabled brand for an `all` occasion; falls back to `unassigned` if no brands), idempotent per occurrence. **Sensitive occasions are notify-first** — pings the operator instead of auto-drafting. Gate (§4a) always holds; never auto-posts.
+- **Deferred (the "polished version"):** country-holiday research (point-at-a-country auto-populate), multi-post **campaign arcs** (needs §7e campaign object), and Easter-relative rules.
+
 ---
 
 ## 8. Phased roadmap

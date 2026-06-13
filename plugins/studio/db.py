@@ -152,9 +152,26 @@ CREATE TABLE IF NOT EXISTS brands (
     created_at  TEXT,
     updated_at  TEXT
 );
+CREATE TABLE IF NOT EXISTS occasions (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    brand         TEXT NOT NULL DEFAULT 'all',  -- brand slug, or 'all' = shows for every brand (§7g)
+    name          TEXT NOT NULL,
+    rule          TEXT NOT NULL,                -- JSON: {"type":"fixed","month":12,"day":25}
+                                                --     | {"type":"nth_weekday","month":5,"weekday":6,"n":2}  (weekday 0=Mon..6=Sun, n=-1=last)
+    region        TEXT,                         -- country/region label (display; informs research)
+    lead_days     INTEGER DEFAULT 14,           -- how far ahead to auto-draft
+    sensitive     INTEGER DEFAULT 0,            -- notify-first instead of auto-cheerful-draft (§6a/§7g)
+    auto_draft    INTEGER DEFAULT 0,            -- generate drafts when the lead window opens (off by default)
+    source        TEXT DEFAULT 'manual',        -- 'builtin' | 'manual'
+    enabled       INTEGER DEFAULT 1,
+    last_handled_for TEXT,                      -- ISO date of the occurrence we last drafted/notified (idempotency)
+    created_at    TEXT,
+    updated_at    TEXT
+);
 CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state);
 CREATE INDEX IF NOT EXISTS idx_events_job ON job_events(job_id);
 CREATE INDEX IF NOT EXISTS idx_suggestions_status ON suggestions(status);
+CREATE INDEX IF NOT EXISTS idx_occasions_brand ON occasions(brand);
 """
 
 
@@ -238,6 +255,149 @@ def init_db():
             "INSERT OR IGNORE INTO media_assets (kind,url,media_id,source,job_id,draft_id,platform,topic,created_at) "
             "SELECT 'video', d.video_path, d.video_id, 'rendered', d.job_id, d.id, d.platform, j.topic, ? "
             "FROM drafts d LEFT JOIN jobs j ON j.id=d.job_id WHERE d.video_path IS NOT NULL", (_now,))
+        # seed the recurring occasions calendar (§7g) once, brand='all' as a shared reference set.
+        # Stored as RULES, not fixed dates, so moveable days recompute every year. auto_draft is OFF
+        # by default — they populate the calendar; the operator opts specific ones into auto-drafting.
+        if conn.execute("SELECT COUNT(*) FROM occasions").fetchone()[0] == 0:
+            _seed_occasions(conn)
+
+
+# --- occasions calendar (§7g) -------------------------------------------------
+# Recurring built-ins for a South-Africa-based operator (the audience default, see metric units).
+# region '' = universal; 'ZA' = South African public holiday/observance. weekday: 0=Mon..6=Sun.
+_OCCASION_SEED = [
+    ("New Year's Day", {"type": "fixed", "month": 1, "day": 1}, ""),
+    ("Valentine's Day", {"type": "fixed", "month": 2, "day": 14}, ""),
+    ("Human Rights Day", {"type": "fixed", "month": 3, "day": 21}, "ZA"),
+    ("Workers' Day", {"type": "fixed", "month": 5, "day": 1}, "ZA"),
+    ("Mother's Day", {"type": "nth_weekday", "month": 5, "weekday": 6, "n": 2}, ""),
+    ("Youth Day", {"type": "fixed", "month": 6, "day": 16}, "ZA"),
+    ("Father's Day", {"type": "nth_weekday", "month": 6, "weekday": 6, "n": 3}, ""),
+    ("Mandela Day", {"type": "fixed", "month": 7, "day": 18}, "ZA"),
+    ("National Women's Day", {"type": "fixed", "month": 8, "day": 9}, "ZA"),
+    ("Heritage Day", {"type": "fixed", "month": 9, "day": 24}, "ZA"),
+    ("Black Friday", {"type": "nth_weekday", "month": 11, "weekday": 4, "n": 4}, ""),
+    ("Christmas Day", {"type": "fixed", "month": 12, "day": 25}, ""),
+    ("Day of Goodwill", {"type": "fixed", "month": 12, "day": 26}, "ZA"),
+    ("New Year's Eve", {"type": "fixed", "month": 12, "day": 31}, ""),
+]
+
+
+def _seed_occasions(conn):
+    now = _utcnow()
+    for name, rule, region in _OCCASION_SEED:
+        conn.execute(
+            "INSERT INTO occasions (brand, name, rule, region, lead_days, sensitive, auto_draft, source, enabled, created_at, updated_at)"
+            " VALUES ('all',?,?,?,14,0,0,'builtin',1,?,?)",
+            (name, json.dumps(rule), region, now, now))
+
+
+def _nth_weekday_date(year, month, weekday, n):
+    """Date of the n-th `weekday` (0=Mon..6=Sun) of `month`/`year`; n=-1 => last. None if out of range."""
+    import calendar
+    if n and n > 0:
+        first = datetime.date(year, month, 1)
+        day = 1 + (weekday - first.weekday()) % 7 + (n - 1) * 7
+        if day > calendar.monthrange(year, month)[1]:
+            return None
+        return datetime.date(year, month, day)
+    last = calendar.monthrange(year, month)[1]
+    d = datetime.date(year, month, last)
+    return datetime.date(year, month, last - (d.weekday() - weekday) % 7)
+
+
+def next_occurrence(rule, from_date):
+    """Next date this rule fires on/after from_date (rolls into next year if this year's has passed)."""
+    if isinstance(rule, str):
+        try:
+            rule = json.loads(rule)
+        except (ValueError, TypeError):
+            return None
+    t = (rule or {}).get("type")
+    for year in (from_date.year, from_date.year + 1):
+        cand = None
+        if t == "fixed":
+            try:
+                cand = datetime.date(year, int(rule["month"]), int(rule["day"]))
+            except (ValueError, KeyError, TypeError):
+                continue
+        elif t == "nth_weekday":
+            try:
+                cand = _nth_weekday_date(year, int(rule["month"]), int(rule["weekday"]), int(rule["n"]))
+            except (ValueError, KeyError, TypeError):
+                continue
+        if cand and cand >= from_date:
+            return cand
+    return None
+
+
+def _today_local(tz_offset_min=120):
+    return (datetime.datetime.now(datetime.timezone.utc)
+            + datetime.timedelta(minutes=tz_offset_min)).date()
+
+
+def list_occasions(brand=None, include_all=True):
+    """Occasions for a brand (plus the shared 'all' set), each with computed next date + days_until.
+    brand None => every occasion. Sorted by how soon they fire."""
+    with _db() as conn:
+        if brand and include_all:
+            rows = conn.execute("SELECT * FROM occasions WHERE brand=? OR brand='all'", (brand,)).fetchall()
+        elif brand:
+            rows = conn.execute("SELECT * FROM occasions WHERE brand=?", (brand,)).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM occasions").fetchall()
+    today = _today_local()
+    out = []
+    for r in rows:
+        o = dict(r)
+        nxt = next_occurrence(o["rule"], today)
+        o["next_date"] = nxt.isoformat() if nxt else None
+        o["days_until"] = (nxt - today).days if nxt else None
+        out.append(o)
+    out.sort(key=lambda o: (o["days_until"] is None, o["days_until"] if o["days_until"] is not None else 0))
+    return out
+
+
+def upsert_occasion(id=None, brand="all", name=None, rule=None, region=None,
+                    lead_days=14, sensitive=0, auto_draft=0, enabled=1):
+    now = _utcnow()
+    rule_json = rule if isinstance(rule, str) else json.dumps(rule)
+    with _db() as conn:
+        if id:
+            conn.execute(
+                "UPDATE occasions SET brand=?, name=?, rule=?, region=?, lead_days=?, sensitive=?, auto_draft=?, enabled=?, updated_at=? WHERE id=?",
+                (brand, name, rule_json, region, int(lead_days), int(bool(sensitive)), int(bool(auto_draft)), int(bool(enabled)), now, id))
+            return id
+        cur = conn.execute(
+            "INSERT INTO occasions (brand, name, rule, region, lead_days, sensitive, auto_draft, source, enabled, created_at, updated_at)"
+            " VALUES (?,?,?,?,?,?,?, 'manual', ?,?,?)",
+            (brand, name, rule_json, region, int(lead_days), int(bool(sensitive)), int(bool(auto_draft)), int(bool(enabled)), now, now))
+        return cur.lastrowid
+
+
+def delete_occasion(occ_id):
+    with _db() as conn:
+        conn.execute("DELETE FROM occasions WHERE id=?", (occ_id,))
+
+
+def mark_occasion_handled(occ_id, occ_date):
+    with _db() as conn:
+        conn.execute("UPDATE occasions SET last_handled_for=?, updated_at=? WHERE id=?", (occ_date, _utcnow(), occ_id))
+
+
+def due_occasions():
+    """Enabled, auto-draft-on occasions whose lead window is open and which we haven't acted on yet
+    for the upcoming occurrence. Returns dicts with next_date/days_until set."""
+    due = []
+    for o in list_occasions(brand=None):
+        if not (o.get("enabled") and o.get("auto_draft")):
+            continue
+        if o["days_until"] is None or o["days_until"] > (o.get("lead_days") or 14) or o["days_until"] < 0:
+            continue
+        if o.get("last_handled_for") == o["next_date"]:
+            continue
+        due.append(o)
+    return due
 
 
 # --- work queue (dashboard-originated jobs, processed by worker.py) ---

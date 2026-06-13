@@ -469,4 +469,75 @@ export function deleteBrand(slug) {
   return { ok: true };
 }
 
+// --- occasions calendar (§7g) — recurring-rule dates resolved for display -----------------
+// weekday convention matches the Python side: 0=Mon .. 6=Sun. All dates are computed in UTC and
+// compared against SAST "today" so the dashboard and the worker agree on what's upcoming.
+function _todayLocalUTC() {
+  const s = new Date(Date.now() + 120 * 60000); // shift to SAST (+02:00), then read as a UTC-midnight date
+  return new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate()));
+}
+function _nthWeekdayDate(year, month, weekday, n) {
+  const dim = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (n > 0) {
+    const firstWd = (new Date(Date.UTC(year, month - 1, 1)).getUTCDay() + 6) % 7; // Mon=0..Sun=6
+    const day = 1 + (((weekday - firstWd) % 7) + 7) % 7 + (n - 1) * 7;
+    return day > dim ? null : new Date(Date.UTC(year, month - 1, day));
+  }
+  const lastWd = (new Date(Date.UTC(year, month - 1, dim)).getUTCDay() + 6) % 7;
+  return new Date(Date.UTC(year, month - 1, dim - ((((lastWd - weekday) % 7) + 7) % 7)));
+}
+function nextOccurrence(rule, fromDate) {
+  let r = rule;
+  if (typeof r === 'string') { try { r = JSON.parse(r); } catch { return null; } }
+  if (!r) return null;
+  for (const year of [fromDate.getUTCFullYear(), fromDate.getUTCFullYear() + 1]) {
+    let cand = null;
+    if (r.type === 'fixed') {
+      cand = new Date(Date.UTC(year, r.month - 1, r.day));
+      if (cand.getUTCMonth() !== r.month - 1) cand = null; // guard impossible dates (e.g. Feb 30)
+    } else if (r.type === 'nth_weekday') {
+      cand = _nthWeekdayDate(year, r.month, r.weekday, r.n);
+    }
+    if (cand && cand >= fromDate) return cand;
+  }
+  return null;
+}
+
+export function listOccasions(brand) {
+  const d = db();
+  let rows;
+  try {
+    rows = (brand && brand !== 'all')
+      ? d.prepare("SELECT * FROM occasions WHERE brand=? OR brand='all'").all(brand)
+      : d.prepare('SELECT * FROM occasions').all();
+  } catch { return []; } // table not created yet (worker seeds it on first run)
+  const today = _todayLocalUTC();
+  const out = rows.map((o) => {
+    const nx = nextOccurrence(o.rule, today);
+    return { ...o, next_date: nx ? nx.toISOString().slice(0, 10) : null, days_until: nx ? Math.round((nx - today) / 86400000) : null };
+  });
+  out.sort((a, b) => (a.days_until == null ? 1 : 0) - (b.days_until == null ? 1 : 0) || (a.days_until || 0) - (b.days_until || 0));
+  return out;
+}
+
+export function upsertOccasion(o) {
+  const d = db();
+  const now = new Date().toISOString();
+  const rule = typeof o.rule === 'string' ? o.rule : JSON.stringify(o.rule);
+  if (!o.name?.trim()) throw new Error('name is required');
+  if (o.id) {
+    d.prepare('UPDATE occasions SET brand=?,name=?,rule=?,region=?,lead_days=?,sensitive=?,auto_draft=?,enabled=?,updated_at=? WHERE id=?')
+      .run(o.brand || 'all', o.name.trim(), rule, o.region || '', o.lead_days ?? 14, o.sensitive ? 1 : 0, o.auto_draft ? 1 : 0, o.enabled === 0 ? 0 : 1, now, o.id);
+    return o.id;
+  }
+  const r = d.prepare("INSERT INTO occasions (brand,name,rule,region,lead_days,sensitive,auto_draft,source,enabled,created_at,updated_at) VALUES (?,?,?,?,?,?,?, 'manual', ?,?,?)")
+    .run(o.brand || 'all', o.name.trim(), rule, o.region || '', o.lead_days ?? 14, o.sensitive ? 1 : 0, o.auto_draft ? 1 : 0, 1, now, now);
+  return r.lastInsertRowid;
+}
+
+export function deleteOccasion(id) {
+  db().prepare('DELETE FROM occasions WHERE id=?').run(id);
+  return { ok: true };
+}
+
 export { STATES };

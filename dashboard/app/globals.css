@@ -440,6 +440,28 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
 .kb-graph-drop { position: absolute; right: 12px; bottom: 10px; font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; color: var(--faint); pointer-events: none; }
 
+/* occasions calendar (§7g) */
+.occ-list { display: flex; flex-direction: column; gap: 7px; }
+.occ-row { display: grid; grid-template-columns: 132px 1fr auto; gap: 14px; align-items: center; background: var(--bg-1); border: 1px solid var(--line); border-left: 2px solid var(--line); border-radius: var(--r-lg); padding: 11px 14px; }
+.occ-row.on { border-left-color: var(--accent); }
+.occ-when { text-align: left; }
+.occ-date { font-family: var(--serif); font-size: 14px; color: var(--fg); }
+.occ-count { font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin-top: 2px; }
+.occ-main { min-width: 0; }
+.occ-name { font-size: 14px; color: var(--fg); display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.occ-rule { font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin-top: 3px; letter-spacing: 0.02em; }
+.occ-badge { font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 999px; padding: 1px 7px; }
+.occ-badge.occ-sensitive { color: var(--accent-2); background: var(--accent-bg); border-color: transparent; }
+.occ-badge.occ-all, .occ-badge.occ-builtin { color: var(--faint); background: transparent; }
+.occ-acts { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.occ-toggle { background: transparent; border: 1px solid var(--line-2); color: var(--muted); border-radius: 999px; padding: 4px 10px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.04em; cursor: pointer; white-space: nowrap; transition: all .12s; }
+.occ-toggle:hover { color: var(--fg); border-color: var(--accent); }
+.occ-toggle.is-on { background: var(--accent-bg); color: var(--accent-2); border-color: transparent; }
+.occ-toggle.is-warn { color: var(--accent-2); border-color: var(--accent); border-style: dashed; }
+.occ-field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.occ-field > span { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+@media (max-width: 760px) { .occ-row { grid-template-columns: 1fr; gap: 8px; } .occ-acts { flex-wrap: wrap; } }
+
 /* ── calendar (Postiz mirror) ──────────────────────────────────────────── */
 .cal-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .cal-nav { display: flex; align-items: center; gap: 8px; }

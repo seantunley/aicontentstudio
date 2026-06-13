@@ -261,6 +261,45 @@ def _heartbeat():
         pass
 
 
+def _check_occasions():
+    """§7g lead-time automation: when an auto-draft occasion's window opens, queue a draft job for it
+    (per the occasion's brand, or every enabled brand for a shared 'all' occasion). Sensitive
+    occasions are notify-first — we ping the operator instead of auto-drafting. Idempotent per
+    occurrence via occasions.last_handled_for, so a fast worker loop won't double-fire."""
+    try:
+        due = db.due_occasions()
+    except Exception as e:  # noqa: BLE001
+        print(f"worker: occasions check error: {e}")
+        return
+    if not due:
+        return
+    brands = [b["slug"] for b in db.list_brands() if b.get("enabled", 1)]
+    for o in due:
+        targets = ([o["brand"]] if o["brand"] != "all" else (brands or ["unassigned"]))
+        when = o["next_date"]
+        days = o["days_until"]
+        if o.get("sensitive"):
+            # notify-first: emotionally-charged occasion — let the operator decide the tone (§6a/§7g)
+            for tb in targets:
+                label = "" if tb in ("all", "unassigned") else f" for {tb}"
+                _telegram_notify(
+                    f"\U0001f56f️ {o['name']} is in {days} days ({when}) — flagged sensitive{label}. "
+                    f"I won't auto-draft this one. Want me to put something together? Tell me the angle and I'll start it.")
+            db.mark_occasion_handled(o["id"], when)
+            print(f"worker: occasion '{o['name']}' sensitive — notified (not drafted)")
+            continue
+        for tb in targets:
+            topic = f"{o['name']} — on-brand post for the occasion ({when})"
+            job = db.create_job(topic, brand=tb, source="occasion")
+            db.enqueue_action(job["id"], "research_draft")
+            db.record_event(job["id"], f"auto-queued by occasions calendar (§7g): {o['name']} on {when}, {days}d out", actor="system")
+        db.mark_occasion_handled(o["id"], when)
+        _telegram_notify(
+            f"\U0001f4c5 {o['name']} is {days} days out ({when}) — I've queued {'a draft' if len(targets)==1 else f'{len(targets)} drafts'} "
+            f"for your approval queue. Nothing posts until you approve.")
+        print(f"worker: occasion '{o['name']}' -> queued {len(targets)} draft(s)")
+
+
 def main():
     db.init_db()
     _heartbeat()
@@ -269,6 +308,7 @@ def main():
         return
     try:
         _maybe_run_scout()
+        _check_occasions()
         _autotag_media()
         _polish_pending()  # polish drafts from ANY path (incl. Telegram) that aren't polished yet
         db.purge_trash(30)  # hard-delete trashed jobs + media older than 30 days
