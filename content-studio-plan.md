@@ -247,7 +247,11 @@ No LLM is *guaranteed* by instruction alone to never err. What this architecture
 
 ## 3d. Engagement layer (comments & DMs)
 
-Publishing generates replies; the system must handle what comes back, not just what goes out. The agent monitors comments/DMs (Postiz inbox features and/or platform APIs) and **triages**:
+Publishing generates replies; the system must handle what comes back, not just what goes out. The agent monitors comments/DMs and **triages**:
+
+**Source decision (13 Jun 2026):** Postiz has **no** inbox/engagement API (verified — only `webhookUrl` + providers' internal `commentPost`; it's a publisher, not an inbox). The chosen engagement source is **Chatwoot** — free, MIT-licensed, self-hosted omnichannel inbox that ingests DMs *and* comments/mentions from the production platforms (Instagram, Facebook, X, Telegram, WhatsApp, LINE) and exposes a full API the studio reads from + posts gated replies into. (Bluesky is test-only and not a production target, so Chatwoot's lack of Bluesky support is moot; if it ever mattered, AT-Proto `listNotifications` is free + open and can be bridged in via Chatwoot's API channel.) **Sequencing:** stand Chatwoot up alongside Postiz only once a production platform account exists to connect — like the performance loop, it has no source to ingest until then. Mixpost was rejected: its engagement inbox is Pro-only and unreleased.
+
+The triage tiers:
 
 - **Routine** (thanks, emoji, simple praise) → summarised in the digest; optionally auto-like where supported.
 - **Questions worth answering** → the agent drafts an on-brand reply that goes through the **same approval gate** as posts (one-tap approve in Telegram).
