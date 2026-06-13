@@ -24,6 +24,7 @@ const ICONS = {
   accounts: <><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" /></>,
   costs: <><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></>,
   trash: <><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" /></>,
+  brands: <><path d="M20.59 13.41 13.42 20.6a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><path d="M7 7h.01" /></>,
   more: <><circle cx="5" cy="12" r="1.4" /><circle cx="12" cy="12" r="1.4" /><circle cx="19" cy="12" r="1.4" /></>,
 };
 
@@ -39,6 +40,9 @@ const GROUPS = [
   { label: 'Intake', items: [
     { href: '/scout', key: 'scout', label: 'Scout', countKey: 'scout' },
     { href: '/jobs', key: 'jobs', label: 'All jobs' },
+  ]},
+  { label: 'Brands', items: [
+    { href: '/brands', key: 'brands', label: 'Brands' },
   ]},
   { label: 'Library', items: [
     { href: '/vault', key: 'vault', label: 'The Vault', countKey: 'vault', calm: true },
@@ -61,6 +65,7 @@ const MORE = [
   { href: '/upcoming', key: 'upcoming', label: 'Upcoming' },
   { href: '/vault', key: 'vault', label: 'The Vault' },
   { href: '/jobs', key: 'jobs', label: 'All jobs' },
+  { href: '/brands', key: 'brands', label: 'Brands' },
   { href: '/accounts', key: 'accounts', label: 'Accounts' },
   { href: '/costs', key: 'costs', label: 'Cost ledger' },
   { href: '/trash', key: 'trash', label: 'Trash' },

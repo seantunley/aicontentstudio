@@ -58,6 +58,27 @@ LOCK_STALE_SECONDS = 1800
 RUN_TIMEOUT_SECONDS = 600
 
 
+def _brand_block(job):
+    """If the job's brand has a profile, inject its voice/safety/region so generation sounds like
+    that brand. Empty when no profile exists — generation behaves exactly as before. Needs no brand
+    details until the operator fills a brand pack in."""
+    try:
+        b = db.get_brand(job.get("brand"))
+    except Exception:  # noqa: BLE001
+        b = None
+    if not b:
+        return ""
+    bits = []
+    if b.get("audience"):  bits.append(f"Audience: {b['audience']}.")
+    if b.get("region"):    bits.append(f"Region: {b['region']} (use its conventions/spelling).")
+    if b.get("voice"):     bits.append(f"Voice rules: {b['voice']}")
+    if b.get("safety"):    bits.append(f"Brand-safety rules (follow strictly): {b['safety']}")
+    if b.get("pillars"):   bits.append(f"Content pillars to draw from: {b['pillars']}")
+    if not bits:
+        return ""
+    return f"BRAND PROFILE for {b.get('name') or job.get('brand')} — write in this brand's voice. " + " ".join(bits) + " "
+
+
 def _agent_prompt(job, with_image, with_video=False):
     targets = (job.get("target_platforms") or "").strip()
     if targets:
@@ -80,6 +101,7 @@ def _agent_prompt(job, with_image, with_video=False):
         "Make each post persuasive: open with a hook, lead with the reader's benefit (not features), "
         "end with one clear call to action. Ethical only, never shame, scare, or use false urgency "
         "(especially on health or sensitive topics). "
+        + _brand_block(job)
         + step2
     )
     if with_image:

@@ -406,4 +406,34 @@ export function revertDraftStep(draftId, stepIndex, who) {
   return { ok: true, char_count: before.length };
 }
 
+// --- Brand registry (§1a/§7): empty until the operator fills packs in; generation uses a
+// brand's profile when present, else the default behaviour. No brand details required to exist. ---
+export function listBrands() {
+  return db().prepare('SELECT * FROM brands ORDER BY name').all();
+}
+export function getBrandBySlug(slug) {
+  return db().prepare('SELECT * FROM brands WHERE slug=?').get(slug) || null;
+}
+const slugify = (s) => (s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+export function upsertBrand(b) {
+  const d = db();
+  const name = (b.name || '').trim();
+  if (!name) throw new Error('name is required');
+  const slug = (b.slug && b.slug.trim()) ? slugify(b.slug) : slugify(name);
+  if (!slug) throw new Error('could not derive a slug');
+  const now = new Date().toISOString();
+  const vals = [name, b.region || null, b.audience || null, b.voice || null, b.safety || null, b.pillars || null, b.sensitive || null, b.enabled === false ? 0 : 1, now];
+  if (d.prepare('SELECT slug FROM brands WHERE slug=?').get(slug)) {
+    d.prepare('UPDATE brands SET name=?,region=?,audience=?,voice=?,safety=?,pillars=?,sensitive=?,enabled=?,updated_at=? WHERE slug=?').run(...vals, slug);
+  } else {
+    d.prepare('INSERT INTO brands (name,region,audience,voice,safety,pillars,sensitive,enabled,updated_at,created_at,slug) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(...vals, now, slug);
+  }
+  return { ok: true, slug };
+}
+export function deleteBrand(slug) {
+  const r = db().prepare('DELETE FROM brands WHERE slug=?').run(slug);
+  if (!r.changes) throw new Error('no such brand');
+  return { ok: true };
+}
+
 export { STATES };

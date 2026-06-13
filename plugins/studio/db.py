@@ -137,6 +137,19 @@ CREATE TABLE IF NOT EXISTS scout_schedule (
     cadence_hours INTEGER DEFAULT 24,        -- legacy, unused
     last_run_at   TEXT
 );
+CREATE TABLE IF NOT EXISTS brands (
+    slug        TEXT PRIMARY KEY,         -- stable id; matches jobs.brand
+    name        TEXT NOT NULL,
+    region      TEXT,                     -- audience country/region (tone, occasions §7g)
+    audience    TEXT,                     -- who they are
+    voice       TEXT,                     -- voice rules / do's & don'ts (free text, injected into generation)
+    safety      TEXT,                     -- brand-safety notes (§6a), free text
+    pillars     TEXT,                     -- content pillars (one per line / comma)
+    sensitive   TEXT,                     -- sensitive topics/occasions -> notify-first
+    enabled     INTEGER DEFAULT 1,
+    created_at  TEXT,
+    updated_at  TEXT
+);
 CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state);
 CREATE INDEX IF NOT EXISTS idx_events_job ON job_events(job_id);
 CREATE INDEX IF NOT EXISTS idx_suggestions_status ON suggestions(status);
@@ -506,6 +519,20 @@ def mark_draft_polished(draft_id):
     """Mark a draft as polished-with-no-change (empty steps), so the sweep won't reprocess it."""
     with _db() as conn:
         conn.execute("UPDATE drafts SET polish_json='[]' WHERE id=? AND polish_json IS NULL", (draft_id,))
+
+
+def get_brand(slug):
+    """A brand's profile (or None). Read at generation time to shape voice + safety per brand."""
+    if not slug:
+        return None
+    with _db() as conn:
+        r = conn.execute("SELECT * FROM brands WHERE slug=? AND enabled=1", (slug,)).fetchone()
+    return dict(r) if r else None
+
+
+def list_brands():
+    with _db() as conn:
+        return [dict(r) for r in conn.execute("SELECT * FROM brands ORDER BY name").fetchall()]
 
 
 def purge_trash(ttl_days=30):
