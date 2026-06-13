@@ -1,8 +1,9 @@
 # AI Content Studio — Planning Document
 
-*Draft v0.19 — a personal, single-operator system for researching topics and producing + publishing content across platforms, controlled via Telegram. Runs multiple brands; deployment topology is variable. This is a living document; add to it freely.*
+*Draft v0.20 — a personal, single-operator system for researching topics and producing + publishing content across platforms, controlled via Telegram. Runs multiple brands; deployment topology is variable. This is a living document; add to it freely.*
 
-*Changes since v0.18: occasions calendar (§7g) — special-occasion automation (recurring rule-based built-ins, manual dates, country-holiday research; region-aware per brand; auto-draft by default with a notify-first carve-out for sensitive occasions); upgrades the old §7e known-dates bullet. Phase 5.*
+*Changes since v0.19: brand context as a hard boundary (§1b) — one active brand at a time; accounts/data/memory/safety/occasions all scope to it; code-enforced at the tool layer (consolidated) or physical (isolated); visible active brand + publish-time brand/destination confirmation. Prevents wrong-brand misfires and cross-brand drift.*
+*Changes in v0.19: occasions calendar (§7g) — special-occasion automation (recurring rule-based built-ins, manual dates, country-holiday research; region-aware per brand; auto-draft by default with a notify-first carve-out for sensitive occasions); upgrades the old §7e known-dates bullet. Phase 5.*
 *Changes in v0.18: added the "ask, don't assume" build rule (§13) — never silently guess on consequential/irreversible/ambiguous things during the build; confirm first.*
 *Changes in v0.17: anti-slop commitment (Principle 0).*
 *Changes in v0.16: dashboard auth. v0.15: mobile-friendly. v0.14: performance loop. v0.13: resilience. v0.12: dashboard custom + from outset. v0.11: build workflow. v0.10: injection defence. v0.9: workflow audit. v0.8: deployment. v0.7: variable deployment. v0.6: multi-brand. v0.5: factual integrity. v0.4: trend scout. v0.3: Postiz + models. v0.2: Hermes.*
@@ -41,6 +42,39 @@ Hermes is built as a persistent per-server agent with its own personality, memor
 - **Scheduler can vary per brand:** self-hosted Postiz for brands I keep close; Zernio's cloud API (§7d, held in reserve) suits a brand I might hand to a client or run hands-off.
 
 **Primary brand:** breastfeeding-support — the most safety-demanding (§6a); build it as the template.
+
+---
+
+## 1b. Brand context as a hard boundary
+
+With multiple brands, the worst failure is not a bad post — it's the **right post on the wrong brand's account** (e.g. breastfeeding content landing on another business's page). Hard to undo, instantly erodes trust. So brand context is a **hard, code-enforced boundary**, not a convenience toggle.
+
+### The model
+At any moment I am operating *inside exactly one brand*. Everything scopes to it:
+- social accounts I can reach,
+- settings,
+- history,
+- memory / knowledge,
+- safety policy (§6a),
+- occasions calendar (§7g).
+
+While in a brand's context I cannot see or touch another brand's accounts or data. **Switching is a deliberate act, never accidental.** This kills both failure modes: **drift** (one brand's voice/knowledge bleeding into another) and **misfire** (posting to the wrong page).
+
+### Enforcement depends on topology (§1a)
+- **Isolated topology (per-brand agent):** sandboxing is *free and absolute* — brands are separate processes that can't see each other's data or accounts. Nothing to "switch"; I just talk to a different agent. The boundary is physical, not a setting that can be misconfigured. **Strongest version — a point in favour of isolating.**
+- **Consolidated topology (one instance, many brands):** switching is a built feature, and the scope MUST be enforced **in code at the tool layer**, not left to the model. Every account lookup, history query, memory retrieval, and publish call is filtered by the **active brand ID outside the model**, so even a confused or prompt-injected agent *physically cannot* reach another brand's accounts. Same philosophy as the publish gate (§4a): don't trust the model to behave — make misbehaviour impossible.
+
+### Robustness details
+- **Active brand is always explicit and visible** — shown in the dashboard header; the bot states it ("you're in Breastfeeding"). I'm never guessing which context I'm in.
+- **Switching is a deliberate command** — an intentional action with clear confirmation of the new context.
+- **Publish-time confirmation includes brand + destinations** — "post to *Breastfeeding* → Instagram + Bluesky?" — so the wrong-page misfire has a second catch right before it happens (ties into the approval gate, §4a).
+
+### Sequencing
+Relevant the moment more than one brand exists (Phase 1 onward). The visible-active-brand indicator and publish-time brand/destination confirmation are cheap and should come early; full code-level scoping matters most in the consolidated topology.
+
+### Open decisions
+- Which topology per brand (§1a) — isolating is the strongest sandbox; decide which brands warrant it.
+- Switch mechanism in Telegram (a command, separate chats per brand, or a default brand) — overlaps the existing §12 "per-brand context switching" item.
 
 ---
 
