@@ -15,6 +15,13 @@ export const PLATFORM_IMAGE = {
 // All platforms the studio can draft for (publish needs the channel connected in Postiz).
 export const SUPPORTED = Object.keys(PLATFORM_IMAGE);
 
+// Per-platform character limits (client-safe mirror of plugins/studio/db.py PLATFORM_LIMITS).
+// Kept here so client components can show "x/limit" without importing the server-only DB module.
+export const PLATFORM_LIMITS = {
+  bluesky: 300, x: 280, instagram: 2200, facebook: 63206, telegram: 4096,
+  vk: 16000, linkedin: 3000, youtube: 5000, tiktok: 2200,
+};
+
 // Display metadata for platform picker chips (brand colour + a compact glyph).
 export const PLATFORM_META = {
   bluesky: { label: 'Bluesky', color: '#1185fe', glyph: '🦋' },

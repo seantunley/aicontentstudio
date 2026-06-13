@@ -2,7 +2,7 @@
 import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useUI } from './ui';
-import { SUPPORTED, PLATFORM_META } from '@/lib/platforms';
+import { SUPPORTED, PLATFORM_META, PLATFORM_LIMITS } from '@/lib/platforms';
 
 async function post(url, body) {
   const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
@@ -434,6 +434,49 @@ export function NicheManager({ niches }) {
 export function LogoutButton() {
   async function out() { await fetch('/api/logout', { method: 'POST' }); window.location.href = '/login'; }
   return <button className="btn btn--ghost" onClick={out}>Sign out</button>;
+}
+
+// Collapsible approval-queue row. Collapsed: topic, platforms, the post's first line, job id.
+// Expanded: the full post, media preview, polish pills, and approve/reject.
+export function QueueItem({ job }) {
+  const [open, setOpen] = useState(false);
+  const d = job.draft;
+  const platforms = (job.target_platforms ? job.target_platforms.split(',') : d ? [d.platform] : [])
+    .map((p) => p.trim()).filter(Boolean);
+  const firstLine = d?.body ? (d.body.split('\n').map((s) => s.trim()).find(Boolean) || '') : '';
+  const lim = d ? PLATFORM_LIMITS[d.platform] : null;
+  return (
+    <div className={`qcard ${open ? 'open' : ''}`}>
+      <button type="button" className="qcard-head" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <span className="qcard-caret">{open ? '▾' : '▸'}</span>
+        <div className="qcard-main">
+          <div className="qcard-topic">{job.topic}</div>
+          {firstLine ? <div className="qcard-title">{firstLine}</div> : null}
+        </div>
+        <div className="qcard-meta">
+          {platforms.map((p) => <span key={p} className="plat">{p}</span>)}
+          <span className="qcard-id">{job.id.slice(0, 8)}</span>
+        </div>
+      </button>
+      {open && (
+        <div className="qcard-body">
+          {d ? (
+            <>
+              <div className="draft-body">{d.body}</div>
+              {d.video_path
+                ? <video className="draft-img" src={d.video_path} controls muted playsInline />
+                : d.image_path ? <img className="draft-img" src={d.image_path} alt="" /> : null}
+              <div className="card-foot" style={lim && d.char_count > lim ? { color: 'var(--red)' } : null}>
+                {d.char_count}{lim ? `/${lim}` : ''} chars · angle {d.angle || '—'} · brand {job.brand}
+              </div>
+              <PostPills polish={d.polish_json} />
+            </>
+          ) : <div className="empty">No draft yet.</div>}
+          <ApprovalActions jobId={job.id} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Pills on a post preview showing what each polish skill changed (marketing-psychology + humanizer).

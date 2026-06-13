@@ -1,9 +1,7 @@
-import Link from 'next/link';
-import { approvalQueue, DRAFT_LIMITS } from '@/lib/db';
-import { ApprovalActions, PostPills } from '@/app/components/actions';
+import { approvalQueue } from '@/lib/db';
+import { QueueItem } from '@/app/components/actions';
 
 export const dynamic = 'force-dynamic';
-const short = (id) => (id ? id.slice(0, 8) : '');
 
 export default function Queue() {
   let q = [];
@@ -11,7 +9,7 @@ export default function Queue() {
   return (
     <>
       <div className="phead">
-        <div><h1>Approval queue</h1><div className="lede">The gate. Nothing ships without your yes. Open a job to edit the copy, then approve it for publishing.</div></div>
+        <div><h1>Approval queue</h1><div className="lede">The gate. Nothing ships without your yes. Tap a post to expand it, edit the copy on its job page, then approve.</div></div>
         <div className="crumbs">{q.length} waiting</div>
       </div>
       {q.length === 0 ? (
@@ -21,32 +19,8 @@ export default function Queue() {
           <div className="bd">When research and drafting finish, proofs land here for your call.</div>
         </div>
       ) : (
-        <div className="grid">
-          {q.map((j) => {
-            const lim = j.draft ? DRAFT_LIMITS[j.draft.platform] : null;
-            return (
-              <div className="card reveal" key={j.id}>
-                <div className="row-between" style={{ marginBottom: 7 }}>
-                  {j.draft ? <span className="plat">{j.draft.platform}</span> : <span />}
-                  <span className="card-foot" style={{ margin: 0 }}>{short(j.id)} · {j.brand}</span>
-                </div>
-                <div className="card-topic"><Link href={`/job/${j.id}`}>{j.topic}</Link></div>
-                {j.draft ? (
-                  <>
-                    <div className="draft-body">{j.draft.body}</div>
-                    {j.draft.video_path
-                      ? <video className="draft-img" src={j.draft.video_path} controls muted playsInline />
-                      : j.draft.image_path ? <img className="draft-img" src={j.draft.image_path} alt="" /> : null}
-                    <div className="card-foot" style={lim && j.draft.char_count > lim ? { color: 'var(--red)' } : null}>
-                      {j.draft.char_count}{lim ? `/${lim}` : ''} chars · angle {j.draft.angle || '—'} · <Link href={`/job/${j.id}`}>open to edit →</Link>
-                    </div>
-                    <PostPills polish={j.draft.polish_json} />
-                  </>
-                ) : <div className="empty">No draft yet.</div>}
-                <ApprovalActions jobId={j.id} />
-              </div>
-            );
-          })}
+        <div className="qlist reveal">
+          {q.map((j) => <QueueItem key={j.id} job={j} />)}
         </div>
       )}
     </>

@@ -367,6 +367,27 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .vtag--add { color: var(--accent); border-color: rgba(227,167,63,0.3); border-style: dashed; }
 .vault-tagedit { margin-top: 9px; }
 
+/* ── approval queue: collapsible posts ─────────────────────────────────── */
+.qlist { display: flex; flex-direction: column; gap: 8px; }
+.qcard { background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; transition: border-color 0.14s; }
+.qcard:hover { border-color: var(--line-2); }
+.qcard.open { border-color: var(--line-2); }
+.qcard-head { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; cursor: pointer;
+  background: none; border: none; color: inherit; padding: 13px 15px; }
+.qcard-caret { font-family: var(--mono); font-size: 11px; color: var(--accent); flex: none; width: 12px; }
+.qcard-main { flex: 1; min-width: 0; }
+.qcard-topic { font-family: var(--serif); font-size: 16px; font-weight: 550; line-height: 1.25; color: var(--fg);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qcard-title { font-size: 12.5px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qcard-meta { display: flex; align-items: center; gap: 7px; flex: none; }
+.qcard-id { font-family: var(--mono); font-size: 10.5px; color: var(--faint); letter-spacing: 0.04em; }
+.qcard-body { padding: 4px 15px 15px; border-top: 1px solid var(--line); animation: reveal 0.25s ease both; }
+.qcard-body .draft-body { margin-top: 12px; }
+@media (max-width: 600px) {
+  .qcard-head { flex-wrap: wrap; }
+  .qcard-meta { width: 100%; padding-left: 24px; flex-wrap: wrap; }
+}
+
 /* ── post-polish pills (what each skill changed) ───────────────────────── */
 .pills { margin-top: 10px; }
 .pills-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
