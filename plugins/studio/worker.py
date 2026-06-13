@@ -17,6 +17,7 @@ import json
 import urllib.request
 
 import db  # same directory
+import humanize  # same directory — the second-model humanizer pass (Principle 0)
 
 LOCK = "/tmp/studio_worker.lock"
 
@@ -71,7 +72,11 @@ def _agent_prompt(job, with_image, with_video=False):
         f"Topic: {job['topic']!r}. Brand: {job['brand']}. "
         "Step 1 — research: search the web, read real sources, then call save_brief with cited facts "
         "(each a real source_url + snippet) and 2-3 distinct angles. Use METRIC units only (Celsius, "
-        "km, kg, litres) — convert any imperial. "
+        "km, kg, litres), convert any imperial. "
+        "Write every draft like a sharp human, not an AI: no em dashes, no significance inflation "
+        "('a testament to', 'plays a vital role'), no rule-of-three lists, no 'serves as' (just say "
+        "'is'), no trailing -ing filler, no AI words (delve, leverage, underscore, tapestry, landscape). "
+        "Concrete and grounded; emojis and hashtags are fine where they fit the platform. "
         + step2
     )
     if with_image:
@@ -98,6 +103,7 @@ def process_one(job):
                            capture_output=True, text=True, timeout=RUN_TIMEOUT_SECONDS)
         state = db.get_job(jid)["state"]
         if state == "preview":
+            _humanize_drafts(jid)  # Layer 2: rewrite each draft through the humanizer before the operator sees it
             db.clear_queued(jid)
             db.record_event(jid, "worker: done — draft ready for review", actor="system")
             _telegram_notify(f'\U0001f4dd Draft ready to review: "{job["topic"]}" — it\'s in your approval queue.',
@@ -111,6 +117,23 @@ def process_one(job):
     except Exception as e:  # noqa: BLE001
         db.enqueue_action(jid, "failed")
         db.record_event(jid, f"worker: error: {e}", actor="system")
+
+
+def _humanize_drafts(job_id):
+    """Second-model humanizer pass (Principle 0): rewrite every draft to strip AI-writing tells
+    before it reaches the approval gate. Best-effort per draft — a failure leaves the (already
+    deterministically-scrubbed) original in place, never blocks the pipeline."""
+    for d in db.list_drafts(job_id):
+        limit = db.PLATFORM_LIMITS.get(d["platform"])
+        try:
+            new = humanize.humanize_via_model(d["body"], d["platform"], limit)
+        except Exception as e:  # noqa: BLE001
+            print(f"worker: humanize draft {d['id']} error: {e}")
+            continue
+        if new and new.strip() != (d["body"] or "").strip():
+            db.update_draft_body(d["id"], new)
+            db.record_event(job_id, f"draft humanized for {d['platform']} ({len(new)} chars)", actor="system")
+            print(f"worker: humanized draft {d['id']} ({d['platform']})")
 
 
 def _locked():

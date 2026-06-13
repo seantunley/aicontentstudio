@@ -484,6 +484,15 @@ def list_drafts(job_id):
         ).fetchall()]
 
 
+def update_draft_body(draft_id, body):
+    """Replace a draft's body (used by the worker's humanizer pass). Recomputes char_count."""
+    body = (body or "").strip()
+    if not body:
+        raise ValueError("draft body is empty")
+    with _db() as conn:
+        conn.execute("UPDATE drafts SET body=?, char_count=? WHERE id=?", (body, len(body), draft_id))
+
+
 def set_draft_image(job_id, image_id, image_path):
     """Attach an already-uploaded publisher media reference (id + url) to the job's latest draft."""
     with _db() as conn:

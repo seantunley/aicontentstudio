@@ -4,7 +4,7 @@ import os
 import json
 import subprocess
 
-from . import db, postiz
+from . import db, postiz, humanize
 
 
 def _ok(**kw):
@@ -223,8 +223,10 @@ def get_brief(args, **kwargs):
 def create_draft(args, **kwargs):
     jid = (args.get("job_id") or "").strip()
     platform = (args.get("platform") or "").strip()
-    body = args.get("body") or ""
-    if not jid or not platform or not body.strip():
+    # Layer 1 of the humanizer (Principle 0): a safe deterministic de-slop on every draft,
+    # whatever path created it. The full second-model rewrite runs later in the worker.
+    body = humanize.scrub((args.get("body") or "").strip())
+    if not jid or not platform or not body:
         return _err("job_id, platform, and body are required")
     job = db.find_job(jid)
     if not job:
