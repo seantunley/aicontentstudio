@@ -183,32 +183,63 @@ export function PublishButton({ jobId, channel }) {
   return <div className="actions"><button className="btn btn--primary" disabled={busy} onClick={go}>{busy ? 'Publishing…' : 'Publish live'}</button></div>;
 }
 
+const _pad = (n) => String(n).padStart(2, '0');
+const _fmtDate = (d) => `${d.getFullYear()}-${_pad(d.getMonth() + 1)}-${_pad(d.getDate())}`;
+const _at = (daysAhead, h, m = 0) => { const d = new Date(); d.setDate(d.getDate() + daysAhead); d.setHours(h, m, 0, 0); return d; };
+
 export function ScheduleButton({ jobId, channel }) {
   const ui = useUI();
   const [open, setOpen] = useState(false);
-  const [when, setWhen] = useState('');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('09:00');
   const [busy, setBusy] = useState(false);
+
+  function openPicker() {
+    const d = _at(1, 9);
+    setDate(_fmtDate(d)); setTime('09:00'); setOpen(true);
+  }
+  const apply = (d) => { setDate(_fmtDate(d)); setTime(`${_pad(d.getHours())}:${_pad(d.getMinutes())}`); };
+  const PRESETS = [['Tomorrow 9am', _at(1, 9)], ['Tomorrow 6pm', _at(1, 18)], ['In 3 days', _at(3, 9)], ['Next week', _at(7, 9)]];
+
+  const chosen = date && time ? new Date(`${date}T${time}`) : null;
+  const valid = chosen && !isNaN(chosen.getTime());
+  const readout = valid
+    ? chosen.toLocaleString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    : '—';
+
   async function go(e) {
     e?.preventDefault();
-    if (!when) { ui.toast('Pick a date & time', 'err'); return; }
+    if (!valid) { ui.toast('Pick a date & time', 'err'); return; }
+    if (chosen.getTime() < Date.now()) { ui.toast('That time is in the past', 'err'); return; }
     setBusy(true);
-    const iso = new Date(when).toISOString(); // datetime-local is browser-local -> ISO/UTC
-    const { ok, data } = await post('/api/schedule', { jobId, when: iso });
-    if (ok) { ui.toast(`Scheduled for ${data.scheduledAt.replace('T', ' ').slice(0, 16)} UTC`); window.location.reload(); return; }
+    const { ok, data } = await post('/api/schedule', { jobId, when: chosen.toISOString() });
+    if (ok) { ui.toast(`Scheduled — ${readout}`); window.location.reload(); return; }
     ui.toast(data.error || 'Schedule failed', 'err'); setBusy(false);
   }
+
   return (
     <>
-      <button className="btn btn--ghost" onClick={() => setOpen(true)}>Schedule</button>
+      <button className="btn btn--ghost" onClick={openPicker}>Schedule</button>
       {open && (
         <Modal bar="schedule" onClose={() => setOpen(false)}>
           <h3>Schedule this post</h3>
           <p>Hands it to Postiz&apos;s queue to post automatically to {channel || 'the connected channel'} at your chosen time.</p>
           <form onSubmit={go} className="field-stack">
-            <input className="input" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
+            <div className="sched-presets">
+              {PRESETS.map(([label, d]) => (
+                <button type="button" key={label} className="chip" onClick={() => apply(d)}>{label}</button>
+              ))}
+            </div>
+            <div className="sched-fields">
+              <label className="sched-f"><span>Date</span>
+                <input className="input" type="date" value={date} min={_fmtDate(new Date())} onChange={(e) => setDate(e.target.value)} /></label>
+              <label className="sched-f"><span>Time</span>
+                <input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} /></label>
+            </div>
+            <div className="sched-readout">Posts <b>{readout}</b> <span className="dim">· your local time</span></div>
             <div className="modal-acts">
               <button type="button" className="btn btn--ghost" onClick={() => setOpen(false)}>Cancel</button>
-              <button type="submit" className="btn btn--primary" disabled={busy || !when}>{busy ? 'Scheduling…' : 'Schedule'}</button>
+              <button type="submit" className="btn btn--primary" disabled={busy || !valid}>{busy ? 'Scheduling…' : 'Schedule'}</button>
             </div>
           </form>
         </Modal>

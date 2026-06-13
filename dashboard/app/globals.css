@@ -348,6 +348,15 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .dow-pill:hover { border-color: var(--accent); }
 .dow-pill.on { border-color: var(--accent); background: var(--accent-bg); color: var(--fg); }
 .sched-time { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.sched-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-family: var(--mono); font-size: 11px; padding: 5px 11px; border-radius: 99px; cursor: pointer;
+  border: 1px solid var(--line-2); background: var(--bg-2); color: var(--fg-2); transition: border-color .12s, color .12s, background .12s; }
+.chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
+.sched-fields { display: flex; gap: 10px; }
+.sched-f { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.sched-f span { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.sched-readout { font-size: 13px; color: var(--fg-2); }
+.sched-readout b { color: var(--fg); }
 
 /* ── the vault ─────────────────────────────────────────────────────────── */
 .vault-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
