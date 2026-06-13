@@ -29,6 +29,7 @@ const ICONS = {
   occasions: <><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /><path d="M12 13l1.2 2.4 2.6.4-1.9 1.8.5 2.6-2.4-1.3-2.4 1.3.5-2.6-1.9-1.8 2.6-.4z" /></>,
   campaigns: <><path d="M3 11l12-5v12L3 13z" /><path d="M15 8a3 3 0 0 1 0 6" /><path d="M6 13v4a2 2 0 0 0 2 2h1" /></>,
   performance: <><path d="M3 3v18h18" /><rect x="7" y="11" width="3" height="7" /><rect x="12" y="7" width="3" height="11" /><rect x="17" y="4" width="3" height="14" /></>,
+  engagement: <><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8A8.5 8.5 0 0 1 12.5 3 8.38 8.38 0 0 1 21 11.5z" /></>,
   more: <><circle cx="5" cy="12" r="1.4" /><circle cx="12" cy="12" r="1.4" /><circle cx="19" cy="12" r="1.4" /></>,
 };
 
@@ -40,6 +41,7 @@ const GROUPS = [
     { href: '/ready', key: 'ready', label: 'Ready to publish', countKey: 'ready' },
     { href: '/upcoming', key: 'upcoming', label: 'Upcoming', countKey: 'upcoming', calm: true },
     { href: '/calendar', key: 'calendar', label: 'Calendar' },
+    { href: '/engagement', key: 'engagement', label: 'Engagement' },
   ]},
   { label: 'Intake', items: [
     { href: '/scout', key: 'scout', label: 'Scout', countKey: 'scout' },

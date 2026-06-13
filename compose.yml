@@ -62,6 +62,13 @@ services:
       - POSTIZ_USER_ID=${POSTIZ_USER_ID}           # operator's Postiz user id (the minted token's subject)
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}   # DM the operator when a post goes live (two-way loop)
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      # §3d engagement engine — Chatwoot (runs from chatwoot/docker-compose.yml on :4009). Set the
+      # token + account id in .env after creating them in the Chatwoot UI; empty = the Engagement
+      # page shows setup steps instead of an inbox.
+      - CHATWOOT_URL=${CHATWOOT_URL:-http://host.docker.internal:4009}            # server-side API calls
+      - CHATWOOT_PUBLIC_URL=${CHATWOOT_PUBLIC_URL:-http://172.18.18.101:4009}     # browser-facing "Open Chatwoot" links (LAN)
+      - CHATWOOT_API_TOKEN=${CHATWOOT_API_TOKEN:-}
+      - CHATWOOT_ACCOUNT_ID=${CHATWOOT_ACCOUNT_ID:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"        # reach Postiz's host-published port from this bridge container
     volumes:

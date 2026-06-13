@@ -18,3 +18,5 @@ node_modules/
 renderer/node_modules/
 renderer/.remotion/
 renderer/out/
+chatwoot/.env
+chatwoot/data/

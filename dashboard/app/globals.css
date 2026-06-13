@@ -522,6 +522,16 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .pillar-chip { font-family: var(--mono); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-2); background: var(--accent-bg); border: 1px solid transparent; border-radius: 999px; padding: 2px 8px; }
 .pillar-cov { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 
+/* engagement inbox (§3d, Chatwoot) */
+.eng-steps { margin: 6px 0 14px; padding-left: 20px; color: var(--fg); font-size: 13.5px; line-height: 1.7; }
+.eng-steps code { font-family: var(--mono); font-size: 12px; background: var(--bg-3); padding: 1px 5px; border-radius: 4px; }
+.eng-list { display: flex; flex-direction: column; gap: 7px; }
+.eng-row { display: block; background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 11px 14px; text-decoration: none; transition: border-color .12s; }
+.eng-row:hover { border-color: var(--accent); }
+.eng-who { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.eng-contact { font-size: 14px; color: var(--fg); }
+.eng-last { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* ── calendar (Postiz mirror) ──────────────────────────────────────────── */
 .cal-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .cal-nav { display: flex; align-items: center; gap: 8px; }
