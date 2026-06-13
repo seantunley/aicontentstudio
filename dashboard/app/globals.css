@@ -486,6 +486,19 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .camp-piece-state.s-preview { color: var(--accent-2); background: var(--accent-bg); }
 .camp-piece-state.s-published { color: var(--green); background: var(--green-bg); }
 
+/* research brief inside an approval-queue card */
+.qresearch { margin: 10px 0; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); }
+.qresearch > summary { cursor: pointer; list-style: none; padding: 9px 12px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.qresearch > summary::-webkit-details-marker { display: none; }
+.qresearch > summary::before { content: '▸ '; color: var(--accent); }
+.qresearch[open] > summary::before { content: '▾ '; }
+.qresearch > summary:hover { color: var(--fg); }
+.qresearch[open] > summary { border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+.qresearch > *:not(summary) { margin-left: 12px; margin-right: 12px; }
+.qresearch[open] { padding-bottom: 8px; }
+.qr-h { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin: 12px 0 6px; }
+.qcard-foot { margin: 10px 0 2px; }
+
 /* ── calendar (Postiz mirror) ──────────────────────────────────────────── */
 .cal-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .cal-nav { display: flex; align-items: center; gap: 8px; }

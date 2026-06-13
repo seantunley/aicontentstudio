@@ -1,5 +1,6 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { createPortal } from 'react-dom';
 import { useUI } from './ui';
 import { SUPPORTED, PLATFORM_META, PLATFORM_LIMITS, PLATFORM_ICON } from '@/lib/platforms';
@@ -514,6 +515,34 @@ export function MediaRestoreButton({ id }) {
 
 // Collapsible approval-queue row. Collapsed: topic, platforms, the post's first line, job id.
 // Expanded: the full post, media preview, polish pills, and approve/reject.
+// The research brief behind a queued draft — the "background" that informs approval. Lazy-loaded.
+function QueueResearch({ jobId }) {
+  const [brief, setBrief] = useState(undefined); // undefined=loading, null=none, obj=loaded
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/brief?jobId=${jobId}`).then((r) => r.json()).then((d) => { if (live) setBrief(d.brief || null); }).catch(() => live && setBrief(null));
+    return () => { live = false; };
+  }, [jobId]);
+  if (brief === undefined) return <div className="qresearch"><div className="empty">Loading research…</div></div>;
+  if (!brief || !(brief.facts || brief.angles)) return null;
+  return (
+    <details className="qresearch">
+      <summary>Research behind this post {brief.recency ? <span className="dim">· {brief.recency}</span> : null}</summary>
+      {(brief.facts || []).length ? <div className="qr-h">Cited facts</div> : null}
+      {(brief.facts || []).map((f, i) => (
+        <div className="fact" key={i}>
+          <span className="fn">{i + 1}.</span>
+          <div className="claim">{f.claim}</div>
+          {f.source_url ? <div className="src"><a href={f.source_url} target="_blank" rel="noreferrer">{f.source_url}</a></div> : null}
+          {f.snippet ? <div className="snip">&ldquo;{f.snippet}&rdquo;</div> : null}
+        </div>
+      ))}
+      {(brief.angles || []).length ? <div className="qr-h">Angles</div> : null}
+      {(brief.angles || []).map((a, i) => <div className="angle" key={i}><b>{a.name}</b>: {a.hook}</div>)}
+    </details>
+  );
+}
+
 export function QueueItem({ job }) {
   const [open, setOpen] = useState(false);
   const d = job.draft;
@@ -549,6 +578,10 @@ export function QueueItem({ job }) {
               <PostPills polish={d.polish_json} draftId={d.id} />
             </>
           ) : <div className="empty">No draft yet.</div>}
+          <QueueResearch jobId={job.id} />
+          <div className="qcard-foot">
+            <Link className="deeplink" href={`/job/${job.id}`}>Open full job — all drafts, sources & timeline ↗</Link>
+          </div>
           <ApprovalActions jobId={job.id} flagged={flagged} />
         </div>
       )}
