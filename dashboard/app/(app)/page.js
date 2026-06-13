@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { pipelineCounts, inProgress, recentJobs, costSummary, approvalQueue, publishable, listSuggestions } from '@/lib/db';
+import { pipelineCounts, inProgress, recentJobs, costSummary, approvalQueue, publishable, listSuggestions, workerHeartbeat } from '@/lib/db';
 import { zar } from '@/lib/money';
 import { za } from '@/lib/time';
 
@@ -7,13 +7,20 @@ export const dynamic = 'force-dynamic';
 
 const short = (id) => (id ? id.slice(0, 8) : '');
 const when = (s) => za(s);
-const WORK = {
-  research_draft: ['queued', 'queued'],
-  research_draft_image: ['queued', 'queued · image'],
-  research_draft_image_video: ['queued', 'queued · video'],
-  processing: ['processing', 'processing'],
-  failed: ['failed', 'failed'],
+const ago = (iso) => {
+  if (!iso) return '';
+  const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.round(s / 60)}m ago`;
+  return `${Math.round(s / 3600)}h ago`;
 };
+// What's happening to a queued/working job, for the operator.
+function workState(qa) {
+  if (qa === 'processing') return { cls: 'processing', label: 'Working now', sub: 'the worker is on this one' };
+  if (qa === 'failed') return { cls: 'failed', label: 'Failed', sub: 'open it to retry' };
+  const extra = qa && qa.includes('video') ? ' (+ video)' : qa && qa.includes('image') ? ' (+ image)' : '';
+  return { cls: 'queued', label: `Queued${extra}`, sub: 'waiting for the worker' };
+}
 
 function DeskCard({ href, n, lab, tone }) {
   const cls = `desk-card ${n ? `t-${tone}` : 'zero'}`;
@@ -28,10 +35,11 @@ function DeskCard({ href, n, lab, tone }) {
 }
 
 export default function Overview() {
-  let pipe = [], work = [], jobs = [], cost = { entries: 0, totalUsd: 0 }, qn = 0, rn = 0, sn = 0, err = null;
+  let pipe = [], work = [], jobs = [], cost = { entries: 0, totalUsd: 0 }, qn = 0, rn = 0, sn = 0, hb = null, err = null;
   try {
     pipe = pipelineCounts();
     work = inProgress();
+    hb = workerHeartbeat();
     jobs = recentJobs(8);
     cost = costSummary();
     qn = approvalQueue().length;
@@ -82,23 +90,37 @@ export default function Overview() {
       </section>
 
       <section className="section reveal r3">
-        <div className="section-head"><span className="idx">03</span><h2>In the works</h2><span className="count">{work.length}</span><span className="rule" /></div>
+        <div className="section-head">
+          <span className="idx">03</span><h2>In the works</h2><span className="count">{work.length}</span><span className="rule" />
+          {(() => {
+            if (!hb) return <span className="wstat wstat--bad">worker: never run</span>;
+            if (hb.agoSec <= 90) return <span className="wstat wstat--ok">worker active · ran {ago(hb.at)}</span>;
+            if (hb.agoSec <= 600) return <span className="wstat wstat--warn">worker idle · ran {ago(hb.at)}</span>;
+            return <span className="wstat wstat--bad">worker not running · last {ago(hb.at)}</span>;
+          })()}
+        </div>
         {work.length === 0 ? (
           <div className="panel blank">
             <div className="fleuron">❧</div>
             <div className="bt">The workshop is quiet.</div>
             <div className="bd">Start a job from the sidebar, or promote a scout idea.</div>
           </div>
-        ) : work.map((j) => {
-          const [st, lab] = WORK[j.queued_action] || ['queued', j.queued_action];
-          return (
-            <div className="work-row" key={j.id}>
-              <span className={`dot ${st}`} />
-              <span className="wt"><Link href={`/job/${j.id}`}>{j.topic}</Link></span>
-              <span className="ws">{lab}</span>
-            </div>
-          );
-        })}
+        ) : (
+          <>
+            {work.map((j) => {
+              const w = workState(j.queued_action);
+              return (
+                <div className={`work-row work-row--${w.cls}`} key={j.id}>
+                  <span className={`dot ${w.cls}`} />
+                  <span className="wt"><Link href={`/job/${j.id}`}>{j.topic}</Link></span>
+                  <span className="wsub">{w.sub}</span>
+                  <span className="ws">{w.label}{w.cls === 'processing' ? ` · ${ago(j.updated_at)}` : ''}</span>
+                </div>
+              );
+            })}
+            <div className="card-foot" style={{ marginTop: 8 }}>The worker runs on a schedule and takes one job at a time. The pulsing row is running now; the rest are queued for the next run.</div>
+          </>
+        )}
       </section>
 
       <section className="section reveal r4">

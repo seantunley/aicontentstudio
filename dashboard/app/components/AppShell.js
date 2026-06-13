@@ -25,6 +25,7 @@ const ICONS = {
   costs: <><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></>,
   trash: <><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" /></>,
   brands: <><path d="M20.59 13.41 13.42 20.6a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><path d="M7 7h.01" /></>,
+  knowledge: <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></>,
   more: <><circle cx="5" cy="12" r="1.4" /><circle cx="12" cy="12" r="1.4" /><circle cx="19" cy="12" r="1.4" /></>,
 };
 
@@ -46,6 +47,7 @@ const GROUPS = [
   ]},
   { label: 'Library', items: [
     { href: '/vault', key: 'vault', label: 'The Vault', countKey: 'vault', calm: true },
+    { href: '/knowledge', key: 'knowledge', label: 'Knowledge' },
   ]},
   { label: 'Operations', items: [
     { href: '/accounts', key: 'accounts', label: 'Accounts' },
@@ -64,6 +66,7 @@ const MORE = [
   { href: '/calendar', key: 'calendar', label: 'Calendar' },
   { href: '/upcoming', key: 'upcoming', label: 'Upcoming' },
   { href: '/vault', key: 'vault', label: 'The Vault' },
+  { href: '/knowledge', key: 'knowledge', label: 'Knowledge' },
   { href: '/jobs', key: 'jobs', label: 'All jobs' },
   { href: '/brands', key: 'brands', label: 'Brands' },
   { href: '/accounts', key: 'accounts', label: 'Accounts' },

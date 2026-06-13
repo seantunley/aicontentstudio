@@ -3,6 +3,7 @@
 // single-operator scale (§9 — SQLite to start, Postgres later).
 import Database from 'better-sqlite3';
 import crypto from 'crypto';
+import fs from 'fs';
 
 const DB_PATH = process.env.STUDIO_DB_PATH || '/opt/studio/studio.db';
 const STATES = ['requested', 'researched', 'planned', 'generated', 'preview', 'approved', 'scheduled', 'published'];
@@ -143,8 +144,23 @@ export function scheduledJobs() {
 }
 
 // Jobs the worker is queued on / working / failed (queued_action carries the status).
+// Order: the job actually being processed first, then waiting, then failed.
 export function inProgress() {
-  return db().prepare("SELECT * FROM jobs WHERE queued_action IS NOT NULL ORDER BY created_at DESC").all();
+  return db().prepare(
+    "SELECT * FROM jobs WHERE queued_action IS NOT NULL"
+    + " ORDER BY CASE queued_action WHEN 'processing' THEN 0 WHEN 'failed' THEN 2 ELSE 1 END, updated_at DESC",
+  ).all();
+}
+
+// Worker liveness: the .worker_heartbeat file the worker writes each run. null if never run.
+export function workerHeartbeat() {
+  try {
+    const p = (process.env.STUDIO_DB_PATH || '/opt/studio/studio.db').replace(/[^/]+$/, '.worker_heartbeat');
+    const at = fs.readFileSync(p, 'utf8').trim();
+    const ms = Date.now() - new Date(at).getTime();
+    if (isNaN(ms)) return null;
+    return { at, agoSec: Math.max(0, Math.round(ms / 1000)) };
+  } catch { return null; }
 }
 
 export function retryJob(jobId) {

@@ -230,8 +230,20 @@ def _autotag_media(limit=5):
             print(f"worker: autotag asset {a['id']} failed: {e}")
 
 
+def _heartbeat():
+    """Write a timestamp each run so the dashboard can show the worker is alive (and which job
+    is actually being processed vs just queued)."""
+    try:
+        p = os.path.join(os.path.dirname(db.DB_PATH), ".worker_heartbeat")
+        with open(p, "w") as f:
+            f.write(__import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat())
+    except OSError:
+        pass
+
+
 def main():
     db.init_db()
+    _heartbeat()
     if _locked():
         print("worker: another run is in progress, skipping")
         return

@@ -247,7 +247,16 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .dot.processing { background: var(--cyan); animation: ping 1.5s ease-out infinite; }
 .dot.failed { background: var(--red); }
 .work-row .wt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
-.work-row .ws { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.work-row .wsub { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.04em; color: var(--faint); white-space: nowrap; }
+.work-row .ws { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.work-row--processing { border-color: var(--cyan); border-left: 2px solid var(--cyan); background: var(--cyan-bg); }
+.work-row--processing .ws { color: var(--cyan); font-weight: 600; }
+.work-row--failed { border-left: 2px solid var(--red); }
+.work-row--failed .ws { color: var(--red); }
+.wstat { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.06em; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line-2); }
+.wstat--ok { color: var(--green); border-color: rgba(147,201,106,0.4); }
+.wstat--warn { color: var(--amber); border-color: rgba(227,167,63,0.4); }
+.wstat--bad { color: var(--red); border-color: rgba(239,100,80,0.4); }
 
 /* ── accounts / stats ──────────────────────────────────────────────────── */
 .accts { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -384,6 +393,25 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .vtag { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: rgba(255,255,255,0.04); border: 1px solid var(--line); color: var(--muted); }
 .vtag--add { color: var(--accent); border-color: rgba(227,167,63,0.3); border-style: dashed; }
 .vault-tagedit { margin-top: 9px; }
+
+/* ── knowledge base ────────────────────────────────────────────────────── */
+.kb-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.kb-split { display: grid; grid-template-columns: 320px 1fr; gap: 12px; align-items: start; }
+.kb-list { display: flex; flex-direction: column; gap: 5px; max-height: 70vh; overflow-y: auto; }
+.kb-item { text-align: left; background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 9px 11px; cursor: pointer; transition: border-color .12s, background .12s; }
+.kb-item:hover { border-color: var(--line-2); }
+.kb-item.on { border-color: var(--accent); background: var(--bg-2); }
+.kb-item-title { font-size: 13px; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kb-item-snip { font-size: 11px; color: var(--muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kb-item-meta { font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); margin-top: 3px; }
+.kb-read { min-height: 50vh; max-height: 78vh; overflow-y: auto; }
+.kb-doc h2 { font-family: var(--serif); font-size: 19px; font-weight: 550; margin: 16px 0 8px; }
+.kb-doc h3 { font-size: 14px; margin: 14px 0 6px; color: var(--fg); }
+.kb-doc h4 { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin: 14px 0 6px; }
+.kb-doc p { font-size: 13.5px; line-height: 1.6; margin: 0 0 10px; white-space: pre-wrap; }
+.kb-doc pre { background: var(--bg); border: 1px solid var(--line); border-left: 2px solid var(--line-2); border-radius: var(--r); padding: 10px 12px; font-family: var(--mono); font-size: 12px; overflow-x: auto; margin: 0 0 10px; }
+.kb-doc blockquote { border-left: 2px solid var(--accent); margin: 0 0 8px; padding: 2px 0 2px 11px; color: var(--muted); font-size: 12.5px; }
+@media (max-width: 760px) { .kb-split { grid-template-columns: 1fr; } }
 
 /* ── calendar (Postiz mirror) ──────────────────────────────────────────── */
 .cal-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
