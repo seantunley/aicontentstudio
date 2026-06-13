@@ -217,6 +217,8 @@ def main():
         _maybe_run_scout()
         _autotag_media()
         _polish_pending()  # polish drafts from ANY path (incl. Telegram) that aren't polished yet
+        db.purge_trash(30)  # hard-delete trashed jobs + media older than 30 days
+
         jobs = db.get_queued_jobs()
         if not jobs:
             return

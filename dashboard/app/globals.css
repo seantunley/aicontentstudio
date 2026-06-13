@@ -13,9 +13,9 @@
   --line:  #272117;
   --line-2:#372f21;
   --fg:    #ece3d0;
-  --fg-2:  #b3a88f;
-  --muted: #7e745d;
-  --faint: #524a3a;
+  --fg-2:  #c6bca3;
+  --muted: #978c73;
+  --faint: #5c5340;
 
   --accent:    #e3a73f;                      /* brass — the desk lamp */
   --accent-2:  #ffc35e;
@@ -179,11 +179,12 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
   padding: 12px 14px; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
 .draft-img { display: block; max-width: 100%; max-height: 320px; border-radius: var(--r); border: 1px solid var(--line-2); margin-top: 10px; }
 
-/* platform tag */
-.plat { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 9.5px;
-  letter-spacing: 0.12em; text-transform: uppercase; color: var(--fg-2); background: var(--bg-3);
-  border: 1px solid var(--line-2); border-radius: 99px; padding: 2px 9px; }
-.plat::before { content:""; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+/* platform tag — brand-badged logo + name (white logo on the brand colour, readable on dark) */
+.plat { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-2); background: var(--bg-3);
+  border: 1px solid var(--line-2); border-radius: 99px; padding: 2px 10px 2px 3px; }
+.plat-logo { width: 17px; height: 17px; border-radius: 50%; display: grid; place-items: center; color: #fff; flex: none; }
+.plat-name { color: var(--fg-2); }
 
 /* ── badges ────────────────────────────────────────────────────────────── */
 .badge { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em;
@@ -194,6 +195,7 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .badge--failed, .badge--cancelled { color: var(--red); border-color: rgba(239,100,80,0.3); }
 .badge--requested, .badge--researched, .badge--planned, .badge--generated { color: var(--cyan); border-color: rgba(92,191,169,0.3); }
 .badge--scheduled { color: var(--accent-2); border-color: rgba(227,167,63,0.3); }
+.badge--review { color: var(--accent); border-color: rgba(227,167,63,0.4); background: var(--accent-bg); }
 .heat { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 9.5px; font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.12em; padding: 2px 9px; border: 1px solid; border-radius: 99px; }
 .heat::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
@@ -227,6 +229,9 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .btn--approve:hover { background: var(--green-bg); border-color: var(--green); }
 .btn--reject { background: transparent; border-color: rgba(239,100,80,0.4); color: var(--red); }
 .btn--reject:hover { background: var(--red-bg); border-color: var(--red); }
+.btn--review { background: transparent; border-color: rgba(227,167,63,0.45); color: var(--accent); }
+.btn--review:hover { background: var(--accent-bg); border-color: var(--accent); }
+.btn--review.on { background: var(--accent-bg); border-color: var(--accent); }
 .btn--ghost { background: transparent; }
 .btn--block { width: 100%; justify-content: center; }
 .btn--sm { padding: 4px 9px; font-size: 10.5px; }
@@ -360,6 +365,10 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .vault-kind { position: absolute; top: 8px; left: 8px; font-family: var(--mono); font-size: 9px; font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.1em; padding: 3px 7px; border-radius: var(--r); background: rgba(0,0,0,0.68); color: #fff; }
 .vault-kind--video { color: var(--accent); }
+.vault-del { position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; border-radius: 50%; border: none;
+  background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity .12s, background .12s; }
+.vault-tile:hover .vault-del { opacity: 1; }
+.vault-del:hover { background: var(--red); }
 .vault-meta { padding: 10px 11px 12px; }
 .vault-topic { font-size: 13px; font-weight: 600; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
 .vault-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; cursor: pointer; min-height: 22px; }

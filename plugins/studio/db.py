@@ -185,6 +185,10 @@ def init_db():
             # Per-skill transformation history for the preview pills: JSON list of
             # {skill, before, after, notes} from the psychology + humanizer passes.
             conn.execute("ALTER TABLE drafts ADD COLUMN polish_json TEXT")
+        mcols = [r[1] for r in conn.execute("PRAGMA table_info(media_assets)").fetchall()]
+        if "deleted_at" not in mcols:
+            # Vault soft-delete: deleted images go to Trash, restorable, purged after 30 days.
+            conn.execute("ALTER TABLE media_assets ADD COLUMN deleted_at TEXT")
         # scout suggestions: where it was found + trend heat (§3b score/flag)
         scols = [r[1] for r in conn.execute("PRAGMA table_info(suggestions)").fetchall()]
         if scols:  # table exists
@@ -502,6 +506,27 @@ def mark_draft_polished(draft_id):
     """Mark a draft as polished-with-no-change (empty steps), so the sweep won't reprocess it."""
     with _db() as conn:
         conn.execute("UPDATE drafts SET polish_json='[]' WHERE id=? AND polish_json IS NULL", (draft_id,))
+
+
+def purge_trash(ttl_days=30):
+    """Hard-delete trashed items older than ttl_days: rejected (cancelled) jobs and soft-deleted
+    media. Spend rows in the cost ledger are kept (job_id nulled) so per-brand totals survive."""
+    import datetime
+    cutoff = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=ttl_days)).isoformat()
+    with _db() as conn:
+        job_ids = [r[0] for r in conn.execute(
+            "SELECT id FROM jobs WHERE state='cancelled' AND updated_at < ?", (cutoff,)).fetchall()]
+        for jid in job_ids:
+            conn.execute("UPDATE cost_ledger SET job_id=NULL WHERE job_id=?", (jid,))  # keep spend history
+            conn.execute("UPDATE suggestions SET job_id=NULL WHERE job_id=?", (jid,))
+            for t in ("drafts", "briefs", "job_events", "publish_tokens"):
+                conn.execute(f"DELETE FROM {t} WHERE job_id=?", (jid,))
+            conn.execute("DELETE FROM jobs WHERE id=?", (jid,))
+        media = conn.execute(
+            "DELETE FROM media_assets WHERE deleted_at IS NOT NULL AND deleted_at < ?", (cutoff,)).rowcount
+    if job_ids or media:
+        print(f"worker: purged {len(job_ids)} trashed job(s) + {media} media older than {ttl_days}d")
+    return {"jobs": len(job_ids), "media": media}
 
 
 def update_draft_body(draft_id, body, polish_steps=None):

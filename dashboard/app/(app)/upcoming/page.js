@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { scheduledJobs } from '@/lib/db';
+import { PlatformChip } from '@/app/components/actions';
 
 export const dynamic = 'force-dynamic';
 const short = (id) => (id ? id.slice(0, 8) : '');
@@ -26,7 +27,7 @@ export default function Upcoming() {
             <div className="card reveal" key={j.id}>
               <div className="row-between" style={{ marginBottom: 7 }}>
                 <span className="badge badge--scheduled">{when(j.scheduled_at)} UTC</span>
-                {j.draft ? <span className="plat">{j.scheduled_to || j.draft.platform}</span> : <span />}
+                {j.draft ? <PlatformChip platform={j.scheduled_to || j.draft.platform} /> : <span />}
               </div>
               <div className="card-topic"><Link href={`/job/${j.id}`}>{j.topic}</Link></div>
               <div className="card-meta">{short(j.id)} · brand {j.brand}</div>

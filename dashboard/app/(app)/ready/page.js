@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { publishable } from '@/lib/db';
-import { PublishButton, ScheduleButton } from '@/app/components/actions';
+import { PublishButton, ScheduleButton, PlatformChip } from '@/app/components/actions';
 
 export const dynamic = 'force-dynamic';
 const short = (id) => (id ? id.slice(0, 8) : '');
@@ -25,7 +25,7 @@ export default function Ready() {
           {r.map((j) => (
             <div className="card reveal" key={j.id}>
               <div className="row-between" style={{ marginBottom: 7 }}>
-                {j.draft ? <span className="plat">{j.draft.platform}</span> : <span />}
+                {j.draft ? <PlatformChip platform={j.draft.platform} /> : <span />}
                 <span className="card-foot" style={{ margin: 0 }}>{short(j.id)} · {j.brand}</span>
               </div>
               <div className="card-topic"><Link href={`/job/${j.id}`}>{j.topic}</Link></div>

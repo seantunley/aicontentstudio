@@ -22,6 +22,7 @@ const ICONS = {
   vault: <><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="12" cy="12" r="3.2" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3" /></>,
   accounts: <><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" /></>,
   costs: <><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></>,
+  trash: <><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" /></>,
   more: <><circle cx="5" cy="12" r="1.4" /><circle cx="12" cy="12" r="1.4" /><circle cx="19" cy="12" r="1.4" /></>,
 };
 
@@ -43,6 +44,7 @@ const GROUPS = [
   { label: 'Operations', items: [
     { href: '/accounts', key: 'accounts', label: 'Accounts' },
     { href: '/costs', key: 'costs', label: 'Cost ledger' },
+    { href: '/trash', key: 'trash', label: 'Trash', countKey: 'trash', calm: true },
   ]},
 ];
 
@@ -58,6 +60,7 @@ const MORE = [
   { href: '/jobs', key: 'jobs', label: 'All jobs' },
   { href: '/accounts', key: 'accounts', label: 'Accounts' },
   { href: '/costs', key: 'costs', label: 'Cost ledger' },
+  { href: '/trash', key: 'trash', label: 'Trash' },
 ];
 
 function Wordmark() {

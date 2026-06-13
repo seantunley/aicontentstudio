@@ -272,11 +272,11 @@ export function addMediaAsset({ kind, url, mediaId, source, jobId, draftId, plat
 }
 export function listMedia(kind, limit = 600) {
   const d = db();
-  if (kind === 'image' || kind === 'video') return d.prepare('SELECT * FROM media_assets WHERE kind=? ORDER BY id DESC LIMIT ?').all(kind, limit);
-  return d.prepare('SELECT * FROM media_assets ORDER BY id DESC LIMIT ?').all(limit);
+  if (kind === 'image' || kind === 'video') return d.prepare('SELECT * FROM media_assets WHERE kind=? AND deleted_at IS NULL ORDER BY id DESC LIMIT ?').all(kind, limit);
+  return d.prepare('SELECT * FROM media_assets WHERE deleted_at IS NULL ORDER BY id DESC LIMIT ?').all(limit);
 }
 export function mediaCounts() {
-  const rows = db().prepare('SELECT kind, COUNT(*) n FROM media_assets GROUP BY kind').all();
+  const rows = db().prepare('SELECT kind, COUNT(*) n FROM media_assets WHERE deleted_at IS NULL GROUP BY kind').all();
   const m = Object.fromEntries(rows.map((r) => [r.kind, r.n]));
   return { image: m.image || 0, video: m.video || 0, total: (m.image || 0) + (m.video || 0) };
 }
@@ -284,6 +284,21 @@ export function setMediaTags(id, tags) {
   const r = db().prepare('UPDATE media_assets SET tags=? WHERE id=?').run(tags || null, Number(id));
   if (!r.changes) throw new Error('no such asset');
   return { ok: true };
+}
+// Vault soft-delete -> Trash (restorable, purged after 30 days).
+export function softDeleteMedia(id) {
+  const r = db().prepare('UPDATE media_assets SET deleted_at=? WHERE id=? AND deleted_at IS NULL')
+    .run(new Date().toISOString(), Number(id));
+  if (!r.changes) throw new Error('no such asset');
+  return { ok: true };
+}
+export function restoreMedia(id) {
+  const r = db().prepare('UPDATE media_assets SET deleted_at=NULL WHERE id=?').run(Number(id));
+  if (!r.changes) throw new Error('no such asset');
+  return { ok: true };
+}
+export function trashedMedia(limit = 300) {
+  return db().prepare('SELECT * FROM media_assets WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT ?').all(limit);
 }
 
 export const DRAFT_LIMITS = { bluesky: 300 };
@@ -331,6 +346,64 @@ export function markPublished(jobId, who, channel) {
       .run(new Date().toISOString(), jobId);
   });
   tx();
+}
+
+// --- Review-later flag (soft middle option between approve and reject) ---
+export function toggleReview(jobId, who) {
+  const d = db();
+  const job = d.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
+  if (!job) throw new Error('no such job');
+  let meta = {};
+  try { meta = JSON.parse(job.meta || '{}'); } catch { meta = {}; }
+  const now = new Date().toISOString();
+  const on = !meta.review_later;
+  if (on) meta.review_later = now; else delete meta.review_later;
+  d.prepare('UPDATE jobs SET meta=?, updated_at=? WHERE id=?').run(JSON.stringify(meta), now, jobId);
+  d.prepare('INSERT INTO job_events (job_id,from_state,to_state,actor,at,detail) VALUES (?,?,?,?,?,?)')
+    .run(jobId, null, null, 'human', now, on ? `flagged for later review by ${who}` : `review flag cleared by ${who}`);
+  return { ok: true, flagged: on };
+}
+
+// --- Trash: rejected jobs are 'cancelled' (soft-deleted), restorable, auto-purged after 30 days ---
+export const TRASH_TTL_DAYS = 30;
+export function trashedJobs() {
+  const jobs = db().prepare("SELECT * FROM jobs WHERE state='cancelled' ORDER BY updated_at DESC").all();
+  const latestDraft = db().prepare('SELECT * FROM drafts WHERE job_id=? ORDER BY id DESC LIMIT 1');
+  return jobs.map((j) => ({ ...j, draft: latestDraft.get(j.id) || null }));
+}
+export function restoreJob(jobId, who) {
+  const d = db();
+  const job = d.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
+  if (!job) throw new Error('no such job');
+  if (job.state !== 'cancelled') throw new Error(`job is '${job.state}', not in trash`);
+  const now = new Date().toISOString();
+  d.prepare('UPDATE jobs SET state=?, updated_at=? WHERE id=?').run('preview', now, jobId);
+  d.prepare('INSERT INTO job_events (job_id,from_state,to_state,actor,at,detail) VALUES (?,?,?,?,?,?)')
+    .run(jobId, 'cancelled', 'preview', 'human', now, `restored from trash by ${who}`);
+  return { ok: true };
+}
+
+// --- Pill revert: roll a draft back to the version BEFORE a polish step (e.g. the longer pre-humanize text) ---
+export function revertDraftStep(draftId, stepIndex, who) {
+  const d = db();
+  const draft = d.prepare('SELECT * FROM drafts WHERE id=?').get(draftId);
+  if (!draft) throw new Error('no such draft');
+  let steps = [];
+  try { steps = JSON.parse(draft.polish_json || '[]'); } catch { steps = []; }
+  const step = steps[stepIndex];
+  if (!step) throw new Error('no such polish step');
+  const before = (step.before || '').trim();
+  if (!before) throw new Error('no earlier version to revert to');
+  const kept = steps.slice(0, stepIndex); // dropping this step and everything after it
+  const tx = d.transaction(() => {
+    d.prepare('UPDATE drafts SET body=?, char_count=?, polish_json=? WHERE id=?')
+      .run(before, before.length, JSON.stringify(kept), draftId);
+    d.prepare('INSERT INTO job_events (job_id,from_state,to_state,actor,at,detail) VALUES (?,?,?,?,?,?)')
+      .run(draft.job_id, null, null, 'human', new Date().toISOString(),
+           `draft reverted to the version before "${step.skill}" via dashboard by ${who}`);
+  });
+  tx();
+  return { ok: true, char_count: before.length };
 }
 
 export { STATES };

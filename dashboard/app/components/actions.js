@@ -2,7 +2,29 @@
 import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useUI } from './ui';
-import { SUPPORTED, PLATFORM_META, PLATFORM_LIMITS } from '@/lib/platforms';
+import { SUPPORTED, PLATFORM_META, PLATFORM_LIMITS, PLATFORM_ICON } from '@/lib/platforms';
+
+// Brand logo (24x24 svg path) tinted to the platform colour. Falls back to nothing if unknown.
+function PlatformLogo({ platform, size = 14 }) {
+  const d = PLATFORM_ICON[platform];
+  if (!d) return null;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ flex: 'none' }}>
+      <path d={d} />
+    </svg>
+  );
+}
+
+// A coloured platform chip (brand-badged logo + name) for the approval/preview screens.
+export function PlatformChip({ platform }) {
+  const m = PLATFORM_META[platform] || { label: platform, color: 'var(--muted)' };
+  return (
+    <span className="plat">
+      <span className="plat-logo" style={{ background: m.color }}><PlatformLogo platform={platform} size={11} /></span>
+      <span className="plat-name">{m.label}</span>
+    </span>
+  );
+}
 
 async function post(url, body) {
   const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
@@ -25,15 +47,17 @@ function Modal({ bar, danger, onClose, children }) {
   );
 }
 
-// Selectable platform tiles with brand icon chips.
+// Selectable platform tiles with brand logo chips.
 function PlatformPicker({ selected, onToggle }) {
   return (
     <div className="ptiles">
       {SUPPORTED.map((p) => {
-        const m = PLATFORM_META[p] || { label: p, color: '#555', glyph: p[0] };
+        const m = PLATFORM_META[p] || { label: p, color: '#555' };
         return (
           <button type="button" key={p} className={`ptile ${selected[p] ? 'on' : ''}`} onClick={() => onToggle(p)}>
-            <span className="pchip" style={{ background: m.color }}>{m.glyph}</span>
+            <span className="pchip" style={{ background: m.color }}>
+              {PLATFORM_ICON[p] ? <PlatformLogo platform={p} size={13} /> : (m.glyph || p[0])}
+            </span>
             <span className="ptile-name">{m.label}</span>
           </button>
         );
@@ -72,7 +96,7 @@ export function NewJobButton({ block }) {
     e?.preventDefault();
     if (!topic.trim()) return;
     const platforms = Object.keys(selected).filter((p) => selected[p]);
-    if (channels && channels.length && !platforms.length) { ui.toast('Pick at least one platform', 'err'); return; }
+    if (!platforms.length) { ui.toast('Pick at least one platform', 'err'); return; }
     setBusy(true);
     const { ok, data } = await post('/api/jobs/new', { topic, brand, withImage: withImage || withVideo, withVideo, platforms });
     if (ok) { ui.toast('Job queued. Researching in the background.'); window.location.href = '/'; return; }
@@ -83,65 +107,59 @@ export function NewJobButton({ block }) {
     <>
       <button className={`btn btn--primary cta ${block ? 'btn--block' : ''}`} onClick={load}>+ New job</button>
       {open && (
-        <div className="modal-back" onClick={() => setOpen(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-bar"><span className="led" /> commission</div>
-            <div className="modal-body">
-              <h3>Start a new job</h3>
-              <p>Researches, drafts a tailored post for each platform you pick, optionally generates an image, then lands in your queue.</p>
-              <form onSubmit={submit} className="field-stack">
-                <input className="input" autoFocus placeholder="topic, e.g. 'latch tips for newborns'"
-                       value={topic} onChange={(e) => setTopic(e.target.value)} />
-                <input className="input" placeholder="brand (optional)" value={brand} onChange={(e) => setBrand(e.target.value)} />
-                <div>
-                  <div className="card-foot" style={{ margin: '2px 0 7px' }}>PLATFORMS</div>
-                  {channels === null ? (
-                    <span className="empty">loading channels…</span>
-                  ) : channels.length === 0 ? (
-                    <span className="empty">No channels connected in Postiz yet.</span>
-                  ) : (
-                    <div className="field-row">
-                      {channels.map((c) => (
-                        <label key={c.platform} className="check">
-                          <input type="checkbox" checked={!!selected[c.platform]} onChange={() => toggle(c.platform)} /> {c.platform}
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="field-row">
-                  <label className="check"><input type="checkbox" checked={withImage || withVideo} disabled={withVideo} onChange={(e) => setWithImage(e.target.checked)} /> + image</label>
-                  <label className="check"><input type="checkbox" checked={withVideo} onChange={(e) => setWithVideo(e.target.checked)} /> + video <span className="empty" style={{ marginLeft: 4 }}>(branded clip)</span></label>
-                </div>
-                <div className="modal-acts">
-                  <button type="button" className="btn btn--ghost" onClick={() => setOpen(false)}>Cancel</button>
-                  <button type="submit" className="btn btn--primary" disabled={busy || !topic.trim()}>{busy ? 'Queuing…' : 'Start job'}</button>
-                </div>
-              </form>
+        <Modal bar="commission" onClose={() => setOpen(false)}>
+          <h3>Start a new job</h3>
+          <p>Researches, then drafts a tailored post for each platform you pick. Optionally adds an image or video. Lands in your approval queue.</p>
+          <form onSubmit={submit} className="field-stack">
+            <input className="input" autoFocus placeholder="topic, e.g. 'latch tips for newborns'"
+                   value={topic} onChange={(e) => setTopic(e.target.value)} />
+            <input className="input" placeholder="brand (optional)" value={brand} onChange={(e) => setBrand(e.target.value)} />
+            <div>
+              <div className="card-foot" style={{ margin: '2px 0 7px' }}>
+                PLATFORMS {channels && channels.length ? <span className="dim">· connected are pre-selected</span> : null}
+              </div>
+              <PlatformPicker selected={selected} onToggle={toggle} />
             </div>
-          </div>
-        </div>
+            <div className="field-row">
+              <label className="check"><input type="checkbox" checked={withImage || withVideo} disabled={withVideo} onChange={(e) => setWithImage(e.target.checked)} /> + image</label>
+              <label className="check"><input type="checkbox" checked={withVideo} onChange={(e) => setWithVideo(e.target.checked)} /> + video <span className="empty" style={{ marginLeft: 4 }}>(branded clip)</span></label>
+            </div>
+            <div className="modal-acts">
+              <button type="button" className="btn btn--ghost" onClick={() => setOpen(false)}>Cancel</button>
+              <button type="submit" className="btn btn--primary" disabled={busy || !topic.trim()}>{busy ? 'Queuing…' : 'Start job'}</button>
+            </div>
+          </form>
+        </Modal>
       )}
     </>
   );
 }
 
-export function ApprovalActions({ jobId }) {
+export function ApprovalActions({ jobId, flagged }) {
   const ui = useUI();
   const [busy, setBusy] = useState(false);
   async function act(kind) {
     if (kind === 'reject') {
-      const ok = await ui.confirm({ title: 'Reject this job?', message: 'It will be cancelled and leave the queue.', confirmLabel: 'Reject', danger: true, tag: 'reject' });
+      const ok = await ui.confirm({ title: 'Reject this job?', message: 'It moves to Trash. You can restore it for 30 days.', confirmLabel: 'Reject', danger: true, tag: 'reject' });
       if (!ok) return;
     }
     setBusy(true);
     const { ok, data } = await post('/api/' + kind, { jobId });
-    if (ok) { ui.toast(kind === 'approve' ? 'Approved. Ready to publish.' : 'Rejected'); window.location.reload(); return; }
+    if (ok) { ui.toast(kind === 'approve' ? 'Approved. Ready to publish.' : 'Moved to Trash'); window.location.reload(); return; }
+    ui.toast(data.error || 'Failed', 'err'); setBusy(false);
+  }
+  async function review() {
+    setBusy(true);
+    const { ok, data } = await post('/api/review', { jobId });
+    if (ok) { ui.toast(data.flagged ? 'Marked for review later' : 'Review flag cleared'); window.location.reload(); return; }
     ui.toast(data.error || 'Failed', 'err'); setBusy(false);
   }
   return (
     <div className="actions">
       <button className="btn btn--approve" disabled={busy} onClick={() => act('approve')}>Approve</button>
+      <button className={`btn btn--review ${flagged ? 'on' : ''}`} disabled={busy} onClick={review}>
+        {flagged ? 'Reviewing later ✓' : 'Review later'}
+      </button>
       <button className="btn btn--reject" disabled={busy} onClick={() => act('reject')}>Reject</button>
     </div>
   );
@@ -436,6 +454,32 @@ export function LogoutButton() {
   return <button className="btn btn--ghost" onClick={out}>Sign out</button>;
 }
 
+// Restore a rejected job from Trash back into the approval queue.
+export function RestoreButton({ jobId }) {
+  const ui = useUI();
+  const [busy, setBusy] = useState(false);
+  async function go() {
+    setBusy(true);
+    const { ok, data } = await post('/api/restore', { jobId });
+    if (ok) { ui.toast('Restored to the approval queue'); window.location.reload(); return; }
+    ui.toast(data.error || 'Failed', 'err'); setBusy(false);
+  }
+  return <button className="btn btn--approve btn--sm" disabled={busy} onClick={go}>↩ Restore</button>;
+}
+
+// Restore a deleted Vault asset from Trash.
+export function MediaRestoreButton({ id }) {
+  const ui = useUI();
+  const [busy, setBusy] = useState(false);
+  async function go() {
+    setBusy(true);
+    const { ok, data } = await post('/api/media', { id, action: 'restore' });
+    if (ok) { ui.toast('Restored to the Vault'); window.location.reload(); return; }
+    ui.toast(data.error || 'Failed', 'err'); setBusy(false);
+  }
+  return <button className="btn btn--approve btn--sm" disabled={busy} onClick={go}>↩ Restore</button>;
+}
+
 // Collapsible approval-queue row. Collapsed: topic, platforms, the post's first line, job id.
 // Expanded: the full post, media preview, polish pills, and approve/reject.
 export function QueueItem({ job }) {
@@ -444,6 +488,8 @@ export function QueueItem({ job }) {
   const platforms = (job.target_platforms ? job.target_platforms.split(',') : d ? [d.platform] : [])
     .map((p) => p.trim()).filter(Boolean);
   const lim = d ? PLATFORM_LIMITS[d.platform] : null;
+  let flagged = false;
+  try { flagged = !!JSON.parse(job.meta || '{}').review_later; } catch {}
   return (
     <div className={`qcard ${open ? 'open' : ''}`}>
       <button type="button" className="qcard-head" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
@@ -452,7 +498,8 @@ export function QueueItem({ job }) {
           <div className="qcard-topic">{job.topic}</div>
         </div>
         <div className="qcard-meta">
-          {platforms.map((p) => <span key={p} className="plat">{p}</span>)}
+          {flagged ? <span className="badge badge--review">review later</span> : null}
+          {platforms.map((p) => <PlatformChip key={p} platform={p} />)}
           <span className="qcard-id">{job.id.slice(0, 8)}</span>
         </div>
       </button>
@@ -467,10 +514,10 @@ export function QueueItem({ job }) {
               <div className="card-foot" style={lim && d.char_count > lim ? { color: 'var(--red)' } : null}>
                 {d.char_count}{lim ? `/${lim}` : ''} chars · angle {d.angle || '—'} · brand {job.brand}
               </div>
-              <PostPills polish={d.polish_json} />
+              <PostPills polish={d.polish_json} draftId={d.id} />
             </>
           ) : <div className="empty">No draft yet.</div>}
-          <ApprovalActions jobId={job.id} />
+          <ApprovalActions jobId={job.id} flagged={flagged} />
         </div>
       )}
     </div>
@@ -480,12 +527,29 @@ export function QueueItem({ job }) {
 // Pills on a post preview showing what each polish skill changed (marketing-psychology + humanizer).
 // `polish` is the draft's polish_json string: [{skill, before, after, notes}, ...].
 const PILL_KEY = { 'Marketing psychology': 'psych', 'Humanized': 'human' };
-export function PostPills({ polish }) {
+export function PostPills({ polish, draftId }) {
+  const ui = useUI();
   const [open, setOpen] = useState(null);
+  const [busy, setBusy] = useState(false);
   let steps = [];
   try { steps = polish ? JSON.parse(polish) : []; } catch { steps = []; }
   if (!steps.length) return null;
   const s = open != null ? steps[open] : null;
+
+  async function revert(i) {
+    const skill = steps[i].skill;
+    const ok = await ui.confirm({
+      title: `Revert before "${skill}"?`,
+      message: `This replaces the current post with the version from before the ${skill} pass${i === 0 ? ' (the original draft)' : ''}. Later edits are dropped too.`,
+      confirmLabel: 'Revert', danger: true, tag: 'revert',
+    });
+    if (!ok) return;
+    setBusy(true);
+    const { ok: done, data } = await post('/api/revert', { draftId, stepIndex: i });
+    if (done) { ui.toast('Reverted to the earlier version'); window.location.reload(); return; }
+    ui.toast(data.error || 'Revert failed', 'err'); setBusy(false);
+  }
+
   return (
     <div className="pills">
       <div className="pills-row">
@@ -504,6 +568,12 @@ export function PostPills({ polish }) {
             <div className="pd-col pd-before"><span className="pd-lab">before</span><span className="pd-text">{s.before}</span></div>
             <div className="pd-col pd-after"><span className="pd-lab">after</span><span className="pd-text">{s.after}</span></div>
           </div>
+          {draftId ? (
+            <div className="actions" style={{ marginTop: 10 }}>
+              <button className="btn btn--sm" disabled={busy} onClick={() => revert(open)}>↩ Revert to “before”</button>
+              <span className="card-foot" style={{ margin: 0 }}>restores the pre-{s.skill.toLowerCase()} text</span>
+            </div>
+          ) : null}
         </div>
       )}
     </div>

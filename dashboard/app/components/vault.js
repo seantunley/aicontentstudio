@@ -23,6 +23,14 @@ export function VaultGrid({ items }) {
     else ui.toast('Failed to save tags', 'err');
   }
 
+  async function del(id) {
+    const ok = await ui.confirm({ title: 'Delete this asset?', message: 'It moves to Trash. You can restore it for 30 days.', confirmLabel: 'Delete', danger: true, tag: 'delete' });
+    if (!ok) return;
+    const r = await fetch('/api/media', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action: 'delete' }) });
+    if (r.ok) { setList((l) => l.filter((a) => a.id !== id)); ui.toast('Moved to Trash'); }
+    else ui.toast('Failed to delete', 'err');
+  }
+
   return (
     <>
       <div className="vault-bar">
@@ -38,14 +46,14 @@ export function VaultGrid({ items }) {
         <div className="panel"><div className="empty">{q ? 'No assets match your search.' : 'Nothing in the Vault yet. Generate or upload media and it lands here.'}</div></div>
       ) : (
         <div className="vault-grid">
-          {filtered.map((a) => <VaultTile key={a.id} a={a} onSave={saveTags} />)}
+          {filtered.map((a) => <VaultTile key={a.id} a={a} onSave={saveTags} onDelete={del} />)}
         </div>
       )}
     </>
   );
 }
 
-function VaultTile({ a, onSave }) {
+function VaultTile({ a, onSave, onDelete }) {
   const [editing, setEditing] = useState(false);
   const [tags, setTags] = useState(a.tags || '');
   const tagList = (a.tags || '').split(',').map((t) => t.trim()).filter(Boolean);
@@ -56,6 +64,7 @@ function VaultTile({ a, onSave }) {
           ? <video src={a.url} muted playsInline preload="metadata" />
           : <img src={a.url} alt={a.tags || a.topic || ''} loading="lazy" />}
         <span className={`vault-kind vault-kind--${a.kind}`}>{a.kind === 'video' ? '▶ video' : 'image'}</span>
+        <button className="vault-del" title="Delete (moves to Trash)" onClick={() => onDelete(a.id)}>✕</button>
       </div>
       <div className="vault-meta">
         <div className="row-between">
