@@ -1,8 +1,8 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useUI } from './ui';
 
-const BLANK = { slug: '', name: '', region: '', audience: '', voice: '', safety: '', pillars: '', sensitive: '' };
+const BLANK = { slug: '', name: '', region: '', audience: '', voice: '', safety: '', pillars: '', sensitive: '', channels: '' };
 
 async function post(body) {
   const r = await fetch('/api/brands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -13,6 +13,20 @@ export function BrandManager({ brands }) {
   const ui = useUI();
   const [editing, setEditing] = useState(null); // brand object or null
   const [busy, setBusy] = useState(false);
+  const [accounts, setAccounts] = useState(null); // connected Postiz channels (null = not loaded)
+
+  useEffect(() => {
+    if (editing && accounts === null) {
+      fetch('/api/channels').then((r) => r.json()).then((d) => setAccounts(d.channels || [])).catch(() => setAccounts([]));
+    }
+  }, [editing, accounts]);
+
+  const selectedChannels = (editing?.channels || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const toggleChannel = (id) => setEditing((b) => {
+    const set = new Set((b.channels || '').split(',').map((s) => s.trim()).filter(Boolean));
+    set.has(id) ? set.delete(id) : set.add(id);
+    return { ...b, channels: [...set].join(',') };
+  });
 
   async function save(e) {
     e?.preventDefault();
@@ -81,6 +95,17 @@ export function BrandManager({ brands }) {
                 <textarea className="ta" rows={3} placeholder="brand-safety notes — red lines, tone rules, anything to never do" value={editing.safety} onChange={set('safety')} />
                 <textarea className="ta" rows={2} placeholder="content pillars — recurring themes, one per line" value={editing.pillars} onChange={set('pillars')} />
                 <input className="input" placeholder="sensitive topics/occasions (notify-first) — optional" value={editing.sensitive} onChange={set('sensitive')} />
+                <div>
+                  <div className="card-foot" style={{ margin: '2px 0 6px' }}>
+                    ACCOUNTS THIS BRAND MAY POST TO (§1b){selectedChannels.length ? <span className="dim"> · {selectedChannels.length} selected</span> : null}
+                  </div>
+                  {accounts === null ? <span className="empty">loading channels…</span>
+                    : accounts.length === 0 ? <span className="empty">No channels connected in Postiz.</span>
+                    : <div className="field-row">{accounts.map((c) => (
+                        <label key={c.id} className="check"><input type="checkbox" checked={selectedChannels.includes(c.id)} onChange={() => toggleChannel(c.id)} /> {c.platform} · {c.handle}</label>
+                      ))}</div>}
+                  <div className="card-foot" style={{ marginTop: 5 }}>Empty = no restriction (any connected account). Set them and this brand can ONLY post to these accounts.</div>
+                </div>
                 <div className="modal-acts">
                   <button type="button" className="btn btn--ghost" onClick={() => setEditing(null)}>Cancel</button>
                   <button type="submit" className="btn btn--primary" disabled={busy}>{busy ? 'Saving…' : 'Save brand'}</button>

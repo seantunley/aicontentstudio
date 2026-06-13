@@ -146,6 +146,7 @@ CREATE TABLE IF NOT EXISTS brands (
     safety      TEXT,                     -- brand-safety notes (§6a), free text
     pillars     TEXT,                     -- content pillars (one per line / comma)
     sensitive   TEXT,                     -- sensitive topics/occasions -> notify-first
+    channels    TEXT,                     -- comma-sep Postiz integration ids this brand may post to (§1b hard boundary)
     enabled     INTEGER DEFAULT 1,
     created_at  TEXT,
     updated_at  TEXT
@@ -202,6 +203,12 @@ def init_db():
         if "deleted_at" not in mcols:
             # Vault soft-delete: deleted images go to Trash, restorable, purged after 30 days.
             conn.execute("ALTER TABLE media_assets ADD COLUMN deleted_at TEXT")
+        try:
+            bcols = [r[1] for r in conn.execute("PRAGMA table_info(brands)").fetchall()]
+            if bcols and "channels" not in bcols:
+                conn.execute("ALTER TABLE brands ADD COLUMN channels TEXT")  # per-brand Postiz accounts (§1b)
+        except Exception:  # noqa: BLE001 — brands table may not exist on very old DBs
+            pass
         # scout suggestions: where it was found + trend heat (§3b score/flag)
         scols = [r[1] for r in conn.execute("PRAGMA table_info(suggestions)").fetchall()]
         if scols:  # table exists

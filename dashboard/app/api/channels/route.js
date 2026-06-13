@@ -9,6 +9,6 @@ export async function GET() {
   if (chans === null) return NextResponse.json({ channels: [], error: 'postiz unreachable' });
   const channels = chans
     .filter((c) => !c.disabled)
-    .map((c) => ({ platform: c.identifier, handle: c.profile || c.name }));
+    .map((c) => ({ id: c.id, platform: c.identifier, handle: c.profile || c.name, name: c.name }));
   return NextResponse.json({ channels });
 }

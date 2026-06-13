@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '../../../lib/session';
-import { getJobById, getDraftsFor, markPublished } from '../../../lib/db';
-import { findIntegration, createPost } from '../../../lib/postiz';
+import { getJobById, getDraftsFor, markPublished, getBrandBySlug } from '../../../lib/db';
+import { findIntegration, createPost, listIntegrations } from '../../../lib/postiz';
 import { notifyTelegram } from '../../../lib/notify';
 
 // Human-clicked publish: the authenticated operator IS the approval (§7a). Fans out — posts EVERY
@@ -20,16 +20,32 @@ export async function POST(req) {
   const drafts = getDraftsFor(job.id);
   if (!drafts.length) return NextResponse.json({ error: 'no draft to publish' }, { status: 400 });
 
+  // §1b hard boundary: if the job's brand owns specific accounts, publish ONLY to those — a brand
+  // can never post to another brand's page. Resolve the brand's channel ids to live integrations.
+  let brandIntegrations = null; // null = brand has no restriction; [] or [...] = restricted set
+  const brand = getBrandBySlug(job.brand);
+  const brandChannelIds = (brand?.channels || '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (brandChannelIds.length) {
+    const all = (await listIntegrations()) || [];
+    brandIntegrations = all.filter((i) => brandChannelIds.includes(i.id) && !i.disabled);
+  }
+
   const published = [];
   const failed = [];
   for (const draft of drafts) {
     try {
-      const ig = await findIntegration(draft.platform);
-      if (!ig) { failed.push(`${draft.platform} (not connected)`); continue; }
+      let ig;
+      if (brandIntegrations !== null) {
+        ig = brandIntegrations.find((i) => i.identifier === draft.platform);
+        if (!ig) { failed.push(`${draft.platform} (brand "${job.brand}" has no ${draft.platform} account assigned)`); continue; }
+      } else {
+        ig = await findIntegration(draft.platform);
+        if (!ig) { failed.push(`${draft.platform} (not connected)`); continue; }
+      }
       const image = draft.image_id ? { id: draft.image_id, path: draft.image_path } : null;
       const video = draft.video_id ? { id: draft.video_id, path: draft.video_path } : null;
       await createPost(ig.id, draft.body, draft.platform, image, video);
-      published.push({ platform: draft.platform, channel: ig.profile, media: video ? 'video' : image ? 'image' : null });
+      published.push({ platform: draft.platform, channel: ig.profile || ig.name, media: video ? 'video' : image ? 'image' : null });
     } catch (e) {
       failed.push(`${draft.platform}: ${String(e?.message || e)}`);
     }
