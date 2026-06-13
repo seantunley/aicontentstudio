@@ -502,6 +502,22 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .angle--pick > div { min-width: 0; }
 .angle--pick .btn { flex-shrink: 0; }
 
+/* performance loop (§7f) */
+.perf-bar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.perf-list { display: flex; flex-direction: column; gap: 10px; }
+.perf-card { background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 14px 16px; }
+.perf-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.perf-name { font-family: var(--serif); font-size: 15px; color: var(--fg); }
+.perf-metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.perf-metric { background: var(--bg); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; }
+.pm-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+.pm-val { font-family: var(--serif); font-size: 22px; color: var(--fg); margin: 4px 0 6px; display: flex; align-items: baseline; gap: 8px; }
+.pm-chg { font-family: var(--mono); font-size: 10px; letter-spacing: 0; }
+.pm-chg.up { color: var(--green); }
+.pm-chg.down { color: var(--red); }
+.spark { display: block; width: 100%; height: 26px; }
+.perf-empty { font-size: 12.5px; color: var(--muted); padding: 4px 0; }
+
 /* ── calendar (Postiz mirror) ──────────────────────────────────────────── */
 .cal-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .cal-nav { display: flex; align-items: center; gap: 8px; }

@@ -114,6 +114,28 @@ export async function uploadMedia(buffer, filename, mime) {
   return r.json();
 }
 
+// §7f performance loop. Channel-level analytics for an integration over the last `days`. Postiz
+// returns an array of metrics, each {label, percentageChange, data:[{total,date}]} — or [] for
+// platforms it has no analytics provider for (e.g. Bluesky). [] on any error / unreachable.
+export async function integrationAnalytics(integrationId, days = 7) {
+  try {
+    const data = await req('GET', `/analytics/${integrationId}?date=${days}`);
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+// Per-post analytics (Postiz GET /analytics/post/:postId), where the platform supports it.
+export async function postAnalytics(postId) {
+  try {
+    const data = await req('GET', `/analytics/post/${postId}`);
+    return Array.isArray(data) ? data : (data ? [data] : []);
+  } catch {
+    return [];
+  }
+}
+
 export async function createPost(integrationId, content, platform, image, video, opts = {}) {
   // `image`/`video` are already-uploaded Postiz media refs {id, path} stored on the draft.
   // Postiz carries both in the same per-post media array; a video takes precedence when present.

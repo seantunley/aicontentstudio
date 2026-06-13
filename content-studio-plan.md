@@ -589,6 +589,11 @@ This closes the loop: analytics flow **back** from Postiz into the system, so it
 ### Sequencing
 Phase 5 — only useful once posts have flowed long enough to mean something, and depends on the Postiz publishing path being solid first. Don't build the scoreboard before the game starts.
 
+### Built (v1 scaffolding — 13 Jun 2026)
+- **Postiz analytics verified at build:** the public API exposes `GET /analytics/:integration?date=<days>` (channel-level, metrics = `[{label, percentageChange, data:[{total,date}]}]`) and `GET /analytics/post/:postId` (per-post). Providers with an analytics method: Instagram, Facebook, YouTube, LinkedIn, TikTok, Threads, Pinterest. **Bluesky has none** — the API returns `[]`, so today (Bluesky is the only connected channel) there's no data. Expected per "don't build the scoreboard before the game starts."
+- **Built ready-to-light-up:** `lib/postiz.integrationAnalytics/postAnalytics`, `/api/performance`, and a **Performance panel** (`/performance`, nav under Operations) — per-channel metric cards with sparklines + a 7/30/90-day range, an honest empty-state naming the unsupported platform, and a note on which platforms report. Populates the moment an analytics-supporting account is connected.
+- **Deferred until data flows:** the daily pull-and-store loop (metrics persisted against each job), the proactive bot digest line, and the four feedback uses (flywheel weighting, recycler top-performers, posting-time tuning, scout/pillar signals) — these need real numbers and, for recycling/timing, systems not yet built.
+
 ---
 
 ## 7g. Occasions calendar (special-occasion automation)
