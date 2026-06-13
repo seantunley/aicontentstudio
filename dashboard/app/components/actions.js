@@ -435,3 +435,36 @@ export function LogoutButton() {
   async function out() { await fetch('/api/logout', { method: 'POST' }); window.location.href = '/login'; }
   return <button className="btn btn--ghost" onClick={out}>Sign out</button>;
 }
+
+// Pills on a post preview showing what each polish skill changed (marketing-psychology + humanizer).
+// `polish` is the draft's polish_json string: [{skill, before, after, notes}, ...].
+const PILL_KEY = { 'Marketing psychology': 'psych', 'Humanized': 'human' };
+export function PostPills({ polish }) {
+  const [open, setOpen] = useState(null);
+  let steps = [];
+  try { steps = polish ? JSON.parse(polish) : []; } catch { steps = []; }
+  if (!steps.length) return null;
+  const s = open != null ? steps[open] : null;
+  return (
+    <div className="pills">
+      <div className="pills-row">
+        <span className="pills-lab">edited by</span>
+        {steps.map((st, i) => (
+          <button key={i} type="button" className={`pill pill--${PILL_KEY[st.skill] || 'x'} ${open === i ? 'on' : ''}`}
+                  onClick={() => setOpen(open === i ? null : i)}>
+            {st.skill}
+          </button>
+        ))}
+      </div>
+      {s && (
+        <div className="pill-panel">
+          <div className="pill-note">{s.notes || 'Rewritten to fit the skill.'}</div>
+          <div className="pill-diff">
+            <div className="pd-col pd-before"><span className="pd-lab">before</span><span className="pd-text">{s.before}</span></div>
+            <div className="pd-col pd-after"><span className="pd-lab">after</span><span className="pd-text">{s.after}</span></div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

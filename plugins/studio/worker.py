@@ -77,6 +77,9 @@ def _agent_prompt(job, with_image, with_video=False):
         "('a testament to', 'plays a vital role'), no rule-of-three lists, no 'serves as' (just say "
         "'is'), no trailing -ing filler, no AI words (delve, leverage, underscore, tapestry, landscape). "
         "Concrete and grounded; emojis and hashtags are fine where they fit the platform. "
+        "Make each post persuasive: open with a hook, lead with the reader's benefit (not features), "
+        "end with one clear call to action. Ethical only, never shame, scare, or use false urgency "
+        "(especially on health or sensitive topics). "
         + step2
     )
     if with_image:
@@ -103,7 +106,7 @@ def process_one(job):
                            capture_output=True, text=True, timeout=RUN_TIMEOUT_SECONDS)
         state = db.get_job(jid)["state"]
         if state == "preview":
-            _humanize_drafts(jid)  # Layer 2: rewrite each draft through the humanizer before the operator sees it
+            _polish_drafts(jid, job.get("brand"))  # Layer 2: psychology + humanizer passes before the operator sees it
             db.clear_queued(jid)
             db.record_event(jid, "worker: done — draft ready for review", actor="system")
             _telegram_notify(f'\U0001f4dd Draft ready to review: "{job["topic"]}" — it\'s in your approval queue.',
@@ -119,21 +122,23 @@ def process_one(job):
         db.record_event(jid, f"worker: error: {e}", actor="system")
 
 
-def _humanize_drafts(job_id):
-    """Second-model humanizer pass (Principle 0): rewrite every draft to strip AI-writing tells
-    before it reaches the approval gate. Best-effort per draft — a failure leaves the (already
-    deterministically-scrubbed) original in place, never blocks the pipeline."""
+def _polish_drafts(job_id, brand=None):
+    """Second-model polish pipeline (Principle 0): run every draft through marketing-psychology
+    then the humanizer before it reaches the approval gate, recording what each pass changed for
+    the preview pills. Best-effort per draft — a failure leaves the (already scrubbed) text in
+    place, never blocks the pipeline."""
     for d in db.list_drafts(job_id):
         limit = db.PLATFORM_LIMITS.get(d["platform"])
         try:
-            new = humanize.humanize_via_model(d["body"], d["platform"], limit)
+            res = humanize.polish(d["body"], d["platform"], limit, brand)
         except Exception as e:  # noqa: BLE001
-            print(f"worker: humanize draft {d['id']} error: {e}")
+            print(f"worker: polish draft {d['id']} error: {e}")
             continue
-        if new and new.strip() != (d["body"] or "").strip():
-            db.update_draft_body(d["id"], new)
-            db.record_event(job_id, f"draft humanized for {d['platform']} ({len(new)} chars)", actor="system")
-            print(f"worker: humanized draft {d['id']} ({d['platform']})")
+        if res and res["changed"]:
+            db.update_draft_body(d["id"], res["final"], polish_steps=res["steps"])
+            labels = ", ".join(s["skill"] for s in res["steps"])
+            db.record_event(job_id, f"draft polished for {d['platform']} ({labels}; {len(res['final'])} chars)", actor="system")
+            print(f"worker: polished draft {d['id']} ({d['platform']}: {labels})")
 
 
 def _locked():

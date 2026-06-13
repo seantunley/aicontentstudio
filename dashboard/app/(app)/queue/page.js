@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { approvalQueue, DRAFT_LIMITS } from '@/lib/db';
-import { ApprovalActions } from '@/app/components/actions';
+import { ApprovalActions, PostPills } from '@/app/components/actions';
 
 export const dynamic = 'force-dynamic';
 const short = (id) => (id ? id.slice(0, 8) : '');
@@ -40,6 +40,7 @@ export default function Queue() {
                     <div className="card-foot" style={lim && j.draft.char_count > lim ? { color: 'var(--red)' } : null}>
                       {j.draft.char_count}{lim ? `/${lim}` : ''} chars · angle {j.draft.angle || '—'} · <Link href={`/job/${j.id}`}>open to edit →</Link>
                     </div>
+                    <PostPills polish={j.draft.polish_json} />
                   </>
                 ) : <div className="empty">No draft yet.</div>}
                 <ApprovalActions jobId={j.id} />

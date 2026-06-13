@@ -367,6 +367,29 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .vtag--add { color: var(--accent); border-color: rgba(227,167,63,0.3); border-style: dashed; }
 .vault-tagedit { margin-top: 9px; }
 
+/* ── post-polish pills (what each skill changed) ───────────────────────── */
+.pills { margin-top: 10px; }
+.pills-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.pills-lab { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); }
+.pill { font-family: var(--mono); font-size: 10px; letter-spacing: 0.04em; padding: 3px 10px; border-radius: 99px;
+  border: 1px solid var(--line-2); background: var(--bg-2); color: var(--fg-2); cursor: pointer;
+  transition: border-color .12s, background .12s, color .12s; display: inline-flex; align-items: center; gap: 5px; }
+.pill::before { content:""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.pill:hover { border-color: var(--muted); color: var(--fg); }
+.pill--psych { color: var(--cyan); border-color: rgba(92,191,169,0.4); }
+.pill--psych.on { background: var(--cyan-bg); }
+.pill--human { color: var(--accent); border-color: rgba(227,167,63,0.4); }
+.pill--human.on { background: var(--accent-bg); }
+.pill-panel { margin-top: 9px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--bg); padding: 11px 12px; animation: reveal 0.25s ease both; }
+.pill-note { font-family: var(--serif); font-style: italic; font-size: 13.5px; color: var(--fg); margin-bottom: 10px; line-height: 1.5; }
+.pill-diff { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.pd-col { border: 1px solid var(--line); border-radius: var(--r); padding: 8px 10px; font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; }
+.pd-before { border-left: 2px solid var(--red); opacity: 0.72; }
+.pd-after { border-left: 2px solid var(--green); }
+.pd-lab { display: block; font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+.pd-text { color: var(--fg-2); }
+@media (max-width: 600px) { .pill-diff { grid-template-columns: 1fr; } }
+
 /* ── studio editor (filerobot) ─────────────────────────────────────────── */
 .editor-root { display: flex; flex-direction: column; height: 100vh; background: var(--bg); }
 .editor-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 14px;

@@ -181,6 +181,10 @@ def init_db():
             conn.execute("ALTER TABLE drafts ADD COLUMN video_path TEXT")  # publisher media URL (video)
         if "video_id" not in dcols:
             conn.execute("ALTER TABLE drafts ADD COLUMN video_id TEXT")    # publisher media id (video)
+        if "polish_json" not in dcols:
+            # Per-skill transformation history for the preview pills: JSON list of
+            # {skill, before, after, notes} from the psychology + humanizer passes.
+            conn.execute("ALTER TABLE drafts ADD COLUMN polish_json TEXT")
         # scout suggestions: where it was found + trend heat (§3b score/flag)
         scols = [r[1] for r in conn.execute("PRAGMA table_info(suggestions)").fetchall()]
         if scols:  # table exists
@@ -484,13 +488,18 @@ def list_drafts(job_id):
         ).fetchall()]
 
 
-def update_draft_body(draft_id, body):
-    """Replace a draft's body (used by the worker's humanizer pass). Recomputes char_count."""
+def update_draft_body(draft_id, body, polish_steps=None):
+    """Replace a draft's body (used by the worker's polish pipeline). Recomputes char_count.
+    polish_steps (optional) = list of {skill, before, after, notes} stored for the preview pills."""
     body = (body or "").strip()
     if not body:
         raise ValueError("draft body is empty")
+    pj = json.dumps(polish_steps) if polish_steps else None
     with _db() as conn:
-        conn.execute("UPDATE drafts SET body=?, char_count=? WHERE id=?", (body, len(body), draft_id))
+        if pj is not None:
+            conn.execute("UPDATE drafts SET body=?, char_count=?, polish_json=? WHERE id=?", (body, len(body), pj, draft_id))
+        else:
+            conn.execute("UPDATE drafts SET body=?, char_count=? WHERE id=?", (body, len(body), draft_id))
 
 
 def set_draft_image(job_id, image_id, image_path):
