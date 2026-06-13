@@ -443,7 +443,6 @@ export function QueueItem({ job }) {
   const d = job.draft;
   const platforms = (job.target_platforms ? job.target_platforms.split(',') : d ? [d.platform] : [])
     .map((p) => p.trim()).filter(Boolean);
-  const firstLine = d?.body ? (d.body.split('\n').map((s) => s.trim()).find(Boolean) || '') : '';
   const lim = d ? PLATFORM_LIMITS[d.platform] : null;
   return (
     <div className={`qcard ${open ? 'open' : ''}`}>
@@ -451,7 +450,6 @@ export function QueueItem({ job }) {
         <span className="qcard-caret">{open ? '▾' : '▸'}</span>
         <div className="qcard-main">
           <div className="qcard-topic">{job.topic}</div>
-          {firstLine ? <div className="qcard-title">{firstLine}</div> : null}
         </div>
         <div className="qcard-meta">
           {platforms.map((p) => <span key={p} className="plat">{p}</span>)}
