@@ -6,6 +6,24 @@ const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satur
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const NTH = [{ v: 1, l: '1st' }, { v: 2, l: '2nd' }, { v: 3, l: '3rd' }, { v: 4, l: '4th' }, { v: -1, l: 'Last' }];
 
+// ISO 3166-1 alpha-2 → flag emoji (regional indicator letters). '' / invalid → globe.
+function flag(code) {
+  const c = (code || '').toUpperCase();
+  if (!/^[A-Z]{2}$/.test(c)) return '🌍';
+  return String.fromCodePoint(...[...c].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
+}
+const COUNTRIES = [
+  { code: '', name: 'Universal (no country)' }, { code: 'ZA', name: 'South Africa' }, { code: 'US', name: 'United States' },
+  { code: 'GB', name: 'United Kingdom' }, { code: 'AU', name: 'Australia' }, { code: 'CA', name: 'Canada' },
+  { code: 'NZ', name: 'New Zealand' }, { code: 'IE', name: 'Ireland' }, { code: 'IN', name: 'India' },
+  { code: 'NG', name: 'Nigeria' }, { code: 'KE', name: 'Kenya' }, { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' }, { code: 'NL', name: 'Netherlands' }, { code: 'ES', name: 'Spain' },
+  { code: 'IT', name: 'Italy' }, { code: 'AE', name: 'United Arab Emirates' }, { code: 'BR', name: 'Brazil' },
+];
+// countries the one-click holiday seeder can populate (must match lib/db COUNTRY_OCCASIONS)
+const SEEDABLE = [{ code: 'ZA', name: 'South Africa' }, { code: 'US', name: 'United States' }, { code: 'GB', name: 'United Kingdom' }, { code: 'AU', name: 'Australia' }, { code: 'CA', name: 'Canada' }];
+function countryName(code) { const c = COUNTRIES.find((x) => x.code === (code || '').toUpperCase()); return c ? c.name : (code || 'Universal'); }
+
 function parseRule(raw) { try { return typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return {}; } }
 function ruleText(raw) {
   const r = parseRule(raw);
@@ -33,6 +51,7 @@ export function OccasionsManager({ occasions, brand }) {
   const ui = useUI();
   const [editing, setEditing] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [seedCode, setSeedCode] = useState('US');
 
   async function post(body) {
     const r = await fetch('/api/occasions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -47,6 +66,15 @@ export function OccasionsManager({ occasions, brand }) {
     if (!ok) return;
     const { ok: done, data } = await post({ action: 'delete', id: o.id });
     if (done) { ui.toast('Deleted'); window.location.reload(); } else ui.toast(data.error || 'Failed', 'err');
+  }
+  async function seedCountry() {
+    setBusy(true);
+    const { ok, data } = await post({ action: 'seed_country', code: seedCode, brand: brand || 'all' });
+    if (ok) {
+      ui.toast(data.added ? `Added ${data.added} ${seedCode} holiday${data.added > 1 ? 's' : ''}` : 'Already added — nothing new');
+      if (data.added) { window.location.reload(); return; }
+    } else ui.toast(data.error || 'Failed', 'err');
+    setBusy(false);
   }
   function openNew() {
     setEditing({ ...BLANK, brand: brand || 'all' });
@@ -76,12 +104,19 @@ export function OccasionsManager({ occasions, brand }) {
 
   return (
     <>
-      <div className="actions" style={{ marginBottom: 16 }}>
+      <div className="actions" style={{ marginBottom: 6, flexWrap: 'wrap', gap: 10 }}>
         <button className="btn btn--primary" onClick={openNew}>+ Add occasion</button>
-        <span className="card-foot" style={{ margin: 0 }}>
-          {brand ? <>Showing <b>{brand}</b>’s occasions + shared ones. </> : 'Showing all occasions across brands. '}
-          Turn on <b>auto-draft</b> to have a draft queued ahead of a date; <b>sensitive</b> ones notify you first instead.
-        </span>
+        <div className="occ-seed">
+          <span className="occ-seed-lbl">Add a country’s holidays:</span>
+          <select className="input" value={seedCode} onChange={(e) => setSeedCode(e.target.value)} style={{ width: 'auto' }}>
+            {SEEDABLE.map((c) => <option key={c.code} value={c.code}>{flag(c.code)} {c.name}</option>)}
+          </select>
+          <button className="btn btn--sm" disabled={busy} onClick={seedCountry}>+ Add</button>
+        </div>
+      </div>
+      <div className="card-foot" style={{ marginBottom: 16 }}>
+        {brand ? <>Showing <b>{brand}</b>’s occasions + shared ones. </> : 'Showing all occasions across brands. '}
+        Turn on <b>auto-draft</b> to have a draft queued ahead of a date; <b>sensitive</b> ones notify you first instead. For a one-off date, use <b>+ Add occasion</b> and pick its country.
       </div>
 
       {occasions.length === 0 ? (
@@ -96,9 +131,9 @@ export function OccasionsManager({ occasions, brand }) {
               </div>
               <div className="occ-main">
                 <div className="occ-name">
+                  <span className="occ-flag" title={countryName(o.region)}>{flag(o.region)}</span>
                   {o.name}
                   {o.sensitive ? <span className="occ-badge occ-sensitive">sensitive</span> : null}
-                  {o.region ? <span className="occ-badge occ-region">{o.region}</span> : null}
                   {o.brand && o.brand !== 'all' ? <span className="occ-badge">{o.brand}</span> : <span className="occ-badge occ-all">all brands</span>}
                   {o.source === 'builtin' ? <span className="occ-badge occ-builtin">built-in</span> : null}
                 </div>
@@ -172,8 +207,10 @@ export function OccasionsManager({ occasions, brand }) {
                   <label className="occ-field"><span>Lead time (days ahead to draft)</span>
                     <input className="input" type="number" min="1" max="120" value={editing.lead_days} onChange={set('lead_days')} />
                   </label>
-                  <label className="occ-field"><span>Region (optional)</span>
-                    <input className="input" placeholder="e.g. ZA" value={editing.region} onChange={set('region')} />
+                  <label className="occ-field"><span>Country</span>
+                    <select className="input" value={editing.region} onChange={set('region')}>
+                      {COUNTRIES.map((c) => <option key={c.code || 'x'} value={c.code}>{flag(c.code)} {c.name}</option>)}
+                    </select>
                   </label>
                 </div>
 

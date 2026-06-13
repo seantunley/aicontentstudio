@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
-import { listOccasions, upsertOccasion, deleteOccasion } from '@/lib/db';
+import { listOccasions, upsertOccasion, deleteOccasion, seedCountryOccasions } from '@/lib/db';
 import { getActiveBrand } from '@/lib/brand';
 
 export const dynamic = 'force-dynamic';
@@ -19,6 +19,7 @@ export async function POST(req) {
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'bad request' }, { status: 400 }); }
   try {
     if (body.action === 'delete') return NextResponse.json(deleteOccasion(body.id));
+    if (body.action === 'seed_country') return NextResponse.json(seedCountryOccasions(body.code, body.brand));
     const id = upsertOccasion(body);
     return NextResponse.json({ ok: true, id });
   } catch (e) {
