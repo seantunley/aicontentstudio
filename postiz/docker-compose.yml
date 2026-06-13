@@ -1,6 +1,9 @@
 services:
   postiz:
-    image: ghcr.io/gitroomhq/postiz-app:latest
+    # Pinned (was :latest) so updates are deliberate. The studio calendar's drag-reschedule
+    # uses Postiz's INTERNAL API, which can change between versions — after bumping this pin,
+    # re-test the calendar drag-sync. To update: change the digest, `docker compose pull && up`.
+    image: ghcr.io/gitroomhq/postiz-app@sha256:3ec7bc8ecf61f08c22e0954291702b097f944def515dc259cb3a441aba4046c0
     container_name: postiz
     restart: always
     environment:

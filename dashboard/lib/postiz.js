@@ -1,7 +1,38 @@
 // Minimal Postiz public-API client for the dashboard's human-clicked Publish action.
 // Mirrors plugins/studio/postiz.py. Auth header is `Authorization: <key>` (no Bearer).
+import crypto from 'crypto';
+
 const API_URL = (process.env.POSTIZ_API_URL || 'http://host.docker.internal:4007/api/public/v1').replace(/\/$/, '');
 const API_KEY = process.env.POSTIZ_API_KEY || '';
+// Postiz's INTERNAL API (e.g. /api/posts/:id/date) — the public API can't reschedule. Derived from
+// the public URL by dropping /public/v1. Authenticated with a minted `auth` JWT (see mintAuthToken).
+const INTERNAL_URL = API_URL.replace(/\/public\/v\d+$/, '');
+const JWT_SECRET = process.env.POSTIZ_JWT_SECRET || '';
+const POSTIZ_USER_ID = process.env.POSTIZ_USER_ID || '';
+
+// Mint the `auth` JWT Postiz's internal API expects: HS256 over {id}, signed with Postiz's JWT_SECRET
+// (matches @gitroom AuthService.signJWT = jsonwebtoken.sign(value, JWT_SECRET), default HS256, no exp).
+// Postiz re-loads the user from its DB by id, so the token only needs a valid signature + the user id.
+function mintAuthToken() {
+  if (!JWT_SECRET || !POSTIZ_USER_ID) throw new Error('POSTIZ_JWT_SECRET / POSTIZ_USER_ID not configured');
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const head = b64({ alg: 'HS256', typ: 'JWT' });
+  const body = b64({ id: POSTIZ_USER_ID });
+  const sig = crypto.createHmac('sha256', JWT_SECRET).update(`${head}.${body}`).digest('base64url');
+  return `${head}.${body}.${sig}`;
+}
+
+// Reschedule a post to a new time via Postiz's internal PUT /posts/:id/date (what its own calendar uses).
+export async function reschedulePost(postId, dateISO) {
+  const r = await fetch(`${INTERNAL_URL}/posts/${postId}/date`, {
+    method: 'PUT',
+    headers: { auth: mintAuthToken(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date: dateISO, action: 'update' }),
+  });
+  if (!r.ok) throw new Error(`Postiz reschedule HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  const t = await r.text();
+  return t ? JSON.parse(t) : { ok: true };
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

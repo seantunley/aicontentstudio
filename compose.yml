@@ -55,6 +55,8 @@ services:
       - COOKIE_SECURE=false                        # over HTTP/LAN; flip true behind HTTPS/Tailscale
       - POSTIZ_API_KEY=${POSTIZ_API_KEY}           # publish approved drafts via Postiz (human-clicked)
       - POSTIZ_API_URL=http://host.docker.internal:4007/api/public/v1
+      - POSTIZ_JWT_SECRET=${POSTIZ_JWT_SECRET}     # mints the `auth` token for Postiz's internal API (calendar drag-reschedule). MUST equal postiz/.env JWT_SECRET.
+      - POSTIZ_USER_ID=${POSTIZ_USER_ID}           # operator's Postiz user id (the minted token's subject)
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}   # DM the operator when a post goes live (two-way loop)
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     extra_hosts:
