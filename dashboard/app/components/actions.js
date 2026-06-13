@@ -516,13 +516,28 @@ export function MediaRestoreButton({ id }) {
 // Collapsible approval-queue row. Collapsed: topic, platforms, the post's first line, job id.
 // Expanded: the full post, media preview, polish pills, and approve/reject.
 // The research brief behind a queued draft — the "background" that informs approval. Lazy-loaded.
+// Each angle has a "Rewrite with this angle" action: the agent picked one angle, but the operator can
+// switch to another and have the draft regenerated against the same research.
 function QueueResearch({ jobId }) {
+  const ui = useUI();
   const [brief, setBrief] = useState(undefined); // undefined=loading, null=none, obj=loaded
+  const [busy, setBusy] = useState(false);
   useEffect(() => {
     let live = true;
     fetch(`/api/brief?jobId=${jobId}`).then((r) => r.json()).then((d) => { if (live) setBrief(d.brief || null); }).catch(() => live && setBrief(null));
     return () => { live = false; };
   }, [jobId]);
+
+  async function useAngle(angle) {
+    const ok = await ui.confirm({ title: 'Rewrite with this angle?', message: `The draft will be regenerated through "${angle}", grounded in the same research, then re-land in your queue. Replaces the current copy.`, confirmLabel: 'Rewrite' });
+    if (!ok) return;
+    setBusy(true);
+    const r = await fetch('/api/redraft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jobId, angle }) });
+    const d = await r.json();
+    if (r.ok) { ui.toast('Re-angling — the post will update here shortly'); setTimeout(() => window.location.reload(), 1400); return; }
+    ui.toast(d.error || 'Failed', 'err'); setBusy(false);
+  }
+
   if (brief === undefined) return <div className="qresearch"><div className="empty">Loading research…</div></div>;
   if (!brief || !(brief.facts || brief.angles)) return null;
   return (
@@ -537,8 +552,13 @@ function QueueResearch({ jobId }) {
           {f.snippet ? <div className="snip">&ldquo;{f.snippet}&rdquo;</div> : null}
         </div>
       ))}
-      {(brief.angles || []).length ? <div className="qr-h">Angles</div> : null}
-      {(brief.angles || []).map((a, i) => <div className="angle" key={i}><b>{a.name}</b>: {a.hook}</div>)}
+      {(brief.angles || []).length ? <div className="qr-h">Angles — switch the post to any of these</div> : null}
+      {(brief.angles || []).map((a, i) => (
+        <div className="angle angle--pick" key={i}>
+          <div><b>{a.name}</b>: {a.hook}</div>
+          <button className="btn btn--sm" disabled={busy} onClick={() => useAngle(`${a.name}: ${a.hook}`)}>Rewrite with this</button>
+        </div>
+      ))}
     </details>
   );
 }

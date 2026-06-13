@@ -498,6 +498,9 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .qresearch[open] { padding-bottom: 8px; }
 .qr-h { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin: 12px 0 6px; }
 .qcard-foot { margin: 10px 0 2px; }
+.angle--pick { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.angle--pick > div { min-width: 0; }
+.angle--pick .btn { flex-shrink: 0; }
 
 /* ── calendar (Postiz mirror) ──────────────────────────────────────────── */
 .cal-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }

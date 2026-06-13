@@ -727,6 +727,24 @@ def list_brands():
         return [dict(r) for r in conn.execute("SELECT * FROM brands ORDER BY name").fetchall()]
 
 
+def jobs_awaiting_redraft():
+    """Jobs the operator asked to re-angle (queued_action='redraft'); the chosen angle is in meta."""
+    with _db() as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT * FROM jobs WHERE queued_action='redraft' ORDER BY updated_at").fetchall()]
+
+
+def redraft_draft(draft_id, body, angle=None):
+    """Replace a draft's body in place with a re-angled rewrite (same draft id, no duplicate).
+    Clears polish_json so the polish sweep re-runs on the new body."""
+    body = (body or "").strip()
+    if not body:
+        raise ValueError("empty redraft")
+    with _db() as conn:
+        conn.execute("UPDATE drafts SET body=?, char_count=?, angle=?, polish_json=NULL WHERE id=?",
+                     (body, len(body), angle, draft_id))
+
+
 def get_campaign(campaign_id):
     """A campaign's row (or None) — read at draft time so a piece knows its arc's theme (§7e)."""
     if not campaign_id:

@@ -645,4 +645,20 @@ export function deleteCampaign(id) {
   return { ok: true };
 }
 
+// Ask the worker to re-angle a previewed job's drafts using a chosen angle from its brief.
+export function requestRedraft(jobId, angle) {
+  const d = db();
+  const job = d.prepare('SELECT meta, state FROM jobs WHERE id=?').get(jobId);
+  if (!job) throw new Error('no such job');
+  if (job.state !== 'preview') throw new Error(`job is '${job.state}', not awaiting approval`);
+  let meta = {};
+  try { meta = JSON.parse(job.meta || '{}'); } catch {}
+  meta.redraft_angle = String(angle || '').slice(0, 300);
+  const now = new Date().toISOString();
+  d.prepare('UPDATE jobs SET queued_action=?, meta=?, updated_at=? WHERE id=?').run('redraft', JSON.stringify(meta), now, jobId);
+  d.prepare('INSERT INTO job_events (job_id,from_state,to_state,actor,at,detail) VALUES (?,?,?,?,?,?)')
+    .run(jobId, null, null, 'human', now, `re-angle requested: ${meta.redraft_angle}`);
+  return { ok: true };
+}
+
 export { STATES };

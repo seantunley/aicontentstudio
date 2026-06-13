@@ -314,6 +314,66 @@ def _check_occasions():
         print(f"worker: occasion '{o['name']}' -> queued {len(targets)} draft(s)")
 
 
+def _redraft_body(platform, limit, angle, facts_text, brand_block, current):
+    """Focused model rewrite of one draft through a chosen angle, grounded in the saved brief's facts.
+    Returns the new body (scrubbed, within limit) or None to leave the draft unchanged."""
+    prompt = (
+        f"Rewrite this {platform} post through a DIFFERENT angle. Use ONLY this angle as the lens: \"{angle}\". "
+        f"Ground every claim ONLY in these researched facts (introduce no new facts):\n{facts_text}\n\n"
+        + (brand_block or "")
+        + "Write like a sharp human, not AI: no em dashes, no significance inflation, no rule-of-three lists, "
+        "no AI words (delve, leverage, tapestry, landscape); concrete and grounded. Open with a hook, lead with "
+        "the reader's benefit, end with one clear call to action. Ethical only — never shame, scare, or use false "
+        f"urgency. Use METRIC units. The post MUST be {limit or 2000} characters or fewer. Output ONLY the "
+        f"rewritten post — no preamble, no surrounding quotes.\n\nCURRENT POST (rewrite it to the new angle, keep "
+        f"the platform's voice + fitting hashtags/emoji):\n{current}"
+    )
+    try:
+        r = subprocess.run(["hermes", "-z", prompt], capture_output=True, text=True, timeout=RUN_TIMEOUT_SECONDS)
+    except Exception:  # noqa: BLE001
+        return None
+    out = humanize.scrub((r.stdout or "").strip().strip('"').strip())
+    if not out:
+        return None
+    return out[:limit] if limit and len(out) > limit else out
+
+
+def _process_redrafts():
+    """§7e/angle-switch: re-angle a job's drafts in place when the operator picks a different angle.
+    Reuses the saved brief (no re-research); rewrites each platform draft, then re-polishes."""
+    try:
+        jobs = db.jobs_awaiting_redraft()
+    except Exception as e:  # noqa: BLE001
+        print(f"worker: redraft scan error: {e}")
+        return
+    for job in jobs:
+        jid = job["id"]
+        try:
+            angle = (json.loads(job.get("meta") or "{}")).get("redraft_angle") or ""
+        except Exception:  # noqa: BLE001
+            angle = ""
+        db.enqueue_action(jid, "processing")
+        brief = db.get_brief(jid) or {}
+        facts = brief.get("facts") or []
+        facts_text = "\n".join(f"- {f.get('claim', '')} ({f.get('source_url', '')})" for f in facts) or "(keep the post's existing facts)"
+        bb = _brand_block(job)
+        n = 0
+        for d in db.list_drafts(jid):
+            limit = db.PLATFORM_LIMITS.get(d["platform"])
+            nb = _redraft_body(d["platform"], limit, angle, facts_text, bb, d["body"])
+            if nb:
+                db.redraft_draft(d["id"], nb, angle)
+                n += 1
+        db.record_event(jid, f"re-angled to {angle!r} — {n} draft(s) rewritten", actor="human")
+        try:
+            _polish_drafts(jid, job.get("brand"))
+        except Exception as e:  # noqa: BLE001
+            print(f"worker: redraft polish error (non-fatal): {e}")
+        db.clear_queued(jid)
+        _telegram_notify(f'\U0001f504 Re-angled "{job["topic"]}" — {angle}. The updated draft is in your approval queue.')
+        print(f"worker: re-angled job {jid[:8]} -> {n} draft(s)")
+
+
 def main():
     db.init_db()
     _heartbeat()
@@ -323,6 +383,7 @@ def main():
     try:
         _maybe_run_scout()
         _check_occasions()
+        _process_redrafts()
         _autotag_media()
         _polish_pending()  # polish drafts from ANY path (incl. Telegram) that aren't polished yet
         db.purge_trash(30)  # hard-delete trashed jobs + media older than 30 days
