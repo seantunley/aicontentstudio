@@ -4,6 +4,7 @@
 import Database from 'better-sqlite3';
 import crypto from 'crypto';
 import fs from 'fs';
+import { writeVoiceExample } from './knowledge';
 
 const DB_PATH = process.env.STUDIO_DB_PATH || '/opt/studio/studio.db';
 const STATES = ['requested', 'researched', 'planned', 'generated', 'preview', 'approved', 'scheduled', 'published'];
@@ -94,6 +95,10 @@ export function approveJob(jobId, who) {
     ev.run(jobId, null, null, 'human', now, `publish token minted by ${who} (dashboard)`);
   });
   tx();
+  // Learning flywheel (§7): the greenlit drafts become brand-tagged voice examples in the KB.
+  for (const dr of getDraftsFor(jobId)) {
+    writeVoiceExample({ brand: job.brand, platform: dr.platform, topic: job.topic, body: dr.body, jobId });
+  }
   return { ok: true, jobId, state: 'approved' };
 }
 

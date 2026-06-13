@@ -73,6 +73,25 @@ export function searchNotes(q, limit = 40) {
   return hits;
 }
 
+// Learning flywheel (§7): an approved post becomes a brand-tagged "voice example" note in the
+// knowledge base, so future generation can retrieve it and stay on-voice. Best-effort; never throws.
+export function writeVoiceExample({ brand, platform, topic, body, jobId }) {
+  try {
+    const text = (body || '').trim();
+    if (!text) return;
+    const bslug = (brand || 'unassigned').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'unassigned';
+    const dir = path.join(KDIR, 'voice', bslug);
+    fs.mkdirSync(dir, { recursive: true });
+    const title = `${(topic || 'post').replace(/\n/g, ' ').slice(0, 80)} — ${platform || 'post'}`;
+    const fm = [
+      '---', `title: ${title.replace(/"/g, "'")}`, 'type: voice-example',
+      `brand: ${brand || 'unassigned'}`, `platform: ${platform || ''}`,
+      `approved: ${new Date().toISOString()}`, `tags: [voice, ${bslug}${platform ? `, ${platform}` : ''}]`, '---',
+    ].join('\n');
+    fs.writeFileSync(path.join(dir, `${String(jobId).slice(0, 8)}-${platform || 'post'}.md`), `${fm}\n\n# ${title}\n\n${text}\n`);
+  } catch { /* never break the approval gate */ }
+}
+
 export function knowledgeStats() {
   const notes = walk(KDIR);
   const chatgpt = notes.filter((r) => r.startsWith(CHATGPT_DIR + '/')).length;

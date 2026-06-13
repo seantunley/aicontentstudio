@@ -1,10 +1,38 @@
 """Tool handlers. Each receives an args dict, returns a JSON string, and never raises
 (errors come back as {"error": ...}) — the Hermes plugin handler contract."""
 import os
+import re
 import json
 import subprocess
+import datetime
 
 from . import db, postiz, humanize
+
+_KNOWLEDGE_DIR = os.environ.get("KNOWLEDGE_DIR", "/opt/studio/knowledge")
+
+
+def _write_voice_example(brand, platform, topic, body, job_id):
+    """Learning flywheel (§7): an approved post becomes a brand-tagged voice-example note in the
+    shared knowledge base, so future generation can retrieve it and stay on-voice. Best-effort —
+    matches the dashboard's writer (lib/knowledge.js) so both approval paths produce the same notes."""
+    try:
+        text = (body or "").strip()
+        if not text:
+            return
+        bslug = re.sub(r"[^a-z0-9]+", "-", (brand or "unassigned").lower()).strip("-") or "unassigned"
+        d = os.path.join(_KNOWLEDGE_DIR, "voice", bslug)
+        os.makedirs(d, exist_ok=True)
+        title = f"{(topic or 'post').replace(chr(10), ' ')[:80]} — {platform or 'post'}"
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        fm = "\n".join([
+            "---", f"title: {title.replace(chr(34), chr(39))}", "type: voice-example",
+            f"brand: {brand or 'unassigned'}", f"platform: {platform or ''}",
+            f"approved: {now}", f"tags: [voice, {bslug}" + (f", {platform}" if platform else "") + "]", "---",
+        ])
+        with open(os.path.join(d, f"{str(job_id)[:8]}-{platform or 'post'}.md"), "w") as f:
+            f.write(f"{fm}\n\n# {title}\n\n{text}\n")
+    except Exception:  # noqa: BLE001 — never break the approval gate
+        pass
 
 
 def _ok(**kw):
@@ -286,6 +314,9 @@ def operator_decision(args, **kwargs):
         db.advance_job(job["id"], "approved", actor="human", detail="operator approved via Telegram")
     except Exception as e:  # noqa: BLE001
         return _err(str(e))
+    # Learning flywheel (§7): capture the greenlit drafts as brand-tagged voice examples.
+    for dr in db.list_drafts(job["id"]):
+        _write_voice_example(job.get("brand"), dr.get("platform"), job.get("topic"), dr.get("body"), job["id"])
     return _ok(job_id=job["id"], decision="approve", state="approved",
                message=f"Approved {job['id'][:8]} — it's now in 'Ready to publish' in the cockpit; publish it there.")
 

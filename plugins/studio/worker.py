@@ -91,7 +91,11 @@ def _agent_prompt(job, with_image, with_video=False):
     p = (
         f"Work on the EXISTING job {job['id']} — do NOT create a new job. "
         f"Topic: {job['topic']!r}. Brand: {job['brand']}. "
-        "Step 1 — research: search the web, read real sources, then call save_brief with cited facts "
+        "Step 1 — research: FIRST consult the knowledge base — use your knowledge-base tools "
+        "(search_notes / build_context) to pull (a) any imported facts, history or reference notes "
+        f"relevant to {job['topic']!r}, and (b) this brand's prior approved posts (search for the brand "
+        f"name {job['brand']!r} and tag 'voice') so you match its established voice and avoid repeating "
+        "past posts. Then search the web, read real sources, and call save_brief with cited facts "
         "(each a real source_url + snippet) and 2-3 distinct angles. Use METRIC units only (Celsius, "
         "km, kg, litres), convert any imperial. "
         "Write every draft like a sharp human, not an AI: no em dashes, no significance inflation "
