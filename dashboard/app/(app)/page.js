@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { pipelineCounts, inProgress, recentJobs, costSummary, approvalQueue, publishable, listSuggestions } from '@/lib/db';
+import { zar } from '@/lib/money';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,7 +65,7 @@ export default function Overview() {
           <DeskCard href="/queue" n={qn} lab="Awaiting approval" tone="ember" />
           <DeskCard href="/ready" n={rn} lab="Ready to publish" tone="green" />
           <DeskCard href="/scout" n={sn} lab="Scout ideas" tone="cyan" />
-          <DeskCard href="/costs" n={`$${Number(cost.totalUsd).toFixed(2)}`} lab="Spend logged" tone="paper" />
+          <DeskCard href="/costs" n={zar(cost.totalUsd)} lab="Spend logged" tone="paper" />
         </div>
       </section>
 

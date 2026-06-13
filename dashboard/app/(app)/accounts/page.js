@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { listIntegrations } from '@/lib/postiz';
 import { costSummary } from '@/lib/db';
+import { zar } from '@/lib/money';
 
 export const dynamic = 'force-dynamic';
 const POSTIZ_UI = 'http://172.18.18.101:4007';
@@ -44,7 +45,7 @@ export default async function Accounts() {
       <section className="section reveal r2">
         <div className="section-head"><span className="idx">02</span><h2>Spend</h2><span className="rule" /><Link className="deeplink" href="/costs">full ledger →</Link></div>
         <div className="statgrid">
-          <div className="stat"><div className="big tnum">${Number(cost.totalUsd).toFixed(2)}</div><div className="lab">Total spend</div></div>
+          <div className="stat"><div className="big tnum">{zar(cost.totalUsd)}</div><div className="lab">Total spend</div></div>
           <div className="stat"><div className="big tnum">{cost.entries}</div><div className="lab">API calls logged</div></div>
         </div>
       </section>

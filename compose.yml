@@ -48,6 +48,7 @@ services:
     user: "1000:1000"                  # match host hermes uid so the shared studio.db stays writable
     environment:
       - STUDIO_DB_PATH=/opt/studio/studio.db
+      - ZAR_PER_USD=${ZAR_PER_USD:-16.28}              # cost ledger shows Rands; API costs are USD. Update the rate as it moves.
       - DASH_USER=${DASH_USER}                          # single-operator login (Phase 1 thin auth, §7a)
       - DASH_PASSWORD_HASH_B64=${DASH_PASSWORD_HASH_B64} # base64 of the bcrypt hash ($ breaks compose interpolation)
       - SESSION_SECRET=${SESSION_SECRET}                # iron-session cookie encryption key

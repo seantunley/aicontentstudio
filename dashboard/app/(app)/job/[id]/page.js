@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getJobById, getBrief, getDraftsFor, getEvents, costForJob, STATES, DRAFT_LIMITS } from '@/lib/db';
+import { zar } from '@/lib/money';
 import { ApprovalActions, PublishButton, ScheduleButton, EditableDraft, RetryButton, UploadMediaButton } from '@/app/components/actions';
 
 export const dynamic = 'force-dynamic';
@@ -47,7 +48,7 @@ export default async function JobPage({ params }) {
           <div className="card-meta" style={{ marginTop: 12 }}>
             brand {job.brand} · via {job.source} · created {when(job.created_at)}
             {job.queued_action ? ` · worker: ${job.queued_action}` : ''}
-            {cost.entries ? ` · cost $${Number(cost.totalUsd).toFixed(3)}` : ''}
+            {cost.entries ? ` · cost ${zar(cost.totalUsd, 3)}` : ''}
           </div>
           {job.state === 'preview' && <ApprovalActions jobId={job.id} />}
           {job.state === 'approved' && (

@@ -1,10 +1,9 @@
 import Link from 'next/link';
 import { costSummary, costThisMonth, costByBrand, costByOperation, recentCosts } from '@/lib/db';
+import { zar, ZAR_PER_USD } from '@/lib/money';
 
 export const dynamic = 'force-dynamic';
 const when = (s) => (s ? s.replace('T', ' ').slice(0, 16) : '');
-const usd = (n) => `$${Number(n || 0).toFixed(4).replace(/0{1,2}$/, '')}`;
-const usd2 = (n) => `$${Number(n || 0).toFixed(2)}`;
 
 export default function Costs() {
   let total = { entries: 0, totalUsd: 0 }, month = { entries: 0, totalUsd: 0 };
@@ -23,14 +22,14 @@ export default function Costs() {
     <>
       <div className="phead">
         <div><h1>Cost ledger</h1><div className="lede">Every API call, attributed per job and per brand, so you can see what each published piece cost.</div></div>
-        <div className="crumbs">{total.entries} entries</div>
+        <div className="crumbs">{total.entries} entries · R{ZAR_PER_USD.toFixed(2)}/$</div>
       </div>
 
       <section className="section reveal r1">
         <div className="section-head"><span className="idx">01</span><h2>Spend</h2><span className="rule" /></div>
         <div className="statgrid">
-          <div className="stat"><div className="big tnum">{usd2(total.totalUsd)}</div><div className="lab">All time</div></div>
-          <div className="stat"><div className="big tnum">{usd2(month.totalUsd)}</div><div className="lab">This month</div></div>
+          <div className="stat"><div className="big tnum">{zar(total.totalUsd)}</div><div className="lab">All time</div></div>
+          <div className="stat"><div className="big tnum">{zar(month.totalUsd)}</div><div className="lab">This month</div></div>
           <div className="stat"><div className="big tnum">{total.entries}</div><div className="lab">API calls logged</div></div>
         </div>
       </section>
@@ -41,7 +40,7 @@ export default function Costs() {
           {brands.length === 0 ? <div className="empty">Fills once generation runs.</div> : brands.map((b) => (
             <div className="bar-row" key={b.brand || '—'}>
               <span>{b.brand || 'unattributed'}</span>
-              <span className="bv">{usd2(b.total)}</span>
+              <span className="bv">{zar(b.total)}</span>
               <span className="bar"><i style={{ width: `${Math.max(2, (b.total / maxBrand) * 100)}%` }} /></span>
             </div>
           ))}
@@ -54,7 +53,7 @@ export default function Costs() {
           {ops.length === 0 ? <div className="empty">Fills once generation runs.</div> : ops.map((o, i) => (
             <div className="bar-row" key={i}>
               <span>{o.operation || '—'} <span className="dim">· {o.provider || '—'}</span></span>
-              <span className="bv">{usd2(o.total)}</span>
+              <span className="bv">{zar(o.total)}</span>
               <span className="bar"><i style={{ width: `${Math.max(2, (o.total / maxOp) * 100)}%` }} /></span>
             </div>
           ))}
@@ -75,7 +74,7 @@ export default function Costs() {
                     <td className="id">{c.operation || '—'}</td>
                     <td className="hide-sm id">{c.model || '—'}</td>
                     <td>{c.job_id ? <Link className="joblink" href={`/job/${c.job_id}`}>{c.topic || c.job_id.slice(0, 8)}</Link> : <span className="dim">—</span>}</td>
-                    <td className="num" style={{ textAlign: 'right' }}>{usd(c.cost_usd)}</td>
+                    <td className="num" style={{ textAlign: 'right' }}>{zar(c.cost_usd, 4)}</td>
                   </tr>
                 ))}
               </tbody>
