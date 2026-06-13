@@ -100,6 +100,14 @@ a:hover { color: var(--accent-2); }
 .side-foot .colophon { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--faint); padding: 0 1px; }
 .cta { display: flex; align-items: center; justify-content: center; gap: 8px; }
 
+/* active-brand switcher (§1b) */
+.brandbar { display: flex; align-items: center; gap: 7px; padding: 7px 9px; border: 1px solid var(--line-2); border-radius: var(--r); background: var(--bg-2); }
+.brandbar.scoped { border-color: var(--accent); background: var(--accent-bg); }
+.brandbar-lab { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); flex: none; }
+.brandbar-sel { flex: 1; min-width: 0; background: transparent; border: none; color: var(--fg); font-family: var(--mono); font-size: 12px; cursor: pointer; outline: none; }
+.brandbar.scoped .brandbar-sel { color: var(--accent); font-weight: 600; }
+.brandbar-sel option { background: var(--bg-1); color: var(--fg); }
+
 .main { padding: 30px 40px 96px; max-width: 1600px; width: 100%; }
 
 /* ── page masthead ─────────────────────────────────────────────────────── */

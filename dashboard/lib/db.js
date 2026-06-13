@@ -17,19 +17,26 @@ function db() {
   return _db;
 }
 
-export function pipelineCounts() {
-  const rows = db().prepare('SELECT state, COUNT(*) n FROM jobs GROUP BY state').all();
+// All pipeline reads take an optional `brand` slug (§1b active-brand scope). null/undefined = all brands.
+export function pipelineCounts(brand) {
+  const rows = brand
+    ? db().prepare('SELECT state, COUNT(*) n FROM jobs WHERE brand=? GROUP BY state').all(brand)
+    : db().prepare('SELECT state, COUNT(*) n FROM jobs GROUP BY state').all();
   const map = Object.fromEntries(rows.map((r) => [r.state, r.n]));
   return STATES.map((s) => ({ state: s, count: map[s] || 0 }));
 }
 
-export function recentJobs(limit = 30) {
-  return db().prepare('SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?').all(limit);
+export function recentJobs(limit = 30, brand) {
+  return brand
+    ? db().prepare('SELECT * FROM jobs WHERE brand=? ORDER BY created_at DESC LIMIT ?').all(brand, limit)
+    : db().prepare('SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?').all(limit);
 }
 
-export function approvalQueue() {
+export function approvalQueue(brand) {
   // Jobs awaiting the human gate, with their latest draft.
-  const jobs = db().prepare("SELECT * FROM jobs WHERE state='preview' ORDER BY updated_at DESC").all();
+  const jobs = brand
+    ? db().prepare("SELECT * FROM jobs WHERE state='preview' AND brand=? ORDER BY updated_at DESC").all(brand)
+    : db().prepare("SELECT * FROM jobs WHERE state='preview' ORDER BY updated_at DESC").all();
   const latestDraft = db().prepare('SELECT * FROM drafts WHERE job_id=? ORDER BY id DESC LIMIT 1');
   return jobs.map((j) => ({ ...j, draft: latestDraft.get(j.id) || null }));
 }
@@ -131,8 +138,10 @@ export function markScheduled(jobId, who, whenISO, where) {
 }
 
 // Upcoming scheduled jobs (+ their latest draft), soonest first.
-export function scheduledJobs() {
-  const jobs = db().prepare("SELECT * FROM jobs WHERE state='scheduled' ORDER BY updated_at DESC").all();
+export function scheduledJobs(brand) {
+  const jobs = brand
+    ? db().prepare("SELECT * FROM jobs WHERE state='scheduled' AND brand=? ORDER BY updated_at DESC").all(brand)
+    : db().prepare("SELECT * FROM jobs WHERE state='scheduled' ORDER BY updated_at DESC").all();
   const latestDraft = db().prepare('SELECT * FROM drafts WHERE job_id=? ORDER BY id DESC LIMIT 1');
   return jobs
     .map((j) => {
@@ -145,11 +154,11 @@ export function scheduledJobs() {
 
 // Jobs the worker is queued on / working / failed (queued_action carries the status).
 // Order: the job actually being processed first, then waiting, then failed.
-export function inProgress() {
-  return db().prepare(
-    "SELECT * FROM jobs WHERE queued_action IS NOT NULL"
-    + " ORDER BY CASE queued_action WHEN 'processing' THEN 0 WHEN 'failed' THEN 2 ELSE 1 END, updated_at DESC",
-  ).all();
+export function inProgress(brand) {
+  const order = " ORDER BY CASE queued_action WHEN 'processing' THEN 0 WHEN 'failed' THEN 2 ELSE 1 END, updated_at DESC";
+  return brand
+    ? db().prepare("SELECT * FROM jobs WHERE queued_action IS NOT NULL AND brand=?" + order).all(brand)
+    : db().prepare("SELECT * FROM jobs WHERE queued_action IS NOT NULL" + order).all();
 }
 
 // Worker liveness: the .worker_heartbeat file the worker writes each run. null if never run.
@@ -336,8 +345,10 @@ export function updateDraftBody(draftId, body) {
 }
 
 // Jobs approved and ready to publish, each with its latest draft.
-export function publishable() {
-  const jobs = db().prepare("SELECT * FROM jobs WHERE state='approved' ORDER BY updated_at DESC").all();
+export function publishable(brand) {
+  const jobs = brand
+    ? db().prepare("SELECT * FROM jobs WHERE state='approved' AND brand=? ORDER BY updated_at DESC").all(brand)
+    : db().prepare("SELECT * FROM jobs WHERE state='approved' ORDER BY updated_at DESC").all();
   const latestDraft = db().prepare('SELECT * FROM drafts WHERE job_id=? ORDER BY id DESC LIMIT 1');
   return jobs.map((j) => ({ ...j, draft: latestDraft.get(j.id) || null }));
 }

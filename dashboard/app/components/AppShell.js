@@ -78,7 +78,26 @@ function Wordmark() {
   return <span className="wordmark">The Studio<em>.</em></span>;
 }
 
-export function AppShell({ user, counts, children }) {
+// Active-brand switcher (§1b: always explicit, deliberate switch). Scopes the cockpit to one brand.
+function BrandSwitcher({ brands, activeBrand }) {
+  async function change(e) {
+    const slug = e.target.value;
+    await fetch('/api/brand', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug }) });
+    window.location.reload();
+  }
+  const has = brands && brands.length > 0;
+  return (
+    <div className={`brandbar ${activeBrand ? 'scoped' : ''}`}>
+      <span className="brandbar-lab">Brand</span>
+      <select className="brandbar-sel" value={activeBrand || 'all'} onChange={change} disabled={!has}>
+        <option value="all">All brands</option>
+        {has && brands.map((b) => <option key={b.slug} value={b.slug}>{b.name}</option>)}
+      </select>
+    </div>
+  );
+}
+
+export function AppShell({ user, counts, brands, activeBrand, children }) {
   const path = usePathname();
   const [more, setMore] = useState(false);
   const active = (href) => (href === '/' ? path === '/' : path.startsWith(href));
@@ -102,7 +121,8 @@ export function AppShell({ user, counts, children }) {
             <Wordmark />
             <div className="strap"><span className="pulse" /> operator&rsquo;s desk</div>
           </div>
-          <NewJobButton block />
+          <BrandSwitcher brands={brands} activeBrand={activeBrand} />
+          <NewJobButton block defaultBrand={activeBrand} />
           <nav className="nav">
             {GROUPS.map((g) => (
               <div key={g.label} style={{ display: 'contents' }}>
@@ -121,7 +141,8 @@ export function AppShell({ user, counts, children }) {
         <div style={{ minWidth: 0 }}>
           <div className="mobile-top">
             <Wordmark />
-            <NewJobButton />
+            <BrandSwitcher brands={brands} activeBrand={activeBrand} />
+            <NewJobButton defaultBrand={activeBrand} />
           </div>
           <main className="main">{children}</main>
         </div>

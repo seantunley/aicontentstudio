@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { pipelineCounts, inProgress, recentJobs, costSummary, approvalQueue, publishable, listSuggestions, workerHeartbeat } from '@/lib/db';
 import { zar } from '@/lib/money';
 import { za } from '@/lib/time';
+import { getActiveBrand } from '@/lib/brand';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,16 +35,17 @@ function DeskCard({ href, n, lab, tone }) {
   return href ? <Link href={href} className={cls}>{body}</Link> : <div className={cls}>{body}</div>;
 }
 
-export default function Overview() {
+export default async function Overview() {
+  const brand = await getActiveBrand();
   let pipe = [], work = [], jobs = [], cost = { entries: 0, totalUsd: 0 }, qn = 0, rn = 0, sn = 0, hb = null, err = null;
   try {
-    pipe = pipelineCounts();
-    work = inProgress();
+    pipe = pipelineCounts(brand);
+    work = inProgress(brand);
     hb = workerHeartbeat();
-    jobs = recentJobs(8);
+    jobs = recentJobs(8, brand);
     cost = costSummary();
-    qn = approvalQueue().length;
-    rn = publishable().length;
+    qn = approvalQueue(brand).length;
+    rn = publishable(brand).length;
     sn = listSuggestions('new').length;
   } catch (e) { err = String(e?.message || e); }
 

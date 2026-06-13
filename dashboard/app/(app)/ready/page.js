@@ -1,13 +1,15 @@
 import Link from 'next/link';
 import { publishable } from '@/lib/db';
+import { getActiveBrand } from '@/lib/brand';
 import { PublishButton, ScheduleButton, PlatformChip } from '@/app/components/actions';
 
 export const dynamic = 'force-dynamic';
 const short = (id) => (id ? id.slice(0, 8) : '');
 
-export default function Ready() {
+export default async function Ready() {
+  const brand = await getActiveBrand();
   let r = [];
-  try { r = publishable(); } catch {}
+  try { r = publishable(brand); } catch {}
   return (
     <>
       <div className="phead">
@@ -37,7 +39,7 @@ export default function Ready() {
                     : j.draft.image_path ? <img className="draft-img" src={j.draft.image_path} alt="" /> : null}
                   <div className="card-foot">{j.draft.char_count} chars{j.draft.video_id ? ' · with video' : j.draft.image_id ? ' · with image' : ''}</div>
                   <div className="actions">
-                    <PublishButton jobId={j.id} channel={j.draft.platform} />
+                    <PublishButton jobId={j.id} channel={j.draft.platform} brand={j.brand} />
                     <ScheduleButton jobId={j.id} channel={j.draft.platform} />
                   </div>
                 </>

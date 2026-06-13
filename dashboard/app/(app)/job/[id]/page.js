@@ -54,7 +54,7 @@ export default async function JobPage({ params }) {
           {job.state === 'preview' && <ApprovalActions jobId={job.id} />}
           {job.state === 'approved' && (
             <div className="actions">
-              <PublishButton jobId={job.id} channel={latestPlatform} />
+              <PublishButton jobId={job.id} channel={latestPlatform} brand={job.brand} />
               <ScheduleButton jobId={job.id} channel={latestPlatform} />
             </div>
           )}

@@ -67,11 +67,11 @@ function PlatformPicker({ selected, onToggle }) {
   );
 }
 
-export function NewJobButton({ block }) {
+export function NewJobButton({ block, defaultBrand }) {
   const ui = useUI();
   const [open, setOpen] = useState(false);
   const [topic, setTopic] = useState('');
-  const [brand, setBrand] = useState('');
+  const [brand, setBrand] = useState(defaultBrand || '');
   const [withImage, setWithImage] = useState(false);
   const [withVideo, setWithVideo] = useState(false);
   const [channels, setChannels] = useState(null); // null = loading
@@ -166,13 +166,13 @@ export function ApprovalActions({ jobId, flagged }) {
   );
 }
 
-export function PublishButton({ jobId, channel }) {
+export function PublishButton({ jobId, channel, brand }) {
   const ui = useUI();
   const [busy, setBusy] = useState(false);
   async function go() {
     const ok = await ui.confirm({
       title: 'Publish live?',
-      message: `This posts publicly to ${channel || 'the connected channel'} right now via Postiz.`,
+      message: `Post ${brand ? `for brand "${brand}" ` : ''}to ${channel || 'the connected channel'} right now via Postiz? Check the brand and destination before confirming.`,
       confirmLabel: 'Publish live', tag: 'publish',
     });
     if (!ok) return;

@@ -1,11 +1,13 @@
 import { approvalQueue } from '@/lib/db';
+import { getActiveBrand } from '@/lib/brand';
 import { QueueItem } from '@/app/components/actions';
 
 export const dynamic = 'force-dynamic';
 
-export default function Queue() {
+export default async function Queue() {
+  const brand = await getActiveBrand();
   let q = [];
-  try { q = approvalQueue(); } catch {}
+  try { q = approvalQueue(brand); } catch {}
   return (
     <>
       <div className="phead">

@@ -1,14 +1,16 @@
 import Link from 'next/link';
 import { recentJobs } from '@/lib/db';
+import { getActiveBrand } from '@/lib/brand';
 import { za } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
 const short = (id) => (id ? id.slice(0, 8) : '');
 const when = (s) => za(s);
 
-export default function Jobs() {
+export default async function Jobs() {
+  const brand = await getActiveBrand();
   let jobs = [];
-  try { jobs = recentJobs(200); } catch {}
+  try { jobs = recentJobs(200, brand); } catch {}
   return (
     <>
       <div className="phead">

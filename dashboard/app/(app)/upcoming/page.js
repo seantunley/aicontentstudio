@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { scheduledJobs } from '@/lib/db';
+import { getActiveBrand } from '@/lib/brand';
 import { PlatformChip } from '@/app/components/actions';
 import { za } from '@/lib/time';
 
@@ -7,9 +8,10 @@ export const dynamic = 'force-dynamic';
 const short = (id) => (id ? id.slice(0, 8) : '');
 const when = (s) => za(s) || 'unscheduled';
 
-export default function Upcoming() {
+export default async function Upcoming() {
+  const brand = await getActiveBrand();
   let r = [];
-  try { r = scheduledJobs(); } catch {}
+  try { r = scheduledJobs(brand); } catch {}
   return (
     <>
       <div className="phead">
