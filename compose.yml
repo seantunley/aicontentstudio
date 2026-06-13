@@ -91,7 +91,9 @@ services:
       - BASIC_MEMORY_LOG_LEVEL=INFO
     user: "1000:1000"                        # image's appuser is uid 1000 (== host hermes); keeps shared files writable
     volumes:
-      - ./studio-data/knowledge:/app/data/basic-memory   # BM's default project root is /app/data/basic-memory; map our shared knowledge dir there (== /opt/studio/knowledge in hermes + dashboard)
+      # The "main" project home is {PROJECT_ROOT}/basic-memory = /app/data/basic-memory; mount our
+      # shared knowledge dir THERE so dropped/imported notes land in the project (== /opt/studio/knowledge).
+      - ./studio-data/knowledge:/app/data/basic-memory
       - ./studio-data/bm-config:/home/appuser/.basic-memory   # its search index + config (bind mount, owned by 1000)
     ports:
       - "127.0.0.1:8808:8000"                # SSE MCP; reached by the host-network hermes at http://localhost:8808
