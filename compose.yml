@@ -76,3 +76,23 @@ services:
     shm_size: "1gb"                    # Chromium needs shared memory for rendering
     ports:
       - "127.0.0.1:3100:3100"          # loopback only; reached by the host-net hermes container
+
+  # Knowledge base (Karpathy LLM-wiki pattern) — Basic Memory: local markdown knowledge graph the
+  # operator's history/artifacts compile into, served to LLMs over MCP. Stores plain markdown on the
+  # SHARED studio-data/knowledge dir, so Hermes (host net, via the MCP/SSE port) and the dashboard
+  # (reads the files directly off /opt/studio/knowledge) both see the same brain. Pinned off :latest.
+  basic-memory:
+    image: ghcr.io/basicmachines-co/basic-memory@sha256:0da35f465fed7b58b6c2e31e7c0dbcbc728760a1b6a71857cfe3ced847c727a1
+    container_name: basic-memory
+    restart: unless-stopped
+    environment:
+      - BASIC_MEMORY_DEFAULT_PROJECT=main
+      - BASIC_MEMORY_SYNC_CHANGES=true       # watch + re-index the markdown dir on change (picks up our imports)
+      - BASIC_MEMORY_LOG_LEVEL=INFO
+    user: "1000:1000"                        # image's appuser is uid 1000 (== host hermes); keeps shared files writable
+    volumes:
+      - ./studio-data/knowledge:/app/data    # the markdown knowledge base (== /opt/studio/knowledge in hermes + dashboard)
+      - ./studio-data/bm-config:/home/appuser/.basic-memory   # its search index + config (bind mount, owned by 1000)
+    ports:
+      - "127.0.0.1:8808:8000"                # SSE MCP; reached by the host-network hermes at http://localhost:8808
+    command: ["basic-memory", "mcp", "--transport", "sse", "--host", "0.0.0.0", "--port", "8000"]
