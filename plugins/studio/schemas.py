@@ -266,6 +266,7 @@ SUGGEST_TOPIC = {
             "source_url": {"type": "string", "description": "A real source URL backing the idea."},
             "source": {"type": "string", "description": "WHERE you found it — e.g. 'Reddit r/beyondthebump', 'BBC News', 'X', 'YouTube'."},
             "heat": {"type": "string", "enum": ["hot", "warm", "cool"], "description": "Trend strength: hot = surging/very timely now, warm = relevant, cool = mild/evergreen-ish."},
+            "pillar": {"type": "string", "description": "Which of the brand's content pillars this idea serves (pick from the pillars listed in the scout prompt). Helps balance coverage. Omit if the brand has none."},
             "niche_id": {"type": "integer", "description": "The scout niche id this came from (passed in the scout prompt)."},
         },
         "required": ["topic"],

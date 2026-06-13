@@ -435,13 +435,14 @@ def suggest_topic(args, **kwargs):
     source_url = (args.get("source_url") or "").strip() or None
     source = (args.get("source") or "").strip() or None
     heat = (args.get("heat") or "warm").strip().lower()
+    pillar = (args.get("pillar") or "").strip() or None
     niche_id = args.get("niche_id")
     if brand == "unassigned" and niche_id:  # backfill the brand from the scout niche
         n = db.get_niche(niche_id)
         if n:
             brand = n["brand"]
     try:
-        r = db.create_suggestion(brand, topic, rationale, source_url, niche_id, source=source, heat=heat)
+        r = db.create_suggestion(brand, topic, rationale, source_url, niche_id, source=source, heat=heat, pillar=pillar)
     except Exception as e:  # noqa: BLE001 — handler contract: never raise
         return _err(str(e))
     if r.get("duplicate"):

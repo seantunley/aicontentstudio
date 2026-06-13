@@ -45,9 +45,27 @@ def _telegram_notify(text):
 
 
 def _scout_prompt(niche):
+    # §7e: steer discovery toward the brand's content pillars (the themes it actually rotates through)
+    # rather than whatever's merely trending, and tag each idea with the pillar it serves.
+    pillars = ""
+    try:
+        b = db.get_brand(niche.get("brand"))
+        if b and (b.get("pillars") or "").strip():
+            pillars = " ".join(b["pillars"].split())
+    except Exception:  # noqa: BLE001
+        pillars = ""
+    pillar_block = (
+        (f"This brand's CONTENT PILLARS (the themes it rotates through): {pillars}. "
+         "Bias your discovery toward ideas that fit these pillars — this is what the brand is about, not "
+         "just whatever is trending — and spread ideas ACROSS the pillars rather than clustering on one. "
+         "For EACH suggestion set pillar=<the single pillar it serves, copied from that list>. ")
+        if pillars else ""
+    )
+    pillar_arg = "pillar=<the brand pillar it serves>, " if pillars else ""
     return (
         f"You are the studio's trend scout. Brand: {niche['brand']!r}. Niche: {niche['query']!r}. "
-        "Scan WIDELY for what's genuinely CURRENT and gaining attention in this niche right now. "
+        + pillar_block
+        + "Scan WIDELY for what's genuinely CURRENT and gaining attention in this niche right now. "
         "USE YOUR REAL-TIME X (Twitter) ACCESS first — see what's actually being posted, discussed, and "
         "trending on X this week — then also check news, Reddit and forums, YouTube, blogs and the open "
         "web. Prefer things surfacing in the LAST 1-2 WEEKS over evergreen. Choose 3-5 SPECIFIC ideas. "
@@ -55,7 +73,8 @@ def _scout_prompt(niche):
         "rationale=<one line, grounded in what you actually read>, source_url=<real URL>, "
         "source=<WHERE you found it, e.g. 'Reddit r/beyondthebump', 'BBC News', 'X', 'YouTube'>, "
         "heat=<'hot' if surging/very timely right now, 'warm' if solidly relevant, 'cool' if mild>, "
-        f"niche_id={niche['id']}). Judge heat HONESTLY from how much fresh recent attention it has — do "
+        + pillar_arg
+        + f"niche_id={niche['id']}). Judge heat HONESTLY from how much fresh recent attention it has — do "
         "not mark everything hot. Use METRIC units only (Celsius, km, kg, litres); convert any imperial. "
         "De-duplicate against ideas already raised. Suggest ONLY — do NOT log_job, save_brief, "
         "create_draft, advance_job, or publish. Then stop."

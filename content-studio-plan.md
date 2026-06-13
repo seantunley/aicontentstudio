@@ -557,7 +557,7 @@ Top performers shouldn't post once and die. A recycler resurfaces proven pieces 
 - **Deferred:** auto-suggesting the arc's angles from a single brief, scheduling the arc across dates on creation (today each piece is scheduled individually from the queue), pillar-tagging, and **evergreen recycling** (hard-depends on the §7f performance loop for the "top performers" list).
 
 ### Pillars (status)
-Per-brand content pillars already exist as a brand-pack field and are injected into generation (`worker._brand_block`). Using pillars to actively steer the scout / balance the calendar / hang recurring formats off them is still to do.
+Per-brand content pillars exist as a brand-pack field and are injected into generation (`worker._brand_block`). **Pillars now steer the scout (built 13 Jun 2026):** when a brand has pillars, the scout prompt (`scout._scout_prompt`) tells the agent to bias discovery toward them and spread ideas across them, and each suggestion is tagged with the pillar it serves (`suggestions.pillar`, `suggest_topic` param). The Scout page shows a per-idea pillar chip + a pillar-coverage strip so under-served themes are visible. Still to do: using pillars to actively balance the *calendar* / gap-filler, and hanging recurring formats ("Myth Monday") off them.
 
 ---
 

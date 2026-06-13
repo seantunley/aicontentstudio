@@ -246,6 +246,8 @@ def init_db():
                 conn.execute("ALTER TABLE suggestions ADD COLUMN source TEXT")
             if "heat" not in scols:
                 conn.execute("ALTER TABLE suggestions ADD COLUMN heat TEXT DEFAULT 'warm'")
+            if "pillar" not in scols:
+                conn.execute("ALTER TABLE suggestions ADD COLUMN pillar TEXT")  # which brand pillar it serves (§7e)
         # scout schedule: day-of-week + time-of-day (upgrade from the old cadence-only model)
         schcols = [r[1] for r in conn.execute("PRAGMA table_info(scout_schedule)").fetchall()]
         if schcols:
@@ -995,15 +997,17 @@ _HEAT = {"hot", "warm", "cool"}
 _HEAT_ORDER = "CASE heat WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 WHEN 'cool' THEN 2 ELSE 3 END, created_at DESC"
 
 
-def create_suggestion(brand, topic, rationale=None, source_url=None, niche_id=None, source=None, heat="warm"):
+def create_suggestion(brand, topic, rationale=None, source_url=None, niche_id=None, source=None, heat="warm", pillar=None):
     """Record a scout idea for the operator to promote or dismiss. Dedupes on (brand, topic) among
-    still-open suggestions so repeated scout runs don't pile duplicates."""
+    still-open suggestions so repeated scout runs don't pile duplicates. `pillar` = which brand
+    content pillar the idea serves (§7e), so the operator can see/balance pillar coverage."""
     topic = (topic or "").strip()
     if not topic:
         raise ValueError("topic is required")
     heat = (heat or "warm").strip().lower()
     if heat not in _HEAT:
         heat = "warm"
+    pillar = (pillar or "").strip() or None
     sid = str(uuid.uuid4())
     now = _utcnow()
     with _db() as conn:
@@ -1013,9 +1017,9 @@ def create_suggestion(brand, topic, rationale=None, source_url=None, niche_id=No
         if dup:
             return {"id": dup["id"], "duplicate": True, "topic": topic}
         conn.execute(
-            "INSERT INTO suggestions (id, brand, topic, rationale, source_url, source, heat, niche_id, status, created_at)"
-            " VALUES (?,?,?,?,?,?,?,?, 'new', ?)",
-            (sid, brand or "unassigned", topic, rationale, source_url, source, heat, niche_id, now))
+            "INSERT INTO suggestions (id, brand, topic, rationale, source_url, source, heat, pillar, niche_id, status, created_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?, 'new', ?)",
+            (sid, brand or "unassigned", topic, rationale, source_url, source, heat, pillar, niche_id, now))
     return {"id": sid, "duplicate": False, "topic": topic, "heat": heat}
 
 

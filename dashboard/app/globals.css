@@ -518,6 +518,10 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .spark { display: block; width: 100%; height: 26px; }
 .perf-empty { font-size: 12.5px; color: var(--muted); padding: 4px 0; }
 
+/* content pillars (§7e) — scout tagging + coverage */
+.pillar-chip { font-family: var(--mono); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-2); background: var(--accent-bg); border: 1px solid transparent; border-radius: 999px; padding: 2px 8px; }
+.pillar-cov { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+
 /* ── calendar (Postiz mirror) ──────────────────────────────────────────── */
 .cal-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .cal-nav { display: flex; align-items: center; gap: 8px; }

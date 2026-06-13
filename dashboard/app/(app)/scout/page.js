@@ -12,6 +12,9 @@ export default function Scout() {
   try { ideas = listSuggestions('new'); } catch {}
   try { niches = listNiches(); } catch {}
   try { schedule = getScoutSchedule(); } catch {}
+  const pillarCov = {};
+  for (const s of ideas) if (s.pillar) pillarCov[s.pillar] = (pillarCov[s.pillar] || 0) + 1;
+  const pillarEntries = Object.entries(pillarCov).sort((a, b) => b[1] - a[1]);
   return (
     <>
       <div className="phead">
@@ -27,6 +30,9 @@ export default function Scout() {
 
       <section className="section reveal r2">
         <div className="section-head"><span className="idx">02</span><h2>Ideas</h2><span className="count">{ideas.length}</span><span className="rule" /></div>
+        {pillarEntries.length ? (
+          <div className="pillar-cov">Pillar coverage: {pillarEntries.map(([p, n]) => <span className="pillar-chip" key={p}>{p} · {n}</span>)}</div>
+        ) : null}
         {ideas.length === 0 ? (
           <div className="panel blank">
             <div className="fleuron">❧</div>
@@ -38,7 +44,10 @@ export default function Scout() {
             {ideas.map((s) => (
               <div className="card reveal" key={s.id}>
                 <div className="row-between">
-                  <span className={`heat heat--${s.heat || 'warm'}`}>{(s.heat || 'warm')}</span>
+                  <span style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span className={`heat heat--${s.heat || 'warm'}`}>{(s.heat || 'warm')}</span>
+                    {s.pillar ? <span className="pillar-chip" title="content pillar">{s.pillar}</span> : null}
+                  </span>
                   <span className="card-foot" style={{ margin: 0 }}>found {when(s.created_at)}</span>
                 </div>
                 <div className="card-topic" style={{ marginTop: 8 }}>{s.topic}</div>
