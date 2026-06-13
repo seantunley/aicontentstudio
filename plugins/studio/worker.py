@@ -127,25 +127,41 @@ def process_one(job):
     db.enqueue_action(jid, "processing")  # claim + mark running (status the cockpit shows)
     db.record_event(jid, "worker: starting research + draft"
                     + (" + image" if with_image else "") + (" + video" if with_video else ""), actor="system")
+
+    # 1) Run the agent. Only a genuine run failure — crash, timeout, or never reaching the gate — is
+    # a 'failed'. (A draft that reached preview has succeeded; see step 2.)
     try:
         r = subprocess.run(["hermes", "-z", _agent_prompt(job, with_image, with_video)],
                            capture_output=True, text=True, timeout=RUN_TIMEOUT_SECONDS)
-        state = db.get_job(jid)["state"]
-        if state == "preview":
-            _polish_drafts(jid, job.get("brand"))  # Layer 2: psychology + humanizer passes before the operator sees it
-            db.clear_queued(jid)
-            db.record_event(jid, "worker: done — draft ready for review", actor="system")
-            _telegram_notify(f'\U0001f4dd Draft ready to review: "{job["topic"]}" — it\'s in your approval queue.',
-                             button=_cockpit_button(jid))
-        else:
-            db.enqueue_action(jid, "failed")
-            db.record_event(jid, f"worker: did not reach preview (state={state}, rc={r.returncode})", actor="system")
     except subprocess.TimeoutExpired:
         db.enqueue_action(jid, "failed")
         db.record_event(jid, "worker: timed out", actor="system")
+        return
     except Exception as e:  # noqa: BLE001
         db.enqueue_action(jid, "failed")
-        db.record_event(jid, f"worker: error: {e}", actor="system")
+        db.record_event(jid, f"worker: agent run error: {e}", actor="system")
+        return
+
+    state = db.get_job(jid)["state"]
+    if state != "preview":
+        db.enqueue_action(jid, "failed")
+        db.record_event(jid, f"worker: did not reach preview (state={state}, rc={r.returncode})", actor="system")
+        return
+
+    # 2) SUCCESS — the drafts are at the gate. From here NOTHING may flip the job to 'failed':
+    # polish and the operator ping are best-effort bookkeeping, and the polish sweep backstops any
+    # draft missed here. A transient DB hiccup in this block must not bury a good, review-ready job.
+    try:
+        _polish_drafts(jid, job.get("brand"))  # Layer 2: psychology + humanizer passes before the operator sees it
+    except Exception as e:  # noqa: BLE001
+        print(f"worker: polish error (non-fatal — sweep will retry): {e}")
+    db.clear_queued(jid)  # drop the 'processing' marker so the cockpit shows it as a normal preview job
+    try:
+        db.record_event(jid, "worker: done — draft ready for review", actor="system")
+        _telegram_notify(f'\U0001f4dd Draft ready to review: "{job["topic"]}" — it\'s in your approval queue.',
+                         button=_cockpit_button(jid))
+    except Exception as e:  # noqa: BLE001
+        print(f"worker: post-success notify error (non-fatal): {e}")
 
 
 def _polish_one_draft(d, brand):

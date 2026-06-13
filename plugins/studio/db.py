@@ -6,6 +6,7 @@ which is the gitignored ./studio-data on the host).
 """
 import os
 import json
+import time
 import uuid
 import secrets
 import sqlite3
@@ -327,11 +328,23 @@ def advance_job(job_id, to_state, actor="agent", detail=None):
 
 
 def record_event(job_id, detail, actor="system", from_state=None, to_state=None):
-    with _db() as conn:
-        conn.execute(
-            "INSERT INTO job_events (job_id, from_state, to_state, actor, at, detail) VALUES (?,?,?,?,?,?)",
-            (job_id, from_state, to_state, actor, _utcnow(), detail),
-        )
+    # The transition audit log is best-effort. The studio worker and the agent subprocess write the
+    # same SQLite file through separate connections, so an INSERT can briefly lose a foreign-key /
+    # lock race; a logging write must never propagate that up and fail an otherwise-good job. Retry
+    # once (the contended row settles), then drop the line rather than raise.
+    for attempt in (1, 2):
+        try:
+            with _db() as conn:
+                conn.execute(
+                    "INSERT INTO job_events (job_id, from_state, to_state, actor, at, detail) VALUES (?,?,?,?,?,?)",
+                    (job_id, from_state, to_state, actor, _utcnow(), detail),
+                )
+            return
+        except Exception as e:  # noqa: BLE001
+            if attempt == 1:
+                time.sleep(0.2)
+                continue
+            print(f"studio: record_event dropped for {job_id}: {e}")
 
 
 def set_job_brand(job_id, brand, actor="human"):
