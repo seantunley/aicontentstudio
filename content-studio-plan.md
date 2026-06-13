@@ -550,6 +550,15 @@ Awareness days, holidays, seasonal moments (World Breastfeeding Week in August, 
 ### Evergreen recycling
 Top performers shouldn't post once and die. A recycler resurfaces proven pieces after a decent interval — refreshed caption, new crop of the same master, "still true a year later" framing — using performance data + the memory bank to pick candidates and Postiz queues to slot them. Recycled pieces still pass the gate (cheap to approve — I've approved them before). One of the highest-ROI automations in social; all the ingredients already exist in this design.
 
+### Built (v1 — 13 Jun 2026)
+- **Campaign object** (`campaigns` table + `jobs.campaign_id`): one theme + a shared platform set, fanned into N pieces. Created from the cockpit `/campaigns` page (name, theme, the arc as one-post-per-line, platforms, optional per-piece image). Each piece becomes a normal job (`source=campaign`), runs the full pipeline, and lands in the approval queue tagged to the campaign — reviewed as a set; the campaign page shows per-piece progress.
+- The drafting agent gets the campaign's **shared theme** injected (`worker._campaign_block`) so pieces are coherent with the arc yet distinct from each other.
+- Deleting a campaign trashes its unpublished pieces (published stay live).
+- **Deferred:** auto-suggesting the arc's angles from a single brief, scheduling the arc across dates on creation (today each piece is scheduled individually from the queue), pillar-tagging, and **evergreen recycling** (hard-depends on the §7f performance loop for the "top performers" list).
+
+### Pillars (status)
+Per-brand content pillars already exist as a brand-pack field and are injected into generation (`worker._brand_block`). Using pillars to actively steer the scout / balance the calendar / hang recurring formats off them is still to do.
+
 ---
 
 ## 7f. Performance loop (analytics back from Postiz)

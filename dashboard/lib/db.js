@@ -577,4 +577,72 @@ export function seedCountryOccasions(code, brand = 'all') {
   return { ok: true, added, country: cc };
 }
 
+// --- campaigns (§7e): one theme fanned into a coordinated arc of posts -----------------------
+export function createCampaign({ brand, name, theme, platforms, pieces, withImage, withVideo, who }) {
+  const list = (pieces || []).map((s) => s.trim()).filter(Boolean);
+  if (!name?.trim()) throw new Error('campaign name is required');
+  if (!list.length) throw new Error('add at least one piece (one post per line)');
+  const d = db();
+  const cid = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const targets = platforms && platforms.length ? platforms.join(',') : null;
+  const action = withVideo ? 'research_draft_image_video' : withImage ? 'research_draft_image' : 'research_draft';
+  const tx = d.transaction(() => {
+    d.prepare('INSERT INTO campaigns (id,brand,name,theme,platforms,status,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)')
+      .run(cid, brand || 'unassigned', name.trim(), theme || '', targets, 'active', who, now);
+    let i = 0;
+    for (const piece of list) {
+      const jid = crypto.randomUUID();
+      i += 1;
+      d.prepare('INSERT INTO jobs (id,brand,topic,state,source,created_by,created_at,updated_at,meta,queued_action,target_platforms,campaign_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+        .run(jid, brand || 'unassigned', piece, 'requested', 'campaign', who, now, now, '{}', action, targets, cid);
+      d.prepare('INSERT INTO job_events (job_id,from_state,to_state,actor,at,detail) VALUES (?,?,?,?,?,?)')
+        .run(jid, null, 'requested', 'human', now, `campaign "${name.trim()}" piece ${i}/${list.length}`);
+    }
+  });
+  tx();
+  return { ok: true, id: cid, pieces: list.length };
+}
+
+export function listCampaigns(brand) {
+  const d = db();
+  let rows;
+  try {
+    rows = brand
+      ? d.prepare('SELECT * FROM campaigns WHERE brand=? ORDER BY created_at DESC').all(brand)
+      : d.prepare('SELECT * FROM campaigns ORDER BY created_at DESC').all();
+  } catch { return []; }
+  return rows.map((c) => {
+    const pieces = d.prepare('SELECT state FROM jobs WHERE campaign_id=?').all(c.id);
+    const ready = pieces.filter((p) => ['preview', 'approved', 'scheduled', 'published'].includes(p.state)).length;
+    const published = pieces.filter((p) => p.state === 'published').length;
+    return { ...c, total: pieces.length, ready, published };
+  });
+}
+
+export function campaignDetail(id) {
+  const d = db();
+  let c;
+  try { c = d.prepare('SELECT * FROM campaigns WHERE id=?').get(id); } catch { return null; }
+  if (!c) return null;
+  const pieces = d.prepare('SELECT id,topic,state,queued_action,target_platforms FROM jobs WHERE campaign_id=? ORDER BY created_at').all(id);
+  return { ...c, pieces };
+}
+
+export function deleteCampaign(id) {
+  // Drop the campaign; its in-flight (not-yet-published) pieces are cancelled to trash, published stay.
+  const d = db();
+  const now = new Date().toISOString();
+  const tx = d.transaction(() => {
+    for (const j of d.prepare("SELECT id FROM jobs WHERE campaign_id=? AND state NOT IN ('published','cancelled')").all(id)) {
+      d.prepare('UPDATE jobs SET state=?, queued_action=NULL, updated_at=? WHERE id=?').run('cancelled', now, j.id);
+      d.prepare('INSERT INTO job_events (job_id,from_state,to_state,actor,at,detail) VALUES (?,?,?,?,?,?)')
+        .run(j.id, null, 'cancelled', 'human', now, 'campaign deleted');
+    }
+    d.prepare('DELETE FROM campaigns WHERE id=?').run(id);
+  });
+  tx();
+  return { ok: true };
+}
+
 export { STATES };

@@ -168,6 +168,16 @@ CREATE TABLE IF NOT EXISTS occasions (
     created_at    TEXT,
     updated_at    TEXT
 );
+CREATE TABLE IF NOT EXISTS campaigns (
+    id          TEXT PRIMARY KEY,
+    brand       TEXT NOT NULL DEFAULT 'unassigned',
+    name        TEXT NOT NULL,
+    theme       TEXT,                         -- the shared idea/brief the arc rotates around (§7e)
+    platforms   TEXT,                         -- comma-sep target platforms for the arc
+    status      TEXT NOT NULL DEFAULT 'active',
+    created_by  TEXT,
+    created_at  TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state);
 CREATE INDEX IF NOT EXISTS idx_events_job ON job_events(job_id);
 CREATE INDEX IF NOT EXISTS idx_suggestions_status ON suggestions(status);
@@ -202,6 +212,8 @@ def init_db():
             conn.execute("ALTER TABLE jobs ADD COLUMN queued_action TEXT")
         if "target_platforms" not in cols:
             conn.execute("ALTER TABLE jobs ADD COLUMN target_platforms TEXT")  # comma-sep platforms to draft for
+        if "campaign_id" not in cols:
+            conn.execute("ALTER TABLE jobs ADD COLUMN campaign_id TEXT")  # links a job to a campaign arc (§7e)
         # an AI-generated image can be attached to a draft (Phase 2). Uploaded to the publisher at
         # attach-time, so we store the publisher's media reference (id + url), not the local file.
         dcols = [r[1] for r in conn.execute("PRAGMA table_info(drafts)").fetchall()]
@@ -713,6 +725,18 @@ def get_brand(slug):
 def list_brands():
     with _db() as conn:
         return [dict(r) for r in conn.execute("SELECT * FROM brands ORDER BY name").fetchall()]
+
+
+def get_campaign(campaign_id):
+    """A campaign's row (or None) — read at draft time so a piece knows its arc's theme (§7e)."""
+    if not campaign_id:
+        return None
+    try:
+        with _db() as conn:
+            r = conn.execute("SELECT * FROM campaigns WHERE id=?", (campaign_id,)).fetchone()
+        return dict(r) if r else None
+    except Exception:  # noqa: BLE001 — table may not exist on an old DB
+        return None
 
 
 def purge_trash(ttl_days=30):

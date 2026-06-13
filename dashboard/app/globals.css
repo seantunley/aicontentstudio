@@ -467,6 +467,25 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .occ-seed .input { padding: 6px 9px; font-size: 12px; }
 @media (max-width: 760px) { .occ-row { grid-template-columns: 1fr; gap: 8px; } .occ-acts { flex-wrap: wrap; } }
 
+/* campaigns (§7e) */
+.camp-list { display: flex; flex-direction: column; gap: 8px; }
+.camp-card { background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; }
+.camp-card.open { border-color: var(--line-2); }
+.camp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; }
+.camp-main { display: flex; align-items: flex-start; gap: 9px; background: none; border: 0; text-align: left; cursor: pointer; color: inherit; flex: 1; min-width: 0; }
+.camp-name { font-family: var(--serif); font-size: 15px; color: var(--fg); display: block; }
+.camp-theme { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.camp-meta { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.camp-prog { font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+.camp-body { border-top: 1px solid var(--line); padding: 6px 14px 12px; }
+.camp-piece { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.camp-piece:last-child { border-bottom: 0; }
+.camp-piece-n { font-family: var(--mono); font-size: 10px; color: var(--faint); width: 18px; flex-shrink: 0; }
+.camp-piece-topic { flex: 1; min-width: 0; font-size: 13px; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.camp-piece-state { font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); background: var(--bg-3); border-radius: 999px; padding: 2px 8px; flex-shrink: 0; }
+.camp-piece-state.s-preview { color: var(--accent-2); background: var(--accent-bg); }
+.camp-piece-state.s-published { color: var(--green); background: var(--green-bg); }
+
 /* ── calendar (Postiz mirror) ──────────────────────────────────────────── */
 .cal-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .cal-nav { display: flex; align-items: center; gap: 8px; }

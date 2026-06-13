@@ -49,7 +49,7 @@ function Modal({ bar, danger, onClose, children }) {
 }
 
 // Selectable platform tiles with brand logo chips.
-function PlatformPicker({ selected, onToggle }) {
+export function PlatformPicker({ selected, onToggle }) {
   return (
     <div className="ptiles">
       {SUPPORTED.map((p) => {
@@ -539,7 +539,7 @@ export function QueueItem({ job }) {
         <div className="qcard-body">
           {d ? (
             <>
-              <div className="draft-body">{d.body}</div>
+              <EditableDraft draftId={d.id} body={d.body} limit={lim} />
               {d.video_path
                 ? <video className="draft-img" src={d.video_path} controls muted playsInline />
                 : d.image_path ? <img className="draft-img" src={d.image_path} alt="" /> : null}

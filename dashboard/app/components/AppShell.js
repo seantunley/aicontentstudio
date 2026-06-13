@@ -27,6 +27,7 @@ const ICONS = {
   brands: <><path d="M20.59 13.41 13.42 20.6a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><path d="M7 7h.01" /></>,
   knowledge: <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></>,
   occasions: <><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /><path d="M12 13l1.2 2.4 2.6.4-1.9 1.8.5 2.6-2.4-1.3-2.4 1.3.5-2.6-1.9-1.8 2.6-.4z" /></>,
+  campaigns: <><path d="M3 11l12-5v12L3 13z" /><path d="M15 8a3 3 0 0 1 0 6" /><path d="M6 13v4a2 2 0 0 0 2 2h1" /></>,
   more: <><circle cx="5" cy="12" r="1.4" /><circle cx="12" cy="12" r="1.4" /><circle cx="19" cy="12" r="1.4" /></>,
 };
 
@@ -42,6 +43,7 @@ const GROUPS = [
   { label: 'Intake', items: [
     { href: '/scout', key: 'scout', label: 'Scout', countKey: 'scout' },
     { href: '/occasions', key: 'occasions', label: 'Occasions' },
+    { href: '/campaigns', key: 'campaigns', label: 'Campaigns' },
     { href: '/jobs', key: 'jobs', label: 'All jobs' },
   ]},
   { label: 'Brands', items: [

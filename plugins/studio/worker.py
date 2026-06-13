@@ -79,6 +79,19 @@ def _brand_block(job):
     return f"BRAND PROFILE for {b.get('name') or job.get('brand')} — write in this brand's voice. " + " ".join(bits) + " "
 
 
+def _campaign_block(job):
+    """If the job is part of a campaign arc (§7e), tell the agent the shared theme so the piece is
+    coherent with the series and distinct from its siblings. Empty otherwise."""
+    c = db.get_campaign(job.get("campaign_id"))
+    if not c:
+        return ""
+    bits = [f"This post is one piece of the campaign {c.get('name')!r}"]
+    if c.get("theme"):
+        bits.append(f"— the arc's shared theme: {c['theme']}")
+    return (" ".join(bits) + ". Keep it coherent with that theme but make this piece distinct from the "
+            "others in the series (its own angle/hook). ")
+
+
 def _agent_prompt(job, with_image, with_video=False):
     targets = (job.get("target_platforms") or "").strip()
     if targets:
@@ -106,6 +119,7 @@ def _agent_prompt(job, with_image, with_video=False):
         "end with one clear call to action. Ethical only, never shame, scare, or use false urgency "
         "(especially on health or sensitive topics). "
         + _brand_block(job)
+        + _campaign_block(job)
         + step2
     )
     if with_image:
