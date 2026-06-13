@@ -48,6 +48,11 @@ export function EngagementInbox() {
     const r = await fetch(`/api/engagement/messages?id=${c.id}`);
     const d = await r.json();
     setThread(d.messages || []);
+    // if the worker already finished a reply-draft for this conversation, prefill the composer
+    try {
+      const dd = await fetch(`/api/engagement/draft?conversationId=${c.id}`).then((x) => x.json());
+      if (dd.draft?.status === 'drafted' && dd.draft.draft) setText(dd.draft.draft);
+    } catch { /* ignore */ }
   }
 
   function lastIncoming() {
@@ -67,8 +72,13 @@ export function EngagementInbox() {
       if (st === 'drafted' || st === 'error') {
         clearInterval(pollRef.current); setDrafting(false);
         setText(d.draft.draft || ''); ui.toast('Draft ready — review before sending');
-      } else if (tries > 16) { clearInterval(pollRef.current); setDrafting(false); ui.toast('Draft is taking a while — try again', 'err'); }
-    }, 2500);
+      } else if (tries > 50) {
+        // the worker runs on a ~60s cron; if it's mid-run this can lag. Stop polling but the draft
+        // will still land — reopening the conversation picks it up.
+        clearInterval(pollRef.current); setDrafting(false);
+        ui.toast('Still drafting — reopen this conversation in a moment to grab it', 'err');
+      }
+    }, 3000);
   }
 
   async function send() {
