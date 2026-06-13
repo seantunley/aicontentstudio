@@ -661,4 +661,16 @@ export function requestRedraft(jobId, angle) {
   return { ok: true };
 }
 
+// §3d engagement: queue an AI reply-draft for a Chatwoot conversation; the worker fills it in.
+export function requestReplyDraft(conversationId, brand, incoming) {
+  const r = db().prepare("INSERT INTO reply_drafts (conversation_id, brand, incoming, status, created_at) VALUES (?,?,?, 'requested', ?)")
+    .run(String(conversationId), brand || null, (incoming || '').slice(0, 2000), new Date().toISOString());
+  return { ok: true, id: r.lastInsertRowid };
+}
+export function getReplyDraft(conversationId) {
+  try {
+    return db().prepare('SELECT status, draft FROM reply_drafts WHERE conversation_id=? ORDER BY id DESC LIMIT 1').get(String(conversationId)) || null;
+  } catch { return null; }
+}
+
 export { STATES };

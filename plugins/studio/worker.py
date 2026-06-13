@@ -374,6 +374,44 @@ def _process_redrafts():
         print(f"worker: re-angled job {jid[:8]} -> {n} draft(s)")
 
 
+def _reply_prompt(brand, incoming):
+    bb = _brand_block({"brand": brand})
+    try:
+        safety = humanize._brand_safety(brand)
+    except Exception:  # noqa: BLE001
+        safety = "Ethical only: never shame, scare, manipulate, or use false urgency."
+    return (
+        "You are replying on behalf of the brand to a follower's message on social media. "
+        f"Their message: \"{incoming}\". " + (bb or "")
+        + safety + " "
+        "Draft a warm, genuinely helpful, on-brand reply in 1-3 sentences. Sound like a real person, not "
+        "AI: no em dashes, no clichés, no significance inflation. NEVER give medical advice — point to a "
+        "professional (IBCLC/doctor) instead. If the message is distressed, a complaint, or a possible "
+        "crisis, reply gently and keep it safe (the operator reviews before it sends). Use METRIC units. "
+        "Output ONLY the reply text — no preamble, no surrounding quotes."
+    )
+
+
+def _process_reply_drafts():
+    """§3d: draft on-brand replies to engagement (Chatwoot) conversations. The operator reviews +
+    sends every draft — this only prepares the text (the human gate, §4a)."""
+    try:
+        pending = db.pending_reply_drafts()
+    except Exception as e:  # noqa: BLE001
+        print(f"worker: reply-draft scan error: {e}")
+        return
+    for r in pending:
+        try:
+            out = subprocess.run(["hermes", "-z", _reply_prompt(r.get("brand"), r.get("incoming") or "")],
+                                 capture_output=True, text=True, timeout=RUN_TIMEOUT_SECONDS)
+            text = humanize.scrub((out.stdout or "").strip().strip('"').strip())
+            db.save_reply_draft(r["id"], text or "(couldn't draft — reply manually)", "drafted")
+            print(f"worker: drafted reply for conversation {r.get('conversation_id')}")
+        except Exception as e:  # noqa: BLE001
+            db.save_reply_draft(r["id"], "(draft failed — reply manually)", "error")
+            print(f"worker: reply-draft error: {e}")
+
+
 def main():
     db.init_db()
     _heartbeat()
@@ -384,6 +422,7 @@ def main():
         _maybe_run_scout()
         _check_occasions()
         _process_redrafts()
+        _process_reply_drafts()
         _autotag_media()
         _polish_pending()  # polish drafts from ANY path (incl. Telegram) that aren't polished yet
         db.purge_trash(30)  # hard-delete trashed jobs + media older than 30 days

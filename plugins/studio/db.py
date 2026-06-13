@@ -178,10 +178,21 @@ CREATE TABLE IF NOT EXISTS campaigns (
     created_by  TEXT,
     created_at  TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS reply_drafts (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id TEXT NOT NULL,                -- Chatwoot conversation id (§3d engagement)
+    brand           TEXT,
+    incoming        TEXT,                          -- the follower message we're replying to (context)
+    draft           TEXT,                          -- the AI-drafted reply (operator reviews before sending)
+    status          TEXT NOT NULL DEFAULT 'requested',  -- requested | drafted | error
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT
+);
 CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state);
 CREATE INDEX IF NOT EXISTS idx_events_job ON job_events(job_id);
 CREATE INDEX IF NOT EXISTS idx_suggestions_status ON suggestions(status);
 CREATE INDEX IF NOT EXISTS idx_occasions_brand ON occasions(brand);
+CREATE INDEX IF NOT EXISTS idx_reply_drafts_conv ON reply_drafts(conversation_id);
 """
 
 
@@ -745,6 +756,36 @@ def redraft_draft(draft_id, body, angle=None):
     with _db() as conn:
         conn.execute("UPDATE drafts SET body=?, char_count=?, angle=?, polish_json=NULL WHERE id=?",
                      (body, len(body), angle, draft_id))
+
+
+def create_reply_draft(conversation_id, brand, incoming):
+    """Queue an AI reply-draft request for a Chatwoot conversation (§3d). The worker fills it in."""
+    now = _utcnow()
+    with _db() as conn:
+        cur = conn.execute(
+            "INSERT INTO reply_drafts (conversation_id, brand, incoming, status, created_at) VALUES (?,?,?, 'requested', ?)",
+            (str(conversation_id), brand, incoming, now))
+        return cur.lastrowid
+
+
+def pending_reply_drafts(limit=8):
+    with _db() as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT * FROM reply_drafts WHERE status='requested' ORDER BY id LIMIT ?", (limit,)).fetchall()]
+
+
+def save_reply_draft(draft_id, text, status="drafted"):
+    with _db() as conn:
+        conn.execute("UPDATE reply_drafts SET draft=?, status=?, updated_at=? WHERE id=?",
+                     (text, status, _utcnow(), draft_id))
+
+
+def latest_reply_draft(conversation_id):
+    """Most recent reply-draft for a conversation (what the inbox composer polls/shows)."""
+    with _db() as conn:
+        r = conn.execute("SELECT * FROM reply_drafts WHERE conversation_id=? ORDER BY id DESC LIMIT 1",
+                         (str(conversation_id),)).fetchone()
+    return dict(r) if r else None
 
 
 def get_campaign(campaign_id):

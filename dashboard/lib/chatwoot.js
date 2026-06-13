@@ -43,6 +43,26 @@ export async function listConversations(status = 'open') {
   }
 }
 
+// Full message thread for one conversation (incoming + outgoing only; activity events filtered out).
+export async function getMessages(conversationId) {
+  if (!chatwootConfigured()) return null;
+  try {
+    const d = await cw(`/conversations/${conversationId}/messages`);
+    const payload = d?.payload || d?.data?.payload || [];
+    return payload
+      .filter((m) => m.content && (m.message_type === 0 || m.message_type === 1))
+      .map((m) => ({
+        id: m.id,
+        content: m.content,
+        incoming: m.message_type === 0,
+        sender: m.sender?.name || (m.message_type === 0 ? 'them' : 'you'),
+        ts: m.created_at || null,
+      }));
+  } catch {
+    return [];
+  }
+}
+
 export async function conversationCount(status = 'open') {
   const list = await listConversations(status);
   return Array.isArray(list) ? list.length : 0;
