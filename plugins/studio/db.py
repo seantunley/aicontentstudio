@@ -232,6 +232,10 @@ def init_db():
             conn.execute("ALTER TABLE drafts ADD COLUMN image_path TEXT")  # publisher media URL
         if "image_id" not in dcols:
             conn.execute("ALTER TABLE drafts ADD COLUMN image_id TEXT")    # publisher media id
+        if "images_json" not in dcols:
+            # multi-image carousel (§7c): JSON array of [{id, path}] in slide order. image_id/image_path
+            # stay as the PRIMARY (= images_json[0]) for single-image consumers.
+            conn.execute("ALTER TABLE drafts ADD COLUMN images_json TEXT")
         if "video_path" not in dcols:
             conn.execute("ALTER TABLE drafts ADD COLUMN video_path TEXT")  # publisher media URL (video)
         if "video_id" not in dcols:
@@ -705,7 +709,7 @@ def create_draft(job_id, platform, body, angle=None, variant=1):
 def list_drafts(job_id):
     with _db() as conn:
         return [dict(r) for r in conn.execute(
-            "SELECT id, platform, angle, body, char_count, variant, image_path, image_id, video_path, video_id, polish_json, created_at FROM drafts"
+            "SELECT id, platform, angle, body, char_count, variant, image_path, image_id, images_json, video_path, video_id, polish_json, created_at FROM drafts"
             " WHERE job_id=? ORDER BY id", (job_id,)
         ).fetchall()]
 
@@ -847,8 +851,22 @@ def set_draft_image(job_id, image_id, image_path):
 
 
 def set_draft_image_by_id(draft_id, image_id, image_path):
+    # single image: it's both the primary and the whole (1-slide) image set.
     with _db() as conn:
-        conn.execute("UPDATE drafts SET image_id=?, image_path=? WHERE id=?", (image_id, image_path, draft_id))
+        conn.execute("UPDATE drafts SET image_id=?, image_path=?, images_json=? WHERE id=?",
+                     (image_id, image_path, json.dumps([{"id": image_id, "path": image_path}]), draft_id))
+
+
+def set_draft_images_by_id(draft_id, media_list):
+    """Attach a CAROUSEL (ordered list of {id, path}) to a draft. The first is the primary image."""
+    media_list = [m for m in (media_list or []) if m and m.get("path")]
+    if not media_list:
+        raise ValueError("no images to attach")
+    primary = media_list[0]
+    with _db() as conn:
+        conn.execute("UPDATE drafts SET image_id=?, image_path=?, images_json=? WHERE id=?",
+                     (primary.get("id"), primary.get("path"), json.dumps(media_list), draft_id))
+    return len(media_list)
 
 
 def set_draft_video_by_id(draft_id, video_id, video_path):

@@ -424,6 +424,53 @@ def set_draft_image(args, **kwargs):
                message=f"Image sized per platform and attached to {len(done)} draft(s): {', '.join(done)}.")
 
 
+def set_carousel(args, **kwargs):
+    """Attach MULTIPLE images as a swipe CAROUSEL to the job's draft(s) — each slide sized per
+    platform, in order. Generate the slides with image_gen first (a distinct image per slide), then
+    pass their file paths here in order. For a single image use set_draft_image instead."""
+    jid = (args.get("job_id") or "").strip()
+    paths = args.get("image_paths") or []
+    if isinstance(paths, str):
+        paths = [paths]
+    paths = [p.strip() for p in paths if p and str(p).strip()]
+    tags = (args.get("tags") or "").strip() or None
+    if not jid or not paths:
+        return _err("job_id and image_paths (a list of 2+ paths) are required")
+    if len(paths) < 2:
+        return _err("a carousel needs at least 2 images — use set_draft_image for one image")
+    if len(paths) > 10:
+        return _err("carousels are capped at 10 images")
+    job = db.find_job(jid)
+    if not job:
+        return _err(f"no job matching '{jid}'")
+    drafts = db.list_drafts(job["id"])
+    if not drafts:
+        return _err("no draft to attach to — create_draft first")
+    for p in paths:
+        if not os.path.exists(p):
+            return _err(f"image file not found: {p}")
+    done = []
+    for d in drafts:
+        tw, th = db.PLATFORM_IMAGE.get(d["platform"], (1080, 1080))
+        media_list = []
+        try:
+            for p in paths:
+                derived = _derive_image(p, tw, th)
+                media = postiz.upload_image(derived)
+                media_list.append({"id": media.get("id"), "path": media.get("path")})
+                db.add_media_asset("image", media.get("path"), media.get("id"), source="derived",
+                                   job_id=job["id"], draft_id=d["id"], platform=d["platform"], width=tw, height=th, tags=tags)
+            db.set_draft_images_by_id(d["id"], media_list)
+            done.append(f"{d['platform']} x{len(media_list)}")
+        except postiz.PostizError as e:
+            return _err(f"upload for {d['platform']} failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            return _err(f"carousel attach for {d['platform']} failed: {e}")
+    db.record_event(job["id"], f"carousel attached ({len(paths)} slides): {', '.join(done)}", actor="agent")
+    return _ok(job_id=job["id"], short_id=job["id"][:8], slides=len(paths), attached=done,
+               message=f"Carousel of {len(paths)} images attached to {len(done)} draft(s).")
+
+
 def suggest_topic(args, **kwargs):
     """Record a timely content idea for the operator to review (trend scout, §3b). SUGGEST ONLY —
     does NOT create a job, research, or publish. The operator promotes it later if they want it."""

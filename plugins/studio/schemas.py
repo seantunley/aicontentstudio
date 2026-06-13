@@ -311,3 +311,22 @@ SET_DRAFT_IMAGE = {
         "required": ["job_id", "image_path"],
     },
 }
+
+SET_CAROUSEL = {
+    "name": "set_carousel",
+    "description": (
+        "Attach MULTIPLE images as a swipe CAROUSEL (multi-image post) to the job's draft(s), in order. "
+        "Use when the operator asks for a carousel / multi-image / swipe post. First call image_gen once "
+        "PER SLIDE to create each distinct image, collect the file paths, then call this ONCE with "
+        "image_paths = the ordered list (2-10 slides). For a single image use set_draft_image instead."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "job_id": {"type": "string", "description": "Full job id or unique short prefix."},
+            "image_paths": {"type": "array", "items": {"type": "string"}, "description": "Ordered list of image file paths from image_gen — 2 to 10 slides."},
+            "tags": {"type": "string", "description": "Comma-separated visual keywords describing the slides (subjects, setting, mood) for the Vault search."},
+        },
+        "required": ["job_id", "image_paths"],
+    },
+}

@@ -42,10 +42,12 @@ export async function POST(req) {
         ig = await findIntegration(draft.platform);
         if (!ig) { failed.push(`${draft.platform} (not connected)`); continue; }
       }
-      const image = draft.image_id ? { id: draft.image_id, path: draft.image_path } : null;
+      let images;
+      try { images = JSON.parse(draft.images_json || 'null'); } catch { images = null; }
+      if (!Array.isArray(images) || !images.length) images = draft.image_id ? [{ id: draft.image_id, path: draft.image_path }] : [];
       const video = draft.video_id ? { id: draft.video_id, path: draft.video_path } : null;
-      await createPost(ig.id, draft.body, draft.platform, image, video);
-      published.push({ platform: draft.platform, channel: ig.profile || ig.name, media: video ? 'video' : image ? 'image' : null });
+      await createPost(ig.id, draft.body, draft.platform, images, video);
+      published.push({ platform: draft.platform, channel: ig.profile || ig.name, media: video ? 'video' : images.length > 1 ? `carousel(${images.length})` : images.length ? 'image' : null });
     } catch (e) {
       failed.push(`${draft.platform}: ${String(e?.message || e)}`);
     }

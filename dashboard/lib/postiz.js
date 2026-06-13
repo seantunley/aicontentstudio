@@ -137,10 +137,14 @@ export async function postAnalytics(postId) {
 }
 
 export async function createPost(integrationId, content, platform, image, video, opts = {}) {
-  // `image`/`video` are already-uploaded Postiz media refs {id, path} stored on the draft.
-  // Postiz carries both in the same per-post media array; a video takes precedence when present.
+  // `image` may be an ARRAY of {id,path} (a carousel/multi-image post), a single {id,path}, or null.
+  // `video` (single) takes precedence. All already-uploaded Postiz media refs from the draft.
   // opts.when: 'now' (default) or 'schedule'; opts.date: ISO time for a scheduled post.
-  const media = video && video.id ? video : image && image.id ? image : null;
+  let mediaArr;
+  if (video && video.id) mediaArr = [{ id: video.id, path: video.path }];
+  else if (Array.isArray(image)) mediaArr = image.filter((m) => m && m.id).map((m) => ({ id: m.id, path: m.path }));
+  else if (image && image.id) mediaArr = [{ id: image.id, path: image.path }];
+  else mediaArr = [];
   const when = opts.when === 'schedule' ? 'schedule' : 'now';
   return req('POST', '/posts', {
     type: when,
@@ -149,7 +153,7 @@ export async function createPost(integrationId, content, platform, image, video,
     tags: [],
     posts: [{
       integration: { id: integrationId },
-      value: [{ content, image: media ? [{ id: media.id, path: media.path }] : [] }],
+      value: [{ content, image: mediaArr }], // Postiz renders 2+ images as a swipe carousel where the platform supports it
       settings: { __type: platform },
     }],
   }, { retry: true }); // §9b: survive transient platform hiccups

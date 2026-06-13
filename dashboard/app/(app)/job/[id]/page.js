@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getJobById, getBrief, getDraftsFor, getEvents, costForJob, STATES, DRAFT_LIMITS } from '@/lib/db';
 import { zar } from '@/lib/money';
 import { za } from '@/lib/time';
-import { ApprovalActions, PublishButton, ScheduleButton, EditableDraft, RetryButton, UploadMediaButton, PostPills, PlatformChip, AnglePicker } from '@/app/components/actions';
+import { ApprovalActions, PublishButton, ScheduleButton, EditableDraft, RetryButton, UploadMediaButton, PostPills, PlatformChip, AnglePicker, DraftMedia } from '@/app/components/actions';
 
 export const dynamic = 'force-dynamic';
 const when = (s) => za(s);
@@ -75,8 +75,7 @@ export default async function JobPage({ params }) {
             </div>
             <EditableDraft draftId={d.id} body={d.body} limit={DRAFT_LIMITS[d.platform]} />
             <PostPills polish={d.polish_json} draftId={d.id} />
-            {d.image_path ? <img className="draft-img" src={d.image_path} alt="" /> : null}
-            {d.video_path ? <video className="draft-img" src={d.video_path} controls muted playsInline /> : null}
+            <DraftMedia draft={d} />
           </div>
         ))}
       </section>

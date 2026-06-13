@@ -542,6 +542,12 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .eng-msg.out .eng-bubble { background: var(--accent-bg); border: 1px solid transparent; border-top-right-radius: 3px; color: var(--accent-2); }
 .eng-compose { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 6px; }
 
+/* multi-image carousel preview (§7c) */
+.carousel-strip { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0; margin-top: 8px; scroll-snap-type: x mandatory; }
+.carousel-slide { position: relative; flex: 0 0 auto; scroll-snap-align: start; }
+.carousel-slide img { height: 200px; width: auto; max-width: 300px; object-fit: cover; border-radius: var(--r); border: 1px solid var(--line); display: block; }
+.carousel-n { position: absolute; bottom: 6px; right: 6px; font-family: var(--mono); font-size: 10px; color: #fff; background: rgba(0,0,0,0.6); border-radius: 999px; padding: 1px 7px; }
+
 /* ── calendar (Postiz mirror) ──────────────────────────────────────────── */
 .cal-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .cal-nav { display: flex; align-items: center; gap: 8px; }

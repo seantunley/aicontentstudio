@@ -573,6 +573,24 @@ function QueueResearch({ jobId }) {
   );
 }
 
+// Renders a draft's media: a video, a single image, or a multi-image carousel strip.
+export function DraftMedia({ draft }) {
+  if (!draft) return null;
+  if (draft.video_path) return <video className="draft-img" src={draft.video_path} controls muted playsInline />;
+  let imgs = [];
+  try { imgs = JSON.parse(draft.images_json || 'null') || []; } catch { imgs = []; }
+  if (!imgs.length && draft.image_path) imgs = [{ path: draft.image_path }];
+  if (!imgs.length) return null;
+  if (imgs.length === 1) return <img className="draft-img" src={imgs[0].path} alt="" />;
+  return (
+    <div className="carousel-strip" title={`${imgs.length}-image carousel`}>
+      {imgs.map((m, i) => (
+        <div className="carousel-slide" key={i}><img src={m.path} alt={`slide ${i + 1}`} /><span className="carousel-n">{i + 1}/{imgs.length}</span></div>
+      ))}
+    </div>
+  );
+}
+
 export function QueueItem({ job }) {
   const [open, setOpen] = useState(false);
   const d = job.draft;
@@ -599,9 +617,7 @@ export function QueueItem({ job }) {
           {d ? (
             <>
               <EditableDraft draftId={d.id} body={d.body} limit={lim} />
-              {d.video_path
-                ? <video className="draft-img" src={d.video_path} controls muted playsInline />
-                : d.image_path ? <img className="draft-img" src={d.image_path} alt="" /> : null}
+              <DraftMedia draft={d} />
               <div className="card-foot" style={lim && d.char_count > lim ? { color: 'var(--red)' } : null}>
                 {d.char_count}{lim ? `/${lim}` : ''} chars · angle {d.angle || '—'} · brand {job.brand}
               </div>
