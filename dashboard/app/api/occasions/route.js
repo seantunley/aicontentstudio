@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
-import { listOccasions, upsertOccasion, deleteOccasion, seedCountryOccasions } from '@/lib/db';
+import { listOccasions, upsertOccasion, deleteOccasion, seedCountryOccasions, listCountries } from '@/lib/db';
 import { getActiveBrand } from '@/lib/brand';
 
 export const dynamic = 'force-dynamic';
@@ -9,7 +9,7 @@ export async function GET() {
   const session = await getSession();
   if (!session.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const brand = await getActiveBrand();
-  return NextResponse.json({ occasions: listOccasions(brand), brand: brand || null });
+  return NextResponse.json({ occasions: listOccasions(brand), brand: brand || null, countries: listCountries() });
 }
 
 export async function POST(req) {

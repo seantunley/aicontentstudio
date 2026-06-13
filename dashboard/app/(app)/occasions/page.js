@@ -1,4 +1,4 @@
-import { listOccasions } from '@/lib/db';
+import { listOccasions, listCountries } from '@/lib/db';
 import { getActiveBrand } from '@/lib/brand';
 import { OccasionsManager } from '@/app/components/occasions';
 
@@ -7,7 +7,8 @@ export const dynamic = 'force-dynamic';
 export default async function OccasionsPage() {
   const brand = await getActiveBrand();
   let occasions = [];
-  try { occasions = listOccasions(brand); } catch {}
+  let countries = [];
+  try { occasions = listOccasions(brand); countries = listCountries(); } catch {}
   const auto = occasions.filter((o) => o.auto_draft).length;
   return (
     <>
@@ -18,7 +19,7 @@ export default async function OccasionsPage() {
         </div>
         <div className="crumbs">{occasions.length} occasions · {auto} auto-draft</div>
       </div>
-      <OccasionsManager occasions={occasions} brand={brand} />
+      <OccasionsManager occasions={occasions} brand={brand} countries={countries} />
     </>
   );
 }

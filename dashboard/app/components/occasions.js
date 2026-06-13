@@ -6,23 +6,13 @@ const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satur
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const NTH = [{ v: 1, l: '1st' }, { v: 2, l: '2nd' }, { v: 3, l: '3rd' }, { v: 4, l: '4th' }, { v: -1, l: 'Last' }];
 
-// ISO 3166-1 alpha-2 → flag emoji (regional indicator letters). '' / invalid → globe.
-function flag(code) {
-  const c = (code || '').toUpperCase();
-  if (!/^[A-Z]{2}$/.test(c)) return '🌍';
-  return String.fromCodePoint(...[...c].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
+// Real SVG flag images (render everywhere — emoji flags don't on Windows/older browsers). flagcdn
+// is keyed by ISO 3166-1 alpha-2; no country code => a globe.
+function Flag({ code, title }) {
+  const c = (code || '').toLowerCase();
+  if (!/^[a-z]{2}$/.test(c)) return <span className="occ-flag" title={title || 'Universal'}>🌐</span>;
+  return <img className="occ-flag-img" src={`https://flagcdn.com/${c}.svg`} alt={code} title={title || code} loading="lazy" />;
 }
-const COUNTRIES = [
-  { code: '', name: 'Universal (no country)' }, { code: 'ZA', name: 'South Africa' }, { code: 'US', name: 'United States' },
-  { code: 'GB', name: 'United Kingdom' }, { code: 'AU', name: 'Australia' }, { code: 'CA', name: 'Canada' },
-  { code: 'NZ', name: 'New Zealand' }, { code: 'IE', name: 'Ireland' }, { code: 'IN', name: 'India' },
-  { code: 'NG', name: 'Nigeria' }, { code: 'KE', name: 'Kenya' }, { code: 'DE', name: 'Germany' },
-  { code: 'FR', name: 'France' }, { code: 'NL', name: 'Netherlands' }, { code: 'ES', name: 'Spain' },
-  { code: 'IT', name: 'Italy' }, { code: 'AE', name: 'United Arab Emirates' }, { code: 'BR', name: 'Brazil' },
-];
-// countries the one-click holiday seeder can populate (must match lib/db COUNTRY_OCCASIONS)
-const SEEDABLE = [{ code: 'ZA', name: 'South Africa' }, { code: 'US', name: 'United States' }, { code: 'GB', name: 'United Kingdom' }, { code: 'AU', name: 'Australia' }, { code: 'CA', name: 'Canada' }];
-function countryName(code) { const c = COUNTRIES.find((x) => x.code === (code || '').toUpperCase()); return c ? c.name : (code || 'Universal'); }
 
 function parseRule(raw) { try { return typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return {}; } }
 function ruleText(raw) {
@@ -47,11 +37,12 @@ function countdown(days) {
 
 const BLANK = { brand: 'all', name: '', region: '', lead_days: 14, sensitive: 0, auto_draft: 0, mode: 'fixed', month: 1, day: 1, n: 2, weekday: 6 };
 
-export function OccasionsManager({ occasions, brand }) {
+export function OccasionsManager({ occasions, brand, countries = [] }) {
   const ui = useUI();
   const [editing, setEditing] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [seedCode, setSeedCode] = useState('US');
+  const [seedCode, setSeedCode] = useState('ZA');
+  const countryName = (code) => (countries.find((x) => x.code === (code || '').toUpperCase()) || {}).name || (code || 'Universal');
 
   async function post(body) {
     const r = await fetch('/api/occasions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -108,8 +99,8 @@ export function OccasionsManager({ occasions, brand }) {
         <button className="btn btn--primary" onClick={openNew}>+ Add occasion</button>
         <div className="occ-seed">
           <span className="occ-seed-lbl">Add a country’s holidays:</span>
-          <select className="input" value={seedCode} onChange={(e) => setSeedCode(e.target.value)} style={{ width: 'auto' }}>
-            {SEEDABLE.map((c) => <option key={c.code} value={c.code}>{flag(c.code)} {c.name}</option>)}
+          <select className="input" value={seedCode} onChange={(e) => setSeedCode(e.target.value)} style={{ width: 'auto', maxWidth: 220 }}>
+            {countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
           </select>
           <button className="btn btn--sm" disabled={busy} onClick={seedCountry}>+ Add</button>
         </div>
@@ -131,7 +122,7 @@ export function OccasionsManager({ occasions, brand }) {
               </div>
               <div className="occ-main">
                 <div className="occ-name">
-                  <span className="occ-flag" title={countryName(o.region)}>{flag(o.region)}</span>
+                  <Flag code={o.region} title={countryName(o.region)} />
                   {o.name}
                   {o.sensitive ? <span className="occ-badge occ-sensitive">sensitive</span> : null}
                   {o.brand && o.brand !== 'all' ? <span className="occ-badge">{o.brand}</span> : <span className="occ-badge occ-all">all brands</span>}
@@ -209,7 +200,8 @@ export function OccasionsManager({ occasions, brand }) {
                   </label>
                   <label className="occ-field"><span>Country</span>
                     <select className="input" value={editing.region} onChange={set('region')}>
-                      {COUNTRIES.map((c) => <option key={c.code || 'x'} value={c.code}>{flag(c.code)} {c.name}</option>)}
+                      <option value="">Universal (no country)</option>
+                      {countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
                     </select>
                   </label>
                 </div>

@@ -461,6 +461,7 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .occ-field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
 .occ-field > span { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
 .occ-flag { font-size: 15px; line-height: 1; margin-right: 1px; }
+.occ-flag-img { width: 21px; height: 15px; border-radius: 2px; object-fit: cover; vertical-align: -2px; box-shadow: 0 0 0 1px var(--line-2); }
 .occ-seed { display: inline-flex; align-items: center; gap: 7px; }
 .occ-seed-lbl { font-family: var(--mono); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
 .occ-seed .input { padding: 6px 9px; font-size: 12px; }

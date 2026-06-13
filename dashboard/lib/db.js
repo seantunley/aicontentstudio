@@ -4,6 +4,7 @@
 import Database from 'better-sqlite3';
 import crypto from 'crypto';
 import fs from 'fs';
+import Holidays from 'date-holidays';
 import { writeVoiceExample } from './knowledge';
 
 const DB_PATH = process.env.STUDIO_DB_PATH || '/opt/studio/studio.db';
@@ -540,64 +541,40 @@ export function deleteOccasion(id) {
   return { ok: true };
 }
 
-// Curated public-holiday templates per country (recurring rules; weekday 0=Mon..6=Sun). The "add a
-// country's holidays" seeder copies these in. Universal days (New Year, Christmas, Mother's/Father's
-// Day) are already seeded brand-wide, so these are the country-DISTINCTIVE dates. Easter-relative
-// holidays are omitted until the resolver supports them (see plan §7g deferred).
-export const COUNTRY_OCCASIONS = {
-  ZA: [
-    ['Human Rights Day', { type: 'fixed', month: 3, day: 21 }],
-    ["Workers' Day", { type: 'fixed', month: 5, day: 1 }],
-    ['Youth Day', { type: 'fixed', month: 6, day: 16 }],
-    ['Mandela Day', { type: 'fixed', month: 7, day: 18 }],
-    ["National Women's Day", { type: 'fixed', month: 8, day: 9 }],
-    ['Heritage Day', { type: 'fixed', month: 9, day: 24 }],
-    ['Day of Reconciliation', { type: 'fixed', month: 12, day: 16 }],
-    ['Day of Goodwill', { type: 'fixed', month: 12, day: 26 }],
-  ],
-  US: [
-    ['Martin Luther King Jr. Day', { type: 'nth_weekday', month: 1, weekday: 0, n: 3 }],
-    ["Presidents' Day", { type: 'nth_weekday', month: 2, weekday: 0, n: 3 }],
-    ['Memorial Day', { type: 'nth_weekday', month: 5, weekday: 0, n: -1 }],
-    ['Juneteenth', { type: 'fixed', month: 6, day: 19 }],
-    ['Independence Day', { type: 'fixed', month: 7, day: 4 }],
-    ['Labor Day', { type: 'nth_weekday', month: 9, weekday: 0, n: 1 }],
-    ['Veterans Day', { type: 'fixed', month: 11, day: 11 }],
-    ['Thanksgiving', { type: 'nth_weekday', month: 11, weekday: 3, n: 4 }],
-  ],
-  GB: [
-    ['Early May Bank Holiday', { type: 'nth_weekday', month: 5, weekday: 0, n: 1 }],
-    ['Spring Bank Holiday', { type: 'nth_weekday', month: 5, weekday: 0, n: -1 }],
-    ['Summer Bank Holiday', { type: 'nth_weekday', month: 8, weekday: 0, n: -1 }],
-    ['Boxing Day', { type: 'fixed', month: 12, day: 26 }],
-  ],
-  AU: [
-    ['Australia Day', { type: 'fixed', month: 1, day: 26 }],
-    ['Anzac Day', { type: 'fixed', month: 4, day: 25 }],
-    ['Boxing Day', { type: 'fixed', month: 12, day: 26 }],
-  ],
-  CA: [
-    ['Canada Day', { type: 'fixed', month: 7, day: 1 }],
-    ['Labour Day', { type: 'nth_weekday', month: 9, weekday: 0, n: 1 }],
-    ['Thanksgiving (Canada)', { type: 'nth_weekday', month: 10, weekday: 0, n: 2 }],
-    ['Boxing Day', { type: 'fixed', month: 12, day: 26 }],
-  ],
-};
+// Every country the holidays library knows (≈200), for the country pickers — no curated subset.
+export function listCountries() {
+  try {
+    const map = new Holidays().getCountries('en');
+    return Object.entries(map).map(([code, name]) => ({ code, name })).sort((a, b) => a.name.localeCompare(b.name));
+  } catch { return []; }
+}
 
-// Bulk-add a country's curated public holidays for a brand scope, skipping ones already present.
+// Bulk-add a country's public + bank holidays (from the date-holidays library — works for ANY
+// country) for a brand scope, skipping ones already present. Each becomes a fixed-date recurring
+// rule; moveable/religious days are stored at their upcoming date and may need a refresh later.
 export function seedCountryOccasions(code, brand = 'all') {
-  const tpl = COUNTRY_OCCASIONS[(code || '').toUpperCase()];
-  if (!tpl) throw new Error(`no holiday template for "${code}"`);
+  const cc = (code || '').toUpperCase();
+  let hols;
+  try { hols = new Holidays(cc).getHolidays(new Date().getFullYear()); }
+  catch { throw new Error(`unknown country "${code}"`); }
+  if (!hols || !hols.length) throw new Error(`no holidays found for "${cc}"`);
   const d = db();
   const scope = brand || 'all';
   const existing = new Set(d.prepare('SELECT name FROM occasions WHERE brand=?').all(scope).map((r) => r.name.toLowerCase()));
+  const seen = new Set();
   let added = 0;
-  for (const [name, rule] of tpl) {
-    if (existing.has(name.toLowerCase())) continue;
-    upsertOccasion({ brand: scope, name, rule, region: code.toUpperCase(), lead_days: 14, sensitive: 0, auto_draft: 0 });
+  for (const h of hols) {
+    if (h.type && !['public', 'bank'].includes(h.type)) continue; // the real days off; skip observances/school
+    const name = (h.name || '').trim();
+    const key = name.toLowerCase();
+    if (!name || existing.has(key) || seen.has(key)) continue;
+    const [, mm, dd] = (h.date || '').slice(0, 10).split('-').map(Number);
+    if (!mm || !dd) continue;
+    seen.add(key);
+    upsertOccasion({ brand: scope, name, rule: { type: 'fixed', month: mm, day: dd }, region: cc, lead_days: 14, sensitive: 0, auto_draft: 0 });
     added += 1;
   }
-  return { ok: true, added, country: code.toUpperCase() };
+  return { ok: true, added, country: cc };
 }
 
 export { STATES };
