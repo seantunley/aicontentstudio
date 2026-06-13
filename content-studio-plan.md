@@ -1,8 +1,9 @@
 # AI Content Studio — Planning Document
 
-*Draft v0.18 — a personal, single-operator system for researching topics and producing + publishing content across platforms, controlled via Telegram. Runs multiple brands; deployment topology is variable. This is a living document; add to it freely.*
+*Draft v0.19 — a personal, single-operator system for researching topics and producing + publishing content across platforms, controlled via Telegram. Runs multiple brands; deployment topology is variable. This is a living document; add to it freely.*
 
-*Changes since v0.17: added the "ask, don't assume" build rule (§13) — never silently guess on consequential/irreversible/ambiguous things during the build; confirm first.*
+*Changes since v0.18: occasions calendar (§7g) — special-occasion automation (recurring rule-based built-ins, manual dates, country-holiday research; region-aware per brand; auto-draft by default with a notify-first carve-out for sensitive occasions); upgrades the old §7e known-dates bullet. Phase 5.*
+*Changes in v0.18: added the "ask, don't assume" build rule (§13) — never silently guess on consequential/irreversible/ambiguous things during the build; confirm first.*
 *Changes in v0.17: anti-slop commitment (Principle 0).*
 *Changes in v0.16: dashboard auth. v0.15: mobile-friendly. v0.14: performance loop. v0.13: resilience. v0.12: dashboard custom + from outset. v0.11: build workflow. v0.10: injection defence. v0.9: workflow audit. v0.8: deployment. v0.7: variable deployment. v0.6: multi-brand. v0.5: factual integrity. v0.4: trend scout. v0.3: Postiz + models. v0.2: Hermes.*
 
@@ -510,7 +511,7 @@ A **campaign object**: one brief that fans out into a coordinated set of pieces 
 Each brand pack defines **3–5 recurring themes** it rotates through (e.g. for the breastfeeding brand: practical latch help / myth-busting / emotional support / behind-the-scenes). Pillars steer the trend scout (§3b), give the gap-filler something smarter to reach for than "anything", and make the calendar balanced rather than whatever-was-trending. Recurring formats ("Myth Monday") hang off pillars.
 
 ### Known-dates calendar (per brand)
-Awareness days, holidays, seasonal moments (World Breastfeeding Week in August, Mother's Day, etc.) maintained per brand. The scout plans **ahead** of predictable moments — proposing a campaign 2–3 weeks out — instead of only reacting to trends.
+Awareness days, holidays, seasonal moments (World Breastfeeding Week in August, Mother's Day, etc.) maintained per brand. The scout plans **ahead** of predictable moments — proposing a campaign 2–3 weeks out — instead of only reacting to trends. *(Upgraded into a full subsystem in §7g — the occasions calendar.)*
 
 ### Evergreen recycling
 Top performers shouldn't post once and die. A recycler resurfaces proven pieces after a decent interval — refreshed caption, new crop of the same master, "still true a year later" framing — using performance data + the memory bank to pick candidates and Postiz queues to slot them. Recycled pieces still pass the gate (cheap to approve — I've approved them before). One of the highest-ROI automations in social; all the ingredients already exist in this design.
@@ -547,6 +548,32 @@ Phase 5 — only useful once posts have flowed long enough to mean something, an
 
 ---
 
+## 7g. Occasions calendar (special-occasion automation)
+
+A per-brand calendar of special occasions (Mother's Day, Father's Day, seasonal moments, business anniversaries) that auto-populates every year and drives content generation ahead of each date. Upgrades the old thin "known-dates" bullet (§7e) into a real subsystem.
+
+### Three sources
+- **Recurring built-ins** — common occasions that repopulate yearly. Stored as **rules, not fixed dates** — e.g. "second Sunday of May" — so moveable occasions (Mother's Day differs by country; Easter shifts) recompute each year instead of going stale.
+- **Manual additions** — my own dates (business anniversary, launch day, locally meaningful days), added by hand.
+- **Country-holiday research** — point it at a country and it pulls that country's public holidays/observances and proposes additions I approve into the calendar.
+
+### Region varies per brand
+Holidays are country-specific and audience region varies per brand (§1a), so each brand's occasions calendar is **region-aware** — its built-ins and research default to its audience's country, not a global default.
+
+### Automation: auto-draft (default), with a sensitivity carve-out
+- **Default = auto-draft.** As an occasion's lead time hits (e.g. 2–3 weeks out, configurable per occasion), the system auto-generates drafts — often a small campaign arc (§7e), not one post — into the approval queue. Auto-draft never means auto-post; the gate (§4a) always holds.
+- **Sensitive occasions drop to notify-first.** Some occasions are emotionally charged for a brand's audience — Mother's Day for the breastfeeding brand especially (loss, infertility, struggling new mothers). Those are flagged **sensitive** per brand and **notify-me-before-drafting** rather than auto-cheerful-draft. Same green/amber logic as the brand-safety policy (§6a); brand-safety and tone rules apply with full force.
+
+### Ties in
+- Lead-time generation uses the **campaign object** (§7e) for multi-post occasions.
+- Drafts pass **factual integrity** (§3c) and **brand safety** (§6a) like any content.
+- The **trend scout** (§3b) reads the occasions calendar so it plans ahead of known dates instead of only reacting to trends.
+
+### Sequencing
+Phase 5 (with campaigns/pillars) — a manual occasions list can exist earlier; the auto-populate-yearly, sensitivity routing, and country-research are the polished version.
+
+---
+
 ## 8. Phased roadmap
 
 Each phase is independently useful — never stuck in a long build with nothing to show.
@@ -556,7 +583,7 @@ Each phase is independently useful — never stuck in a long build with nothing 
 - **Phase 2 — Images + thumbnails.** Text-to-image visuals + text-overlay thumbnails, tuned to brand look. *Dashboard gains full-fidelity image/video previews (§7a) — now there are visual assets to inspect.* **Engagement triage-and-notify (§3d) fits here too** — posts are flowing, replies are arriving.
 - **Phase 3 — Short video** (Reels/Shorts/TikTok). **Assembly approach:** script → AI voiceover → b-roll → auto-captions (timed with Whisper) → stitched to 9:16 with ffmpeg.
 - **Phase 4 — Long-form YouTube.** Longer scripts, chaptering, longer assembly pipeline, upload + thumbnail via YouTube Data API. Heaviest lift; leans on everything before it.
-- **Phase 5 — Intelligence polish.** Feedback learning loop, brand-memory vector store, the trend scout (§3b), **campaigns/pillars/recycling (§7e), engagement reply-drafting (§3d), and the performance loop (§7f) — analytics back from Postiz feeding memory, recycling, timing, and the scout**. *(A basic suggest-only scout can arrive earlier, once Phase 1 research works; novelty-ranking and auto-draft are the polished version.)*
+- **Phase 5 — Intelligence polish.** Feedback learning loop, brand-memory vector store, the trend scout (§3b), **campaigns/pillars/recycling (§7e), the occasions calendar (§7g), engagement reply-drafting (§3d), and the performance loop (§7f) — analytics back from Postiz feeding memory, recycling, timing, and the scout**. *(A basic suggest-only scout can arrive earlier, once Phase 1 research works; novelty-ranking and auto-draft are the polished version. A manual occasions list can also arrive earlier; auto-populate/sensitivity/country-research are the polished version.)*
 
 ---
 
