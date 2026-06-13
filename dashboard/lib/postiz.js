@@ -51,6 +51,28 @@ export async function listIntegrations() {
   }
 }
 
+// List posts (scheduled + published) in a date range — the studio calendar mirror of Postiz.
+// Returns a normalized array; [] if Postiz is unreachable (calendar degrades gracefully).
+export async function listPosts(startISO, endISO) {
+  try {
+    const qs = `startDate=${encodeURIComponent(startISO)}&endDate=${encodeURIComponent(endISO)}`;
+    const data = await req('GET', `/posts?${qs}`);
+    const arr = Array.isArray(data) ? data : data.posts || [];
+    return arr.map((p) => ({
+      id: p.id,
+      date: p.publishDate,
+      content: p.content || '',
+      state: (p.state || '').toLowerCase(),     // published | queue | draft | error ...
+      platform: p.integration?.providerIdentifier || null,
+      account: p.integration?.name || null,
+      releaseURL: p.releaseURL || null,
+      group: p.group || null,
+    }));
+  } catch {
+    return null; // unreachable
+  }
+}
+
 // Upload a raw media buffer (operator's own photo/clip) to Postiz. Returns {id, path}.
 export async function uploadMedia(buffer, filename, mime) {
   if (!API_KEY) throw new Error('POSTIZ_API_KEY not configured');

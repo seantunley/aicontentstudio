@@ -385,6 +385,41 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .vtag--add { color: var(--accent); border-color: rgba(227,167,63,0.3); border-style: dashed; }
 .vault-tagedit { margin-top: 9px; }
 
+/* ── calendar (Postiz mirror) ──────────────────────────────────────────── */
+.cal-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.cal-nav { display: flex; align-items: center; gap: 8px; }
+.cal-title { font-family: var(--serif); font-size: 19px; font-weight: 550; margin-left: 6px; }
+.cal-meta { display: flex; align-items: center; gap: 14px; }
+.cal-status { font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; color: var(--muted); }
+.cal-status--down { color: var(--red); }
+.cal-status--ok { color: var(--green); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; }
+.cal-wd { background: var(--bg-1); font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); padding: 8px 9px; text-align: left; }
+.cal-cell { background: var(--bg); min-height: 104px; padding: 6px 6px 8px; display: flex; flex-direction: column; gap: 4px; }
+.cal-cell.off { background: var(--bg-1); }
+.cal-cell.off .cal-daynum { color: var(--faint); }
+.cal-cell.today { background: var(--accent-bg); }
+.cal-daynum { font-family: var(--mono); font-size: 11px; color: var(--fg-2); font-variant-numeric: tabular-nums; }
+.cal-cell.today .cal-daynum { color: var(--accent); font-weight: 600; }
+.cal-posts { display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
+.cal-post { display: flex; align-items: center; gap: 5px; background: var(--bg-2); border: 1px solid var(--line-2); border-left: 2px solid var(--muted);
+  border-radius: var(--r); padding: 3px 6px; font-size: 11px; color: var(--fg-2); overflow: hidden; }
+.cal-post:hover { border-color: var(--accent); color: var(--fg); }
+.cal-post.st-published { border-left-color: var(--green); }
+.cal-post.st-queue, .cal-post.st-draft { border-left-color: var(--accent); }
+.cal-post.st-error { border-left-color: var(--red); }
+.cal-dot { width: 15px; height: 15px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+.cal-time { font-family: var(--mono); font-size: 9.5px; color: var(--muted); flex: none; }
+.cal-snip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 12px; font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+.cal-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.st-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.st-dot.st-queue { background: var(--accent); } .st-dot.st-published { background: var(--green); } .st-dot.st-error { background: var(--red); }
+@media (max-width: 720px) {
+  .cal-cell { min-height: 64px; }
+  .cal-snip { display: none; }
+}
+
 /* ── approval queue: collapsible posts ─────────────────────────────────── */
 .qlist { display: flex; flex-direction: column; gap: 8px; }
 .qcard { background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; transition: border-color 0.14s; }

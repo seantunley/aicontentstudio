@@ -17,6 +17,7 @@ const ICONS = {
   queue: <><path d="M20 6L9 17l-5-5" /></>,
   ready: <><path d="M12 19V5M5 12l7-7 7 7" /></>,
   upcoming: <><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></>,
+  calendar: <><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4M7 13h2M11 13h2M15 13h2M7 17h2M11 17h2" /></>,
   scout: <><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></>,
   jobs: <><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></>,
   vault: <><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="12" cy="12" r="3.2" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3" /></>,
@@ -33,6 +34,7 @@ const GROUPS = [
     { href: '/queue', key: 'queue', label: 'Approval queue', countKey: 'queue' },
     { href: '/ready', key: 'ready', label: 'Ready to publish', countKey: 'ready' },
     { href: '/upcoming', key: 'upcoming', label: 'Upcoming', countKey: 'upcoming', calm: true },
+    { href: '/calendar', key: 'calendar', label: 'Calendar' },
   ]},
   { label: 'Intake', items: [
     { href: '/scout', key: 'scout', label: 'Scout', countKey: 'scout' },
@@ -55,6 +57,7 @@ const TABS = [
   { href: '/scout', key: 'scout', label: 'Scout', countKey: 'scout' },
 ];
 const MORE = [
+  { href: '/calendar', key: 'calendar', label: 'Calendar' },
   { href: '/upcoming', key: 'upcoming', label: 'Upcoming' },
   { href: '/vault', key: 'vault', label: 'The Vault' },
   { href: '/jobs', key: 'jobs', label: 'All jobs' },
