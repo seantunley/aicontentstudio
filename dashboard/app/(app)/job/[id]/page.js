@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getJobById, getBrief, getDraftsFor, getEvents, costForJob, STATES, DRAFT_LIMITS } from '@/lib/db';
 import { zar } from '@/lib/money';
 import { za } from '@/lib/time';
-import { ApprovalActions, PublishButton, ScheduleButton, EditableDraft, RetryButton, UploadMediaButton, PostPills, PlatformChip } from '@/app/components/actions';
+import { ApprovalActions, PublishButton, ScheduleButton, EditableDraft, RetryButton, UploadMediaButton, PostPills, PlatformChip, AnglePicker } from '@/app/components/actions';
 
 export const dynamic = 'force-dynamic';
 const when = (s) => za(s);
@@ -95,8 +95,8 @@ export default async function JobPage({ params }) {
                 {f.snippet ? <div className="snip">&ldquo;{f.snippet}&rdquo;</div> : null}
               </div>
             ))}
-            <div className="section-head" style={{ marginTop: 14 }}><h2>Angles</h2><span className="rule" /></div>
-            {(brief.angles || []).map((a, i) => (<div className="angle" key={i}><b>{a.name}</b>: {a.hook}</div>))}
+            <div className="section-head" style={{ marginTop: 14 }}><h2>Angles</h2>{job.state === 'preview' ? <span className="count" style={{ color: 'var(--muted)' }}>switch the post to any</span> : null}<span className="rule" /></div>
+            <AnglePicker jobId={job.id} angles={brief.angles} canRedraft={job.state === 'preview'} />
             {brief.unverified && brief.unverified.length > 0 ? (
               <>
                 <div className="section-head" style={{ marginTop: 14 }}><h2>Couldn&rsquo;t verify</h2><span className="rule" /></div>

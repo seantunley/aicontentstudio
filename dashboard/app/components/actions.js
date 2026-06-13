@@ -515,29 +515,44 @@ export function MediaRestoreButton({ id }) {
 
 // Collapsible approval-queue row. Collapsed: topic, platforms, the post's first line, job id.
 // Expanded: the full post, media preview, polish pills, and approve/reject.
-// The research brief behind a queued draft — the "background" that informs approval. Lazy-loaded.
-// Each angle has a "Rewrite with this angle" action: the agent picked one angle, but the operator can
-// switch to another and have the draft regenerated against the same research.
-function QueueResearch({ jobId }) {
+// The agent picks ONE angle; this lets the operator switch to any other researched angle and have the
+// draft regenerated against the same brief. Shared by the queue card and the job-detail page. The
+// "Rewrite with this" action only appears while the job is at the gate (canRedraft) — re-angling a
+// published/approved post makes no sense (and the API rejects it).
+export function AnglePicker({ jobId, angles, canRedraft }) {
   const ui = useUI();
-  const [brief, setBrief] = useState(undefined); // undefined=loading, null=none, obj=loaded
   const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    let live = true;
-    fetch(`/api/brief?jobId=${jobId}`).then((r) => r.json()).then((d) => { if (live) setBrief(d.brief || null); }).catch(() => live && setBrief(null));
-    return () => { live = false; };
-  }, [jobId]);
-
+  const list = angles || [];
+  if (!list.length) return null;
   async function useAngle(angle) {
     const ok = await ui.confirm({ title: 'Rewrite with this angle?', message: `The draft will be regenerated through "${angle}", grounded in the same research, then re-land in your queue. Replaces the current copy.`, confirmLabel: 'Rewrite' });
     if (!ok) return;
     setBusy(true);
     const r = await fetch('/api/redraft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jobId, angle }) });
     const d = await r.json();
-    if (r.ok) { ui.toast('Re-angling — the post will update here shortly'); setTimeout(() => window.location.reload(), 1400); return; }
+    if (r.ok) { ui.toast('Re-angling — the post will update shortly'); setTimeout(() => window.location.reload(), 1400); return; }
     ui.toast(d.error || 'Failed', 'err'); setBusy(false);
   }
+  return (
+    <>
+      {list.map((a, i) => (
+        <div className={`angle ${canRedraft ? 'angle--pick' : ''}`} key={i}>
+          <div><b>{a.name}</b>: {a.hook}</div>
+          {canRedraft ? <button className="btn btn--sm" disabled={busy} onClick={() => useAngle(`${a.name}: ${a.hook}`)}>Rewrite with this</button> : null}
+        </div>
+      ))}
+    </>
+  );
+}
 
+// The research brief behind a queued draft — the "background" that informs approval. Lazy-loaded.
+function QueueResearch({ jobId }) {
+  const [brief, setBrief] = useState(undefined); // undefined=loading, null=none, obj=loaded
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/brief?jobId=${jobId}`).then((r) => r.json()).then((d) => { if (live) setBrief(d.brief || null); }).catch(() => live && setBrief(null));
+    return () => { live = false; };
+  }, [jobId]);
   if (brief === undefined) return <div className="qresearch"><div className="empty">Loading research…</div></div>;
   if (!brief || !(brief.facts || brief.angles)) return null;
   return (
@@ -553,12 +568,7 @@ function QueueResearch({ jobId }) {
         </div>
       ))}
       {(brief.angles || []).length ? <div className="qr-h">Angles — switch the post to any of these</div> : null}
-      {(brief.angles || []).map((a, i) => (
-        <div className="angle angle--pick" key={i}>
-          <div><b>{a.name}</b>: {a.hook}</div>
-          <button className="btn btn--sm" disabled={busy} onClick={() => useAngle(`${a.name}: ${a.hook}`)}>Rewrite with this</button>
-        </div>
-      ))}
+      <AnglePicker jobId={jobId} angles={brief.angles} canRedraft />
     </details>
   );
 }
