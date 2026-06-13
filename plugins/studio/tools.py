@@ -353,9 +353,36 @@ def present_for_review(args, **kwargs):
     if not tok or not chat:
         return _err("Telegram not configured")
     cap = draft["body"]
+    # gather the draft's image(s): a carousel sends all slides as a media group, a single image one photo.
+    imgs = []
     try:
-        if draft.get("image_path"):
-            img = requests.get(draft["image_path"], timeout=30).content
+        imgs = json.loads(draft.get("images_json") or "null") or []
+    except Exception:  # noqa: BLE001
+        imgs = []
+    if not imgs and draft.get("image_path"):
+        imgs = [{"path": draft["image_path"]}]
+    try:
+        if len(imgs) > 1:
+            files, media = {}, []
+            for i, m in enumerate(imgs[:10]):
+                try:
+                    content = requests.get(m["path"], timeout=30).content
+                except Exception:  # noqa: BLE001
+                    continue
+                key = f"photo{i}"
+                files[key] = (f"{key}.jpg", content)
+                item = {"type": "photo", "media": f"attach://{key}"}
+                if not media:
+                    item["caption"] = cap  # caption rides on the first slide
+                media.append(item)
+            if media:
+                requests.post(f"https://api.telegram.org/bot{tok}/sendMediaGroup",
+                              data={"chat_id": chat, "media": json.dumps(media)}, files=files, timeout=60)
+            else:
+                requests.post(f"https://api.telegram.org/bot{tok}/sendMessage",
+                              data={"chat_id": chat, "text": cap}, timeout=15)
+        elif imgs:
+            img = requests.get(imgs[0]["path"], timeout=30).content
             requests.post(f"https://api.telegram.org/bot{tok}/sendPhoto",
                           data={"chat_id": chat, "caption": cap},
                           files={"photo": ("post.jpg", img)}, timeout=30)

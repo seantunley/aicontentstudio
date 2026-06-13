@@ -439,7 +439,7 @@ def get_queued_jobs():
     # Only the actionable queue values; 'processing'/'failed' are status markers, not work to pick up.
     with _db() as conn:
         return [dict(r) for r in conn.execute(
-            "SELECT * FROM jobs WHERE queued_action IN ('research_draft','research_draft_image')"
+            "SELECT * FROM jobs WHERE queued_action IN ('research_draft','research_draft_image','research_draft_image_video','research_draft_carousel')"
             " ORDER BY created_at").fetchall()]
 
 

@@ -92,7 +92,7 @@ def _campaign_block(job):
             "others in the series (its own angle/hook). ")
 
 
-def _agent_prompt(job, with_image, with_video=False):
+def _agent_prompt(job, with_image, with_video=False, with_carousel=False):
     targets = (job.get("target_platforms") or "").strip()
     if targets:
         step2 = (f"Step 2 — draft for ONLY these platforms: {targets}. For EACH, write a draft TAILORED "
@@ -122,7 +122,12 @@ def _agent_prompt(job, with_image, with_video=False):
         + _campaign_block(job)
         + step2
     )
-    if with_image:
+    if with_carousel:
+        p += ("Step 3 — carousel: this is a multi-image swipe post. Call image_gen 3 times for 3 DISTINCT, "
+              "on-brand, safe slides that form a coherent set (e.g. 3 tips, 3 steps, or a mini story), then "
+              "call set_carousel ONCE with the 3 image paths IN ORDER and a `tags` list of visual keywords "
+              "(subjects, setting, mood) for the media Vault search. ")
+    elif with_image:
         p += ("Step 3 — image: call image_gen ONCE for one relevant, on-brand, safe master image, then "
               "call set_draft_image once with its path AND a `tags` list of visual keywords describing "
               "what's in the image (subjects, setting, mood) for the media Vault search. ")
@@ -137,7 +142,8 @@ def process_one(job):
     jid = job["id"]
     qa = job.get("queued_action") or ""
     with_video = "video" in qa
-    with_image = "image" in qa or with_video  # video needs an image to animate
+    with_carousel = "carousel" in qa
+    with_image = "image" in qa or with_video or with_carousel  # video animates an image; carousel = many
     db.enqueue_action(jid, "processing")  # claim + mark running (status the cockpit shows)
     db.record_event(jid, "worker: starting research + draft"
                     + (" + image" if with_image else "") + (" + video" if with_video else ""), actor="system")
@@ -145,7 +151,7 @@ def process_one(job):
     # 1) Run the agent. Only a genuine run failure — crash, timeout, or never reaching the gate — is
     # a 'failed'. (A draft that reached preview has succeeded; see step 2.)
     try:
-        r = subprocess.run(["hermes", "-z", _agent_prompt(job, with_image, with_video)],
+        r = subprocess.run(["hermes", "-z", _agent_prompt(job, with_image, with_video, with_carousel)],
                            capture_output=True, text=True, timeout=RUN_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
         db.enqueue_action(jid, "failed")

@@ -75,6 +75,7 @@ export function NewJobButton({ block, defaultBrand }) {
   const [brand, setBrand] = useState(defaultBrand || '');
   const [withImage, setWithImage] = useState(false);
   const [withVideo, setWithVideo] = useState(false);
+  const [withCarousel, setWithCarousel] = useState(false);
   const [channels, setChannels] = useState(null); // null = loading
   const [selected, setSelected] = useState({});
   const [busy, setBusy] = useState(false);
@@ -100,7 +101,7 @@ export function NewJobButton({ block, defaultBrand }) {
     const platforms = Object.keys(selected).filter((p) => selected[p]);
     if (!platforms.length) { ui.toast('Pick at least one platform', 'err'); return; }
     setBusy(true);
-    const { ok, data } = await post('/api/jobs/new', { topic, brand, withImage: withImage || withVideo, withVideo, platforms });
+    const { ok, data } = await post('/api/jobs/new', { topic, brand, withImage: withImage || withVideo || withCarousel, withVideo, withCarousel, platforms });
     if (ok) { ui.toast('Job queued. Researching in the background.'); window.location.href = '/'; return; }
     ui.toast(data.error || 'Failed to queue', 'err'); setBusy(false);
   }
@@ -123,8 +124,9 @@ export function NewJobButton({ block, defaultBrand }) {
               <PlatformPicker selected={selected} onToggle={toggle} />
             </div>
             <div className="field-row">
-              <label className="check"><input type="checkbox" checked={withImage || withVideo} disabled={withVideo} onChange={(e) => setWithImage(e.target.checked)} /> + image</label>
-              <label className="check"><input type="checkbox" checked={withVideo} onChange={(e) => setWithVideo(e.target.checked)} /> + video <span className="empty" style={{ marginLeft: 4 }}>(branded clip)</span></label>
+              <label className="check"><input type="checkbox" checked={withImage || withVideo} disabled={withVideo || withCarousel} onChange={(e) => { setWithImage(e.target.checked); if (e.target.checked) setWithCarousel(false); }} /> + image</label>
+              <label className="check"><input type="checkbox" checked={withVideo} disabled={withCarousel} onChange={(e) => { setWithVideo(e.target.checked); if (e.target.checked) setWithCarousel(false); }} /> + video <span className="empty" style={{ marginLeft: 4 }}>(branded clip)</span></label>
+              <label className="check"><input type="checkbox" checked={withCarousel} onChange={(e) => { setWithCarousel(e.target.checked); if (e.target.checked) { setWithImage(false); setWithVideo(false); } }} /> + carousel <span className="empty" style={{ marginLeft: 4 }}>(multi-image swipe)</span></label>
             </div>
             <div className="modal-acts">
               <button type="button" className="btn btn--ghost" onClick={() => setOpen(false)}>Cancel</button>
