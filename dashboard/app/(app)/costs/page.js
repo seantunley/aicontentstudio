@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { costSummary, costThisMonth, costByBrand, costByOperation, recentCosts } from '@/lib/db';
 import { zar, ZAR_PER_USD } from '@/lib/money';
+import { za } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
-const when = (s) => (s ? s.replace('T', ' ').slice(0, 16) : '');
+const when = (s) => za(s);
 
 export default function Costs() {
   let total = { entries: 0, totalUsd: 0 }, month = { entries: 0, totalUsd: 0 };

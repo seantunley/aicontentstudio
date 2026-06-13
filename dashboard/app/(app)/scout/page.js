@@ -1,8 +1,9 @@
 import { listSuggestions, listNiches, getScoutSchedule } from '@/lib/db';
 import { SuggestionActions, NicheManager, ScoutSchedule } from '@/app/components/actions';
+import { za } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
-const when = (s) => (s ? s.replace('T', ' ').slice(0, 16) : '');
+const when = (s) => za(s);
 
 export default function Scout() {
   let ideas = [];

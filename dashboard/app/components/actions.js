@@ -3,6 +3,7 @@ import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useUI } from './ui';
 import { SUPPORTED, PLATFORM_META, PLATFORM_LIMITS, PLATFORM_ICON } from '@/lib/platforms';
+import { za } from '@/lib/time';
 
 // Brand logo (24x24 svg path) tinted to the platform colour. Falls back to nothing if unknown.
 function PlatformLogo({ platform, size = 14 }) {
@@ -204,7 +205,7 @@ export function ScheduleButton({ jobId, channel }) {
   const chosen = date && time ? new Date(`${date}T${time}`) : null;
   const valid = chosen && !isNaN(chosen.getTime());
   const readout = valid
-    ? chosen.toLocaleString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    ? chosen.toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
     : '—';
 
   async function go(e) {
@@ -236,7 +237,7 @@ export function ScheduleButton({ jobId, channel }) {
               <label className="sched-f"><span>Time</span>
                 <input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} /></label>
             </div>
-            <div className="sched-readout">Posts <b>{readout}</b> <span className="dim">· your local time</span></div>
+            <div className="sched-readout">Posts <b>{readout}</b> <span className="dim">· SAST</span></div>
             <div className="modal-acts">
               <button type="button" className="btn btn--ghost" onClick={() => setOpen(false)}>Cancel</button>
               <button type="submit" className="btn btn--primary" disabled={busy || !valid}>{busy ? 'Scheduling…' : 'Schedule'}</button>
@@ -385,7 +386,7 @@ export function SuggestionActions({ id }) {
 }
 
 const DOW = [['1', 'Mon'], ['2', 'Tue'], ['3', 'Wed'], ['4', 'Thu'], ['5', 'Fri'], ['6', 'Sat'], ['7', 'Sun']];
-const fmtWhen = (s) => (s ? s.replace('T', ' ').slice(0, 16) + ' UTC' : 'never');
+const fmtWhen = (s) => (s ? `${za(s)} SAST` : 'never');
 
 export function ScoutSchedule({ schedule }) {
   const ui = useUI();

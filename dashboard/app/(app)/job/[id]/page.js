@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { getJobById, getBrief, getDraftsFor, getEvents, costForJob, STATES, DRAFT_LIMITS } from '@/lib/db';
 import { zar } from '@/lib/money';
+import { za } from '@/lib/time';
 import { ApprovalActions, PublishButton, ScheduleButton, EditableDraft, RetryButton, UploadMediaButton, PostPills, PlatformChip } from '@/app/components/actions';
 
 export const dynamic = 'force-dynamic';
-const when = (s) => (s ? s.replace('T', ' ').slice(0, 16) : '');
+const when = (s) => za(s);
 
 function Lane({ state }) {
   const dead = state === 'cancelled';
@@ -58,7 +59,7 @@ export default async function JobPage({ params }) {
             </div>
           )}
           {job.state === 'scheduled' && (() => { let m = {}; try { m = JSON.parse(job.meta || '{}'); } catch {} return (
-            <div className="card-meta" style={{ marginBottom: 0 }}>Scheduled for {when(m.scheduled_at)} UTC{m.scheduled_to ? ` · ${m.scheduled_to}` : ''}</div>
+            <div className="card-meta" style={{ marginBottom: 0 }}>Scheduled for {when(m.scheduled_at)} SAST{m.scheduled_to ? ` · ${m.scheduled_to}` : ''}</div>
           ); })()}
           {job.queued_action === 'failed' && <div className="actions"><RetryButton jobId={job.id} /></div>}
         </div>

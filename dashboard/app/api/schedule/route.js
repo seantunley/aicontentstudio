@@ -47,7 +47,7 @@ export async function POST(req) {
   markScheduled(job.id, session.user.name, whenISO, where);
 
   await notifyTelegram(
-    `🗓 Scheduled. "${job.topic}" will post to ${where} at ${whenISO.replace('T', ' ').slice(0, 16)} UTC.` +
+    `🗓 Scheduled. "${job.topic}" will post to ${where} at ${new Date(whenISO).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })} SAST.` +
     `${failed.length ? `\n(failed: ${failed.join('; ')})` : ''}`,
   );
 

@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import { pipelineCounts, inProgress, recentJobs, costSummary, approvalQueue, publishable, listSuggestions } from '@/lib/db';
 import { zar } from '@/lib/money';
+import { za } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
 
 const short = (id) => (id ? id.slice(0, 8) : '');
-const when = (s) => (s ? s.replace('T', ' ').slice(0, 16) : '');
+const when = (s) => za(s);
 const WORK = {
   research_draft: ['queued', 'queued'],
   research_draft_image: ['queued', 'queued · image'],

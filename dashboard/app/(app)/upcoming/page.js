@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { scheduledJobs } from '@/lib/db';
 import { PlatformChip } from '@/app/components/actions';
+import { za } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
 const short = (id) => (id ? id.slice(0, 8) : '');
-const when = (s) => (s ? s.replace('T', ' ').slice(0, 16) : 'unscheduled');
+const when = (s) => za(s) || 'unscheduled';
 
 export default function Upcoming() {
   let r = [];
@@ -26,7 +27,7 @@ export default function Upcoming() {
           {r.map((j) => (
             <div className="card reveal" key={j.id}>
               <div className="row-between" style={{ marginBottom: 7 }}>
-                <span className="badge badge--scheduled">{when(j.scheduled_at)} UTC</span>
+                <span className="badge badge--scheduled">{when(j.scheduled_at)} SAST</span>
                 {j.draft ? <PlatformChip platform={j.scheduled_to || j.draft.platform} /> : <span />}
               </div>
               <div className="card-topic"><Link href={`/job/${j.id}`}>{j.topic}</Link></div>

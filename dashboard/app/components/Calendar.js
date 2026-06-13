@@ -2,13 +2,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { PLATFORM_META, PLATFORM_ICON } from '@/lib/platforms';
 import { useUI } from './ui';
+import { PlatformChip } from './actions';
 
 const POSTIZ_UI = 'http://172.18.18.101:4007';
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const pad = (n) => String(n).padStart(2, '0');
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const hhmm = (d) => d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
+const TZ = 'Africa/Johannesburg';
+const hhmm = (d) => d.toLocaleTimeString('en-ZA', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false });
 
 function monthGrid(cursor) {
   const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
@@ -30,6 +32,7 @@ export function Calendar() {
   const [status, setStatus] = useState('loading');
   const [drag, setDrag] = useState(null);   // post being dragged
   const [over, setOver] = useState(null);    // day key hovered
+  const [hover, setHover] = useState(null);  // { p, rect } for the preview popover
   const grid = monthGrid(cursor);
 
   const load = useCallback(async () => {
@@ -64,7 +67,7 @@ export function Calendar() {
     const r = await fetch('/api/calendar/reschedule', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, date: target.toISOString() }),
     });
-    if (r.ok) { ui.toast(`Moved to ${target.toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' })} ${hhmm(target)}`); load(); }
+    if (r.ok) { ui.toast(`Moved to ${target.toLocaleDateString('en-ZA', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short' })} ${hhmm(target)} SAST`); load(); }
     else { const d = await r.json().catch(() => ({})); ui.toast(d.error || 'Reschedule failed', 'err'); load(); }
   }
 
@@ -98,13 +101,13 @@ export function Calendar() {
                 {items.map((p) => (
                   <div key={p.id} className={`cal-post st-${p.state} ${drag?.id === p.id ? 'dragging' : ''} ${canMove(p) ? '' : 'locked'}`}
                        draggable={canMove(p)}
-                       onDragStart={canMove(p) ? () => setDrag(p) : undefined}
+                       onDragStart={canMove(p) ? () => { setHover(null); setDrag(p); } : undefined}
                        onDragEnd={() => { setDrag(null); setOver(null); }}
-                       onClick={() => window.open(p.releaseURL || POSTIZ_UI, '_blank')}
-                       title={`${hhmm(new Date(p.date))} · ${p.account || p.platform || ''}${canMove(p) ? ' · drag to move' : ' · published (locked)'}\n${p.content}`}>
+                       onMouseEnter={(e) => { if (!drag) setHover({ p, rect: e.currentTarget.getBoundingClientRect() }); }}
+                       onMouseLeave={() => setHover(null)}
+                       onClick={() => window.open(p.releaseURL || POSTIZ_UI, '_blank')}>
                     <Logo platform={p.platform} />
                     <span className="cal-time">{hhmm(new Date(p.date))}</span>
-                    <span className="cal-snip">{p.content}</span>
                   </div>
                 ))}
               </div>
@@ -118,6 +121,27 @@ export function Calendar() {
         <span><i className="st-dot st-error" /> error</span>
         <span className="dim">changes sync to Postiz; moves made in Postiz appear here within a minute.</span>
       </div>
+
+      {hover && (() => {
+        const { p, rect } = hover;
+        const W = 300;
+        const right = rect.right + 12 + W > (typeof window !== 'undefined' ? window.innerWidth : 1600);
+        const left = right ? Math.max(8, rect.left - W - 12) : rect.right + 12;
+        const top = Math.max(8, Math.min(rect.top - 6, (typeof window !== 'undefined' ? window.innerHeight : 900) - 220));
+        const dt = new Date(p.date);
+        const badge = p.state === 'published' ? 'published' : p.state === 'error' ? 'failed' : 'scheduled';
+        return (
+          <div className="cal-pop" style={{ left, top, width: W }}>
+            <div className="cal-pop-head">
+              {p.platform ? <PlatformChip platform={p.platform} /> : null}
+              <span className={`badge badge--${badge}`}>{p.state || 'scheduled'}</span>
+            </div>
+            <div className="cal-pop-when">{dt.toLocaleDateString('en-ZA', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · {hhmm(dt)} SAST</div>
+            {p.account ? <div className="cal-pop-acct">{p.account}</div> : null}
+            <div className="cal-pop-body">{p.content || <span className="dim">No text.</span>}</div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

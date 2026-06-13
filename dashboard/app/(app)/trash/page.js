@@ -1,8 +1,9 @@
 import { trashedJobs, trashedMedia, TRASH_TTL_DAYS } from '@/lib/db';
 import { RestoreButton, MediaRestoreButton } from '@/app/components/actions';
+import { za } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
-const when = (s) => (s ? s.replace('T', ' ').slice(0, 16) : '');
+const when = (s) => za(s);
 const daysLeft = (iso) => {
   if (!iso) return TRASH_TTL_DAYS;
   const gone = (Date.now() - new Date(iso).getTime()) / 86400000;
