@@ -483,9 +483,25 @@ def create_draft(job_id, platform, body, angle=None, variant=1):
 def list_drafts(job_id):
     with _db() as conn:
         return [dict(r) for r in conn.execute(
-            "SELECT id, platform, angle, body, char_count, variant, image_path, image_id, video_path, video_id, created_at FROM drafts"
+            "SELECT id, platform, angle, body, char_count, variant, image_path, image_id, video_path, video_id, polish_json, created_at FROM drafts"
             " WHERE job_id=? ORDER BY id", (job_id,)
         ).fetchall()]
+
+
+def preview_drafts_unpolished(limit=12):
+    """Drafts on jobs at the gate ('preview') that the polish pipeline hasn't touched yet —
+    used by the worker sweep so posts from ANY path (incl. Telegram) get polished + pills."""
+    with _db() as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT d.id, d.platform, d.body, d.job_id, j.brand FROM drafts d JOIN jobs j ON j.id = d.job_id"
+            " WHERE j.state='preview' AND d.polish_json IS NULL ORDER BY d.id LIMIT ?", (limit,)
+        ).fetchall()]
+
+
+def mark_draft_polished(draft_id):
+    """Mark a draft as polished-with-no-change (empty steps), so the sweep won't reprocess it."""
+    with _db() as conn:
+        conn.execute("UPDATE drafts SET polish_json='[]' WHERE id=? AND polish_json IS NULL", (draft_id,))
 
 
 def update_draft_body(draft_id, body, polish_steps=None):

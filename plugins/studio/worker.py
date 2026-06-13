@@ -122,23 +122,41 @@ def process_one(job):
         db.record_event(jid, f"worker: error: {e}", actor="system")
 
 
+def _polish_one_draft(d, brand):
+    """Run the polish pipeline (marketing-psychology -> humanizer) on one draft, recording what
+    each pass changed for the preview pills. Best-effort — a failure never blocks the pipeline."""
+    limit = db.PLATFORM_LIMITS.get(d["platform"])
+    try:
+        res = humanize.polish(d["body"], d["platform"], limit, brand)
+    except Exception as e:  # noqa: BLE001
+        print(f"worker: polish draft {d['id']} error: {e}")
+        return  # leave polish_json NULL so it's retried next tick
+    if res and res["changed"]:
+        db.update_draft_body(d["id"], res["final"], polish_steps=res["steps"])
+        labels = ", ".join(s["skill"] for s in res["steps"])
+        db.record_event(d.get("job_id") or "", f"draft polished for {d['platform']} ({labels}; {len(res['final'])} chars)", actor="system")
+        print(f"worker: polished draft {d['id']} ({d['platform']}: {labels})")
+    else:
+        db.mark_draft_polished(d["id"])  # attempted, no change — don't reprocess
+
+
 def _polish_drafts(job_id, brand=None):
-    """Second-model polish pipeline (Principle 0): run every draft through marketing-psychology
-    then the humanizer before it reaches the approval gate, recording what each pass changed for
-    the preview pills. Best-effort per draft — a failure leaves the (already scrubbed) text in
-    place, never blocks the pipeline."""
+    """Polish all not-yet-polished drafts of one job (the worker's own dashboard jobs, inline
+    before the 'draft ready' ping)."""
     for d in db.list_drafts(job_id):
-        limit = db.PLATFORM_LIMITS.get(d["platform"])
-        try:
-            res = humanize.polish(d["body"], d["platform"], limit, brand)
-        except Exception as e:  # noqa: BLE001
-            print(f"worker: polish draft {d['id']} error: {e}")
+        if d.get("polish_json"):
             continue
-        if res and res["changed"]:
-            db.update_draft_body(d["id"], res["final"], polish_steps=res["steps"])
-            labels = ", ".join(s["skill"] for s in res["steps"])
-            db.record_event(job_id, f"draft polished for {d['platform']} ({labels}; {len(res['final'])} chars)", actor="system")
-            print(f"worker: polished draft {d['id']} ({d['platform']}: {labels})")
+        _polish_one_draft(d, brand)
+
+
+def _polish_pending(limit=12):
+    """Sweep: polish any preview draft from ANY path (incl. Telegram conversations) that hasn't
+    been through the pipeline yet. Mirrors the vision auto-tag sweep — makes polish universal."""
+    pending = db.preview_drafts_unpolished(limit)
+    if pending:
+        print(f"worker: polishing {len(pending)} pending draft(s)")
+    for d in pending:
+        _polish_one_draft(d, d.get("brand"))
 
 
 def _locked():
@@ -198,6 +216,7 @@ def main():
     try:
         _maybe_run_scout()
         _autotag_media()
+        _polish_pending()  # polish drafts from ANY path (incl. Telegram) that aren't polished yet
         jobs = db.get_queued_jobs()
         if not jobs:
             return
