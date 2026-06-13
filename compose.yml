@@ -15,7 +15,10 @@ services:
     image: nousresearch/hermes-agent:${HERMES_IMAGE_TAG:-v2026.6.5}
     container_name: hermes
     restart: unless-stopped              # auto-restart after crash/reboot (plan §9b)
-    command: ["gateway", "run"]
+    # Apply our idempotent in-image patches (clarify buttons show option text, not 1/2/3) as the
+    # hermes user, then hand off to the gateway. Patch source lives in ./plugins (version-controlled);
+    # it no-ops safely if a Hermes upgrade changes the target code. See plugins/patch_clarify.py.
+    command: ["sh", "-lc", "/opt/hermes/.venv/bin/python /opt/data/plugins/patch_clarify.py || true; exec /opt/hermes/.venv/bin/hermes gateway run"]
     network_mode: host                   # per official Hermes compose; Telegram is outbound long-poll, no inbound port
     environment:
       - HERMES_UID=${HERMES_UID:-1000}   # own files written into the volumes as the host user
