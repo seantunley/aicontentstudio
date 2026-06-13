@@ -34,7 +34,7 @@ export async function POST(req, { params }) {
       const media = await uploadMedia(buf, base, mime);
       for (const d of drafts) setDraftVideoById(d.id, media.id, media.path);
       addMediaAsset({ kind: 'video', url: media.path, mediaId: media.id, source: 'uploaded', jobId: job.id, platform: drafts[0]?.platform, topic: job.topic, tags: base.replace(/[._-]+/g, ' ').trim() });
-      logEvent(job.id, `operator uploaded own video (${base}) — attached to ${drafts.length} draft(s)`);
+      logEvent(job.id, `operator uploaded own video (${base}), attached to ${drafts.length} draft(s)`);
       return NextResponse.json({ ok: true, kind: 'video', attached: drafts.length });
     }
     if (mime.startsWith('image/')) {
@@ -49,10 +49,10 @@ export async function POST(req, { params }) {
         addMediaAsset({ kind: 'image', url: media.path, mediaId: media.id, source: 'uploaded', jobId: job.id, draftId: d.id, platform: d.platform, width: w, height: h, topic: job.topic, tags: base.replace(/[._-]+/g, ' ').trim() });
         done.push(`${d.platform} ${w}x${h}`);
       }
-      logEvent(job.id, `operator uploaded own image (${base}) — sized + attached: ${done.join(', ')}`);
+      logEvent(job.id, `operator uploaded own image (${base}), sized + attached: ${done.join(', ')}`);
       return NextResponse.json({ ok: true, kind: 'image', attached: done });
     }
-    return NextResponse.json({ error: `unsupported type ${mime || 'unknown'} — upload an image or a video` }, { status: 400 });
+    return NextResponse.json({ error: `unsupported type ${mime || 'unknown'}; upload an image or a video` }, { status: 400 });
   } catch (e) {
     return NextResponse.json({ error: String(e?.message || e) }, { status: 502 });
   }

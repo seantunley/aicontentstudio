@@ -93,7 +93,7 @@ export default async function JobPage({ params }) {
               </div>
             ))}
             <div className="section-head" style={{ marginTop: 14 }}><h2>Angles</h2><span className="rule" /></div>
-            {(brief.angles || []).map((a, i) => (<div className="angle" key={i}><b>{a.name}</b> — {a.hook}</div>))}
+            {(brief.angles || []).map((a, i) => (<div className="angle" key={i}><b>{a.name}</b>: {a.hook}</div>))}
             {brief.unverified && brief.unverified.length > 0 ? (
               <>
                 <div className="section-head" style={{ marginTop: 14 }}><h2>Couldn&rsquo;t verify</h2><span className="rule" /></div>

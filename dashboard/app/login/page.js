@@ -26,7 +26,7 @@ export default function Login() {
       <div className="auth reveal">
         <div className="wordmark">The Studio<em>.</em></div>
         <div className="rulebox" />
-        <div className="strap">operator&rsquo;s desk — sign in</div>
+        <div className="strap">operator&rsquo;s desk · sign in</div>
         <form onSubmit={submit}>
           <input className="input" placeholder="username" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} />
           <input className="input" type="password" placeholder="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />

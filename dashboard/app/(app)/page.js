@@ -46,7 +46,7 @@ export default function Overview() {
   return (
     <>
       <div className="phead">
-        <div><h1>The desk</h1><div className="lede">Everything moving through the studio — and what&rsquo;s waiting on your call.</div></div>
+        <div><h1>The desk</h1><div className="lede">Everything moving through the studio, and what&rsquo;s waiting on your call.</div></div>
         <div className="crumbs">{dateline}</div>
       </div>
 

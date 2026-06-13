@@ -35,8 +35,8 @@ export async function POST(req) {
     }
   }
   if (!published.length) {
-    await notifyTelegram(`⚠️ Publish FAILED for "${job.topic}" after retries — ${failed.join('; ')}. It stays in Ready to publish; try again.`);
-    return NextResponse.json({ error: `nothing published — ${failed.join('; ')}` }, { status: 502 });
+    await notifyTelegram(`⚠️ Publish FAILED for "${job.topic}" after retries: ${failed.join('; ')}. It stays in Ready to publish; try again.`);
+    return NextResponse.json({ error: `nothing published: ${failed.join('; ')}` }, { status: 502 });
   }
 
   const where = published.map((p) => p.channel || p.platform).join(', ');
@@ -44,7 +44,7 @@ export async function POST(req) {
 
   const links = published.filter((p) => p.platform === 'bluesky' && p.channel).map((p) => `https://bsky.app/profile/${p.channel}`);
   await notifyTelegram(
-    `✅ Published — "${job.topic}" is now live on ${where}.` +
+    `✅ Published. "${job.topic}" is now live on ${where}.` +
     `${links.length ? `\n${links.join('\n')}` : ''}${failed.length ? `\n(failed: ${failed.join('; ')})` : ''}`,
   );
 

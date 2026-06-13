@@ -40,14 +40,14 @@ export async function POST(req) {
     }
   }
   if (!scheduled.length) {
-    return NextResponse.json({ error: `nothing scheduled — ${failed.join('; ')}` }, { status: 502 });
+    return NextResponse.json({ error: `nothing scheduled: ${failed.join('; ')}` }, { status: 502 });
   }
 
   const where = scheduled.map((p) => p.channel || p.platform).join(', ');
   markScheduled(job.id, session.user.name, whenISO, where);
 
   await notifyTelegram(
-    `🗓 Scheduled — "${job.topic}" will post to ${where} at ${whenISO.replace('T', ' ').slice(0, 16)} UTC.` +
+    `🗓 Scheduled. "${job.topic}" will post to ${where} at ${whenISO.replace('T', ' ').slice(0, 16)} UTC.` +
     `${failed.length ? `\n(failed: ${failed.join('; ')})` : ''}`,
   );
 

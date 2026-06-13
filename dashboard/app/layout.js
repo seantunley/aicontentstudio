@@ -1,8 +1,8 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'The Studio — Operator’s Desk',
-  description: 'AI Content Studio — operator console',
+  title: 'The Studio · Operator’s Desk',
+  description: 'AI Content Studio · operator console',
 };
 export const viewport = { width: 'device-width', initialScale: 1, themeColor: '#0f0d0a' };
 

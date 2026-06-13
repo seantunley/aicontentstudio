@@ -11,7 +11,7 @@ export default function Queue() {
   return (
     <>
       <div className="phead">
-        <div><h1>Approval queue</h1><div className="lede">The gate. Nothing ships without your yes — open a job to edit the copy, approve to ready it for publishing.</div></div>
+        <div><h1>Approval queue</h1><div className="lede">The gate. Nothing ships without your yes. Open a job to edit the copy, then approve it for publishing.</div></div>
         <div className="crumbs">{q.length} waiting</div>
       </div>
       {q.length === 0 ? (

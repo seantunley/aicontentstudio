@@ -11,7 +11,7 @@ export default function Upcoming() {
   return (
     <>
       <div className="phead">
-        <div><h1>Upcoming</h1><div className="lede">Handed to Postiz&rsquo;s queue — these post themselves at their slot.</div></div>
+        <div><h1>Upcoming</h1><div className="lede">Handed to Postiz&rsquo;s queue. These post themselves at their slot.</div></div>
         <div className="crumbs">{r.length} scheduled</div>
       </div>
       {r.length === 0 ? (

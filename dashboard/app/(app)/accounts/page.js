@@ -14,14 +14,14 @@ export default async function Accounts() {
   return (
     <>
       <div className="phead">
-        <div><h1>Accounts</h1><div className="lede">Connected channels and their health. Publishing credentials live in Postiz — never here.</div></div>
+        <div><h1>Accounts</h1><div className="lede">Connected channels and their health. Publishing credentials live in Postiz, never here.</div></div>
         <div className="crumbs">{channels ? `${channels.length} connected${down ? ` · ${down} disabled` : ''}` : 'postiz unreachable'}</div>
       </div>
 
       <section className="section reveal r1">
         <div className="section-head"><span className="idx">01</span><h2>Channels</h2><span className="rule" /><a className="deeplink" href={POSTIZ_UI} target="_blank" rel="noreferrer">open Postiz →</a></div>
         {channels === null ? (
-          <div className="panel"><span className="err">Postiz API unreachable — connection health unknown.</span></div>
+          <div className="panel"><span className="err">Postiz API unreachable. Connection health unknown.</span></div>
         ) : channels.length === 0 ? (
           <div className="panel blank">
             <div className="fleuron">❧</div>
@@ -34,7 +34,7 @@ export default async function Accounts() {
               <div className="acct" key={c.id}>
                 {c.picture ? <img src={c.picture} alt="" /> : null}
                 <div><div className="ah">{c.name}</div><div className="ap">{c.identifier}{c.profile ? ` · ${c.profile}` : ''}</div></div>
-                <span className="ok" style={c.disabled ? { background: 'var(--red)', boxShadow: '0 0 6px var(--red)' } : null} title={c.disabled ? 'disabled — reconnect in Postiz' : 'healthy'} />
+                <span className="ok" style={c.disabled ? { background: 'var(--red)', boxShadow: '0 0 6px var(--red)' } : null} title={c.disabled ? 'disabled, reconnect in Postiz' : 'healthy'} />
               </div>
             ))}
           </div>
@@ -52,7 +52,7 @@ export default async function Accounts() {
       <section className="section reveal r3">
         <div className="section-head"><span className="idx">03</span><h2>Calendar</h2><span className="rule" /></div>
         <div className="panel">
-          <div className="lede" style={{ marginBottom: 12 }}>Scheduling and the content calendar live in Postiz — the studio hands approved work to its queue.</div>
+          <div className="lede" style={{ marginBottom: 12 }}>Scheduling and the content calendar live in Postiz. The studio hands approved work to its queue.</div>
           <a className="btn btn--primary" href={POSTIZ_UI} target="_blank" rel="noreferrer">Open Postiz calendar →</a>
         </div>
       </section>

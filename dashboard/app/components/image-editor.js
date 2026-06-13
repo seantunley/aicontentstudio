@@ -82,7 +82,7 @@ export default function ImageEditor({ src, topic }) {
       <div className="editor-bar">
         <a className="btn btn--ghost" href="/vault">← Vault</a>
         <span className="editor-title">
-          Studio Editor{topic ? ` — ${topic}` : ''}
+          Studio Editor{topic ? `: ${topic}` : ''}
           {done ? '  ·  saved ✓' : saving ? '  ·  saving…' : ''}
           {err ? <span className="err" style={{ marginLeft: 10 }}>{err}</span> : null}
         </span>

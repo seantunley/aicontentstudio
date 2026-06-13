@@ -75,7 +75,7 @@ export function NewJobButton({ block }) {
     if (channels && channels.length && !platforms.length) { ui.toast('Pick at least one platform', 'err'); return; }
     setBusy(true);
     const { ok, data } = await post('/api/jobs/new', { topic, brand, withImage: withImage || withVideo, withVideo, platforms });
-    if (ok) { ui.toast('Job queued — researching in the background'); window.location.href = '/'; return; }
+    if (ok) { ui.toast('Job queued. Researching in the background.'); window.location.href = '/'; return; }
     ui.toast(data.error || 'Failed to queue', 'err'); setBusy(false);
   }
 
@@ -90,7 +90,7 @@ export function NewJobButton({ block }) {
               <h3>Start a new job</h3>
               <p>Researches, drafts a tailored post for each platform you pick, optionally generates an image, then lands in your queue.</p>
               <form onSubmit={submit} className="field-stack">
-                <input className="input" autoFocus placeholder="topic — e.g. 'latch tips for newborns'"
+                <input className="input" autoFocus placeholder="topic, e.g. 'latch tips for newborns'"
                        value={topic} onChange={(e) => setTopic(e.target.value)} />
                 <input className="input" placeholder="brand (optional)" value={brand} onChange={(e) => setBrand(e.target.value)} />
                 <div>
@@ -136,7 +136,7 @@ export function ApprovalActions({ jobId }) {
     }
     setBusy(true);
     const { ok, data } = await post('/api/' + kind, { jobId });
-    if (ok) { ui.toast(kind === 'approve' ? 'Approved — ready to publish' : 'Rejected'); window.location.reload(); return; }
+    if (ok) { ui.toast(kind === 'approve' ? 'Approved. Ready to publish.' : 'Rejected'); window.location.reload(); return; }
     ui.toast(data.error || 'Failed', 'err'); setBusy(false);
   }
   return (
@@ -256,7 +256,7 @@ export function UploadMediaButton({ jobId }) {
     try {
       const r = await fetch(`/api/jobs/${jobId}/media`, { method: 'POST', body: fd });
       const data = await r.json().catch(() => ({}));
-      if (r.ok) { ui.toast(`Your ${data.kind} is attached — sized per platform`); window.location.reload(); return; }
+      if (r.ok) { ui.toast(`Your ${data.kind} is attached, sized per platform`); window.location.reload(); return; }
       ui.toast(data.error || 'Upload failed', 'err');
     } catch { ui.toast('Upload failed', 'err'); }
     setBusy(false);
@@ -278,7 +278,7 @@ export function RunScoutButton() {
   async function go() {
     setBusy(true);
     const { ok, data } = await post('/api/scout/run', {});
-    if (ok) ui.toast('Scout queued — new ideas land within ~2 min');
+    if (ok) ui.toast('Scout queued. New ideas land within about 2 min.');
     else ui.toast(data.error || 'Failed', 'err');
     setBusy(false);
   }
@@ -298,7 +298,7 @@ export function SuggestionActions({ id }) {
     setBusy(true);
     const platforms = Object.keys(sel).filter((p) => sel[p]);
     const { ok, data } = await post('/api/suggestions', { id, action: 'promote', platforms, withImage: withImage || withVideo, withVideo });
-    if (ok) { ui.toast('Promoted — researching now'); window.location.reload(); return; }
+    if (ok) { ui.toast('Promoted. Researching now.'); window.location.reload(); return; }
     ui.toast(data.error || 'Failed', 'err'); setBusy(false);
   }
   async function dismiss() {
@@ -319,7 +319,7 @@ export function SuggestionActions({ id }) {
       {open && (
         <Modal bar="promote" onClose={() => setOpen(false)}>
           <h3>Promote to a job</h3>
-          <p>Researches + drafts this idea. Pick the platforms — tick <b>YouTube</b> for a long-form post. Leave all off to use your connected channels. <span className="dim">(Drafting works for any platform; publishing needs it connected in Postiz.)</span></p>
+          <p>Researches and drafts this idea. Pick the platforms. Tick <b>YouTube</b> for a long-form post. Leave all off to use your connected channels. <span className="dim">(Drafting works for any platform; publishing needs it connected in Postiz.)</span></p>
           <PlatformPicker selected={sel} onToggle={toggle} />
           <div className="field-row" style={{ marginTop: 12 }}>
             <label className="check"><input type="checkbox" checked={withImage || withVideo} disabled={withVideo} onChange={(e) => setWithImage(e.target.checked)} /> + image</label>
@@ -411,7 +411,7 @@ export function NicheManager({ niches }) {
   }
   return (
     <div className="card">
-      <div className="card-foot" style={{ marginBottom: 8 }}>SCOUT NICHES — what the scout looks for</div>
+      <div className="card-foot" style={{ marginBottom: 8 }}>SCOUT NICHES · what the scout looks for</div>
       {niches.length === 0 ? <div className="empty" style={{ marginBottom: 10 }}>No niches yet. Add one and the scout will hunt ideas for it.</div> : (
         <div className="field-stack" style={{ marginBottom: 12 }}>
           {niches.map((n) => (
@@ -424,7 +424,7 @@ export function NicheManager({ niches }) {
       )}
       <form onSubmit={add} className="field-row">
         <input className="input" style={{ flex: '0 1 140px' }} placeholder="brand" value={brand} onChange={(e) => setBrand(e.target.value)} />
-        <input className="input" style={{ flex: '1 1 200px' }} placeholder="niche / topic area — e.g. 'newborn sleep'" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <input className="input" style={{ flex: '1 1 200px' }} placeholder="niche / topic area, e.g. 'newborn sleep'" value={query} onChange={(e) => setQuery(e.target.value)} />
         <button type="submit" className="btn btn--primary" disabled={busy || !query.trim()}>Add</button>
       </form>
     </div>

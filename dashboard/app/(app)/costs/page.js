@@ -22,7 +22,7 @@ export default function Costs() {
   return (
     <>
       <div className="phead">
-        <div><h1>Cost ledger</h1><div className="lede">Every API call, attributed per job and per brand — what each published piece actually cost.</div></div>
+        <div><h1>Cost ledger</h1><div className="lede">Every API call, attributed per job and per brand, so you can see what each published piece cost.</div></div>
         <div className="crumbs">{total.entries} entries</div>
       </div>
 
@@ -64,7 +64,7 @@ export default function Costs() {
       <section className="section reveal r4">
         <div className="section-head"><span className="idx">04</span><h2>Recent entries</h2><span className="rule" /></div>
         <div className="panel" style={{ padding: 0 }}>
-          {recent.length === 0 ? <div className="empty" style={{ padding: 16 }}>No entries yet — costs log as generation runs.</div> : (
+          {recent.length === 0 ? <div className="empty" style={{ padding: 16 }}>No entries yet. Costs log as generation runs.</div> : (
             <table className="table">
               <thead><tr><th>When</th><th>Brand</th><th>Operation</th><th className="hide-sm">Model</th><th>Job</th><th style={{ textAlign: 'right' }}>Cost</th></tr></thead>
               <tbody>

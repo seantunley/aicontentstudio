@@ -35,7 +35,7 @@ export function VaultGrid({ items }) {
         <span className="card-foot">{filtered.length} asset{filtered.length === 1 ? '' : 's'}</span>
       </div>
       {filtered.length === 0 ? (
-        <div className="panel"><div className="empty">{q ? 'No assets match your search.' : 'Nothing in the Vault yet — generate or upload media and it lands here.'}</div></div>
+        <div className="panel"><div className="empty">{q ? 'No assets match your search.' : 'Nothing in the Vault yet. Generate or upload media and it lands here.'}</div></div>
       ) : (
         <div className="vault-grid">
           {filtered.map((a) => <VaultTile key={a.id} a={a} onSave={saveTags} />)}

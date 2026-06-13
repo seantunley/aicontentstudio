@@ -13,7 +13,7 @@ export default function Vault() {
       <div className="phead">
         <div>
           <h1>The Vault</h1>
-          <div className="lede">Every image and video the studio has made or you&apos;ve uploaded — tagged and searchable, ready to reuse.</div>
+          <div className="lede">Every image and video the studio has made or you&apos;ve uploaded. Tagged and searchable, ready to reuse.</div>
         </div>
         <div className="crumbs">{counts.image} images · {counts.video} videos</div>
       </div>

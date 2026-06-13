@@ -30,7 +30,7 @@ export default function Scout() {
           <div className="panel blank">
             <div className="fleuron">❧</div>
             <div className="bt">No pitches on the desk.</div>
-            <div className="bd">The scout runs on its schedule — add a niche above to give it a beat to cover.</div>
+            <div className="bd">The scout runs on its schedule. Add a niche above to give it a beat to cover.</div>
           </div>
         ) : (
           <div className="grid">
