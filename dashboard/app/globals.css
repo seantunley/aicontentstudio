@@ -421,6 +421,25 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .kb-doc blockquote { border-left: 2px solid var(--accent); margin: 0 0 8px; padding: 2px 0 2px 11px; color: var(--muted); font-size: 12.5px; }
 @media (max-width: 760px) { .kb-split { grid-template-columns: 1fr; } }
 
+/* knowledge: view toggle + force-directed graph */
+.kb-views { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.kb-view { background: var(--bg-1); color: var(--muted); border: 0; padding: 7px 14px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; transition: background .12s, color .12s; }
+.kb-view + .kb-view { border-left: 1px solid var(--line); }
+.kb-view:hover { color: var(--fg); }
+.kb-view.on { background: var(--accent-bg); color: var(--accent-2); }
+.kb-graph-legend { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+.kb-leg { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.kb-leg i { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid; display: inline-block; }
+.kb-graph-hint { flex: 1 1 auto; min-width: 0; font-family: var(--mono); font-size: 10px; color: var(--faint); letter-spacing: 0.04em; }
+.kb-graph-wrap { position: relative; height: 72vh; border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden;
+  background: radial-gradient(120% 120% at 50% 0%, #14110d 0%, #0f0d0a 70%); }
+.kb-graph-canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+.kb-graph-canvas:active { cursor: grabbing; }
+.kb-graph-tip { position: absolute; left: 12px; top: 12px; max-width: 60%; background: rgba(20,17,13,0.92); border: 1px solid var(--line-2);
+  border-left: 2px solid var(--accent); border-radius: var(--r); padding: 7px 11px; font-size: 12px; color: var(--fg); pointer-events: none;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
+.kb-graph-drop { position: absolute; right: 12px; bottom: 10px; font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; color: var(--faint); pointer-events: none; }
+
 /* ── calendar (Postiz mirror) ──────────────────────────────────────────── */
 .cal-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .cal-nav { display: flex; align-items: center; gap: 8px; }

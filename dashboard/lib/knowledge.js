@@ -20,15 +20,32 @@ function walk(dir, base = dir, out = []) {
 }
 
 function parseFrontmatter(text) {
-  const m = /^---\n([\s\S]*?)\n---\n?/.exec(text);
   const fm = {};
-  if (m) {
-    for (const line of m[1].split('\n')) {
-      const i = line.indexOf(':');
-      if (i > 0) fm[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+  let rest = text;
+  // Basic Memory rewrites notes on sync and can PREPEND its own frontmatter block (permalink, …)
+  // above the original, leaving two `--- … ---` fences. Consume every leading fence and merge keys
+  // (first occurrence wins) so the real title/tags survive.
+  for (let guard = 0; guard < 4; guard += 1) {
+    const m = /^\s*---\n([\s\S]*?)\n---\n?/.exec(rest);
+    if (!m) break;
+    const lines = m[1].split('\n');
+    for (let li = 0; li < lines.length; li += 1) {
+      const i = lines[li].indexOf(':');
+      if (i <= 0) continue;
+      const k = lines[li].slice(0, i).trim();
+      let v = lines[li].slice(i + 1).trim();
+      if (!v) {
+        // Basic Memory normalises inline `tags: [a, b]` into a YAML block list (`- a` lines).
+        // Collect those into a bracketed string so _parseTags still works.
+        const items = [];
+        while (li + 1 < lines.length && /^\s*-\s+/.test(lines[li + 1])) { items.push(lines[li + 1].replace(/^\s*-\s+/, '').trim()); li += 1; }
+        if (items.length) v = `[${items.join(', ')}]`;
+      }
+      if (!(k in fm)) fm[k] = v;
     }
+    rest = rest.slice(m[0].length);
   }
-  return { fm, body: m ? text.slice(m[0].length) : text };
+  return { fm, body: rest };
 }
 
 export function listNotes() {
@@ -90,6 +107,107 @@ export function writeVoiceExample({ brand, platform, topic, body, jobId }) {
     ].join('\n');
     fs.writeFileSync(path.join(dir, `${String(jobId).slice(0, 8)}-${platform || 'post'}.md`), `${fm}\n\n# ${title}\n\n${text}\n`);
   } catch { /* never break the approval gate */ }
+}
+
+const _noteSlug = (s) => (s || 'note').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'note';
+const _uniqueFile = (dir, stem, ext = '.md') => {
+  let file = path.join(dir, stem + ext), i = 2;
+  while (fs.existsSync(file)) file = path.join(dir, `${stem}-${i++}${ext}`);
+  return file;
+};
+
+// Write a note straight from the dashboard (title + optional tags + markdown body). Lands in the
+// shared KB; Basic Memory indexes it and Hermes can then retrieve it.
+export function writeNote({ title, body, tags }) {
+  const t = (title || '').trim();
+  if (!t) throw new Error('title is required');
+  const text = (body || '').trim();
+  if (!text) throw new Error('note body is empty');
+  const dir = path.join(KDIR, 'notes');
+  fs.mkdirSync(dir, { recursive: true });
+  const tagList = (Array.isArray(tags) ? tags : String(tags || '').split(',')).map((s) => s.trim()).filter(Boolean);
+  const fm = ['---', `title: ${t.replace(/"/g, "'")}`, 'type: note', 'source: dashboard',
+    `created: ${new Date().toISOString()}`, `tags: [${['note', ...tagList].join(', ')}]`, '---'].join('\n');
+  const file = _uniqueFile(dir, _noteSlug(t));
+  fs.writeFileSync(file, `${fm}\n\n# ${t}\n\n${text}\n`);
+  return { rel: path.relative(KDIR, file) };
+}
+
+// Save an uploaded markdown / text file as a note. If it has no frontmatter, give it a minimal one
+// (title from filename) so it's titled and tagged in the graph/search.
+export function importMarkdownFile(name, text) {
+  const dir = path.join(KDIR, 'notes');
+  fs.mkdirSync(dir, { recursive: true });
+  const stem = _noteSlug((name || 'note').replace(/\.(md|markdown|mdown|txt|text)$/i, ''));
+  const file = _uniqueFile(dir, stem);
+  let out = text || '';
+  if (!/^---\s*\n/.test(out)) {
+    const title = stem.replace(/[-_]+/g, ' ');
+    out = ['---', `title: ${title}`, 'type: note', 'source: upload', `created: ${new Date().toISOString()}`,
+      'tags: [note, upload]', '---', '', out].join('\n');
+  }
+  fs.writeFileSync(file, out);
+  return { rel: path.relative(KDIR, file) };
+}
+
+function _parseTags(raw) {
+  if (!raw) return [];
+  return raw.replace(/^\[|\]$/g, '').split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+}
+
+// Build a node/link graph of the knowledge base for the dashboard's force-directed view.
+// Nodes = notes (grouped history | voice | note) plus tag hubs; edges = [[wikilinks]] between notes
+// and note→tag membership (so even un-linked imports cluster meaningfully). Capped for readability.
+export function knowledgeGraph({ maxNodes = 400, maxTags = 40 } = {}) {
+  const parsed = [];
+  for (const rel of walk(KDIR)) {
+    let text = '';
+    try { text = fs.readFileSync(path.join(KDIR, rel), 'utf8'); } catch { continue; }
+    const { fm, body } = parseFrontmatter(text);
+    const type = (fm.type || '').toLowerCase();
+    let group = 'note';
+    if (type === 'conversation' || fm.source === 'chatgpt' || rel.startsWith('chatgpt/')) group = 'history';
+    else if (type === 'voice-example' || rel.startsWith('voice/')) group = 'voice';
+    parsed.push({
+      rel, title: fm.title || rel.replace(/\.md$/, ''), group, brand: fm.brand || '',
+      tags: _parseTags(fm.tags),
+      wikilinks: [...body.matchAll(/\[\[([^\]]+)\]\]/g)].map((m) => m[1].split('|')[0].trim()),
+    });
+  }
+  const dropped = Math.max(0, parsed.length - maxNodes);
+  const kept = parsed.slice(0, maxNodes);
+
+  const byTitle = new Map();
+  for (const n of kept) {
+    byTitle.set(n.title.toLowerCase(), n.rel);
+    byTitle.set(n.rel.replace(/\.md$/, '').toLowerCase(), n.rel);
+    byTitle.set(path.basename(n.rel).replace(/\.md$/, '').toLowerCase(), n.rel);
+  }
+  const nodes = kept.map((n) => ({ id: n.rel, title: n.title, group: n.group, brand: n.brand }));
+  const links = [];
+  const seen = new Set();
+  for (const n of kept) {
+    for (const w of n.wikilinks) {
+      const target = byTitle.get(w.toLowerCase());
+      if (target && target !== n.rel) {
+        const key = [n.rel, target].sort().join('||');
+        if (!seen.has(key)) { seen.add(key); links.push({ source: n.rel, target, kind: 'link' }); }
+      }
+    }
+  }
+  const tagCount = new Map();
+  for (const n of kept) for (const t of n.tags) tagCount.set(t, (tagCount.get(t) || 0) + 1);
+  const topTags = new Set([...tagCount.entries()].filter(([, c]) => c >= 2)
+    .sort((a, b) => b[1] - a[1]).slice(0, maxTags).map(([t]) => t));
+  for (const t of topTags) nodes.push({ id: `tag:${t}`, title: `#${t}`, group: 'tag', degree: tagCount.get(t) });
+  for (const n of kept) for (const t of n.tags) if (topTags.has(t)) links.push({ source: n.rel, target: `tag:${t}`, kind: 'tag' });
+
+  // degree (for node sizing)
+  const deg = new Map();
+  for (const l of links) { deg.set(l.source, (deg.get(l.source) || 0) + 1); deg.set(l.target, (deg.get(l.target) || 0) + 1); }
+  for (const nd of nodes) nd.degree = nd.degree || deg.get(nd.id) || 0;
+
+  return { nodes, links, dropped, counts: { notes: kept.length, tags: topTags.size, edges: links.length } };
 }
 
 export function knowledgeStats() {
