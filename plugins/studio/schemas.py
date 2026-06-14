@@ -228,6 +228,37 @@ LIST_DRAFTS = {
     },
 }
 
+QUEUE_CONTENT = {
+    "name": "queue_content",
+    "description": (
+        "Hand a content request to the Studio (the source of truth). Creates a QUEUED job the Studio "
+        "worker then researches, drafts, polishes, brand-safety-checks and validates on the Studio's "
+        "own models, and notifies the operator when it's review-ready. In a conversation, use THIS for "
+        "every content request instead of researching or drafting yourself — ONE call per distinct "
+        "piece (3 reels + 2 carousels = 5 calls). Pin the brand first; never queue 'unassigned'. "
+        "Platform connection is irrelevant — queue for any platform the operator names. Do NOT write "
+        "the post, a plan, or your research in the chat; this tool sends the work to the Studio."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "topic": {"type": "string", "description": "Short topic for this ONE piece (a few words — never a whole plan)."},
+            "brand": {"type": "string", "description": "Brand slug. Required — never 'unassigned'; clarify with the operator first if unknown."},
+            "platforms": {
+                "type": "array", "items": {"type": "string"},
+                "description": ("Target platforms, e.g. ['instagram','facebook']. One or more of: instagram, "
+                                "facebook, x, bluesky, linkedin, telegram, vk, youtube, tiktok. Omit/empty = all connected channels."),
+            },
+            "media": {
+                "type": "string", "enum": ["none", "image", "video", "carousel"],
+                "description": "Format: none = text only; image = single image; video = short branded clip (reel/Short/TikTok); carousel = multi-image swipe.",
+            },
+            "slides": {"type": "integer", "description": "For media='carousel' only: number of slides (2-10, default 4)."},
+        },
+        "required": ["topic", "brand"],
+    },
+}
+
 PRESENT_FOR_REVIEW = {
     "name": "present_for_review",
     "description": (

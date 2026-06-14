@@ -474,6 +474,40 @@ def create_job(topic, brand="unassigned", source="telegram", created_by=None, me
     return get_job(job_id)
 
 
+def create_and_queue(topic, brand="unassigned", source="telegram", created_by=None,
+                     platforms=None, media="none", slides=4):
+    """Create a job AND queue it for the worker — the worker then researches, drafts, polishes,
+    safety-checks and validates it, and pings when it's review-ready. This is how a control surface
+    (Telegram, etc.) hands work to the Studio: the work flows through the Studio, nothing is done in
+    the chat. media: 'none' | 'image' | 'video' | 'carousel'."""
+    media = (media or "none").strip().lower()
+    action = {"carousel": "research_draft_carousel", "video": "research_draft_image_video",
+              "image": "research_draft_image"}.get(media, "research_draft")
+    meta = {}
+    if media == "carousel":
+        try:
+            n = int(slides)
+        except (TypeError, ValueError):
+            n = 4
+        meta["carousel_slides"] = max(2, min(10, n))
+    targets = ",".join([p.strip() for p in (platforms or []) if p and p.strip()]) or None
+    job_id = str(uuid.uuid4())
+    now = _utcnow()
+    with _db() as conn:
+        conn.execute(
+            "INSERT INTO jobs (id, brand, topic, state, source, created_by, created_at, updated_at,"
+            " meta, queued_action, target_platforms) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (job_id, brand or "unassigned", topic, "requested", source, created_by, now, now,
+             json.dumps(meta), action, targets),
+        )
+        conn.execute(
+            "INSERT INTO job_events (job_id, from_state, to_state, actor, at, detail) VALUES (?,?,?,?,?,?)",
+            (job_id, None, "requested", "agent", now,
+             f"job created + queued ({action}){' for ' + targets if targets else ''}"),
+        )
+    return get_job(job_id)
+
+
 def get_job(job_id):
     with _db() as conn:
         row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()

@@ -60,7 +60,8 @@ def _run_pass(body, platform, limit, instructions, timeout=120):
         return None
     prompt = instructions.format(platform=platform or "social", body=body, limit=limit or 2000)
     try:
-        r = subprocess.run(["hermes", "-z", prompt], capture_output=True, text=True, timeout=timeout)
+        import llm  # Studio model seam; imported here so humanize stays usable in both load contexts
+        r = llm.run_z(prompt, timeout=timeout)
     except Exception:  # noqa: BLE001 — a polish failure never breaks the pipeline
         return None
     after, notes = _split_notes(r.stdout or "")

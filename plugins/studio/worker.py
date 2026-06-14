@@ -20,6 +20,7 @@ import urllib.request
 import db  # same directory
 import humanize  # same directory — the second-model humanizer pass (Principle 0)
 import registry  # same directory — platform capability registry + validation
+import llm  # same directory — Studio model seam (STUDIO_TEXT_MODEL); keeps Studio work off the chat model
 
 LOCK = "/tmp/studio_worker.lock"
 
@@ -56,8 +57,11 @@ def _telegram_notify(text, button=None):
 def _cockpit_button(job_id, text="\U0001f50d Preview in cockpit"):
     base = os.environ.get("STUDIO_COCKPIT_URL", "").rstrip("/")
     return {"text": text, "url": f"{base}/job/{job_id}"} if base else None
-LOCK_STALE_SECONDS = 1800
-RUN_TIMEOUT_SECONDS = 600
+# Quality over speed: a single thorough research+draft run may take many minutes. Per-job timeout is
+# generous; the stale-lock window sits above it so a legitimately long run is never mistaken for a
+# crash (and one job is processed per run — see main() — so each locked run stays bounded).
+LOCK_STALE_SECONDS = 2700  # 45 min — self-heals a crashed lock, but won't break a long honest run
+RUN_TIMEOUT_SECONDS = 1500  # 25 min — room for deep research + drafting, not a "slap it together" cap
 
 
 def _brand_block(job):
@@ -110,9 +114,11 @@ def _agent_prompt(job, with_image, with_video=False, with_carousel=False):
         "(search_notes / build_context) to pull (a) any imported facts, history or reference notes "
         f"relevant to {job['topic']!r}, and (b) this brand's prior approved posts (search for the brand "
         f"name {job['brand']!r} and tag 'voice') so you match its established voice and avoid repeating "
-        "past posts. Then search the web, read real sources, and call save_brief with cited facts "
-        "(each a real source_url + snippet) and 2-3 distinct angles. Use METRIC units only (Celsius, "
-        "km, kg, litres), convert any imperial. "
+        "past posts. Then search the web and read real sources, and be THOROUGH: consult several "
+        "current, credible sources, dig for concrete specifics (numbers, names, recent developments), "
+        "and don't settle for a shallow first pass. This is professional work, so take the time to get "
+        "it right, quality over speed. Call save_brief with cited facts (each a real source_url + "
+        "snippet) and 2-3 distinct angles. Use METRIC units only (Celsius, km, kg, litres), convert any imperial. "
         "Write every draft like a sharp human, not an AI: no em dashes, no significance inflation "
         "('a testament to', 'plays a vital role'), no rule-of-three lists, no 'serves as' (just say "
         "'is'), no trailing -ing filler, no AI words (delve, leverage, underscore, tapestry, landscape). "
@@ -162,8 +168,7 @@ def process_one(job):
     # 1) Run the agent. Only a genuine run failure — crash, timeout, or never reaching the gate — is
     # a 'failed'. (A draft that reached preview has succeeded; see step 2.)
     try:
-        r = subprocess.run(["hermes", "-z", _agent_prompt(job, with_image, with_video, with_carousel)],
-                           capture_output=True, text=True, timeout=RUN_TIMEOUT_SECONDS)
+        r = llm.run_z(_agent_prompt(job, with_image, with_video, with_carousel), timeout=RUN_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
         db.enqueue_action(jid, "failed")
         db.record_event(jid, "worker: timed out", actor="system")
@@ -282,7 +287,7 @@ def _autotag_media(limit=5):
         prompt = ("Look at this image and reply with ONLY 6-10 short content tags describing what is IN it "
                   f"(objects, people, setting, mood, colours), comma-separated, nothing else. Image: {a['url']}")
         try:
-            r = subprocess.run(["hermes", "-z", prompt], capture_output=True, text=True, timeout=120)
+            r = llm.run_z(prompt, timeout=120)
             tags = _clean_tags(r.stdout)
             if tags and "," in tags:
                 db.set_media_tags(a["id"], tags)
@@ -357,7 +362,7 @@ def _redraft_body(platform, limit, angle, facts_text, brand_block, current):
         f"real accounts use them, none on sensitive health topics):\n{current}"
     )
     try:
-        r = subprocess.run(["hermes", "-z", prompt], capture_output=True, text=True, timeout=RUN_TIMEOUT_SECONDS)
+        r = llm.run_z(prompt, timeout=RUN_TIMEOUT_SECONDS)
     except Exception:  # noqa: BLE001
         return None
     out = humanize.scrub((r.stdout or "").strip().strip('"').strip())
@@ -444,7 +449,7 @@ def _safety_check(body, brand):
         f"POST:\n{body}"
     )
     try:
-        r = subprocess.run(["hermes", "-z", prompt], capture_output=True, text=True, timeout=120)
+        r = llm.run_z(prompt, timeout=120)
         out = r.stdout or ""
         v = re.search(r"VERDICT:\s*(green|amber|red)", out, re.I)
         rs = re.search(r"REASON:\s*(.+)", out)
@@ -507,8 +512,7 @@ def _process_reply_drafts():
         return
     for r in pending:
         try:
-            out = subprocess.run(["hermes", "-z", _reply_prompt(r.get("brand"), r.get("incoming") or "")],
-                                 capture_output=True, text=True, timeout=RUN_TIMEOUT_SECONDS)
+            out = llm.run_z(_reply_prompt(r.get("brand"), r.get("incoming") or ""), timeout=RUN_TIMEOUT_SECONDS)
             text = humanize.scrub((out.stdout or "").strip().strip('"').strip())
             db.save_reply_draft(r["id"], text or "(couldn't draft — reply manually)", "drafted")
             print(f"worker: drafted reply for conversation {r.get('conversation_id')}")
@@ -537,9 +541,12 @@ def main():
         jobs = db.get_queued_jobs()
         if not jobs:
             return
-        print(f"worker: processing {len(jobs)} queued job(s)")
-        for j in jobs:
-            process_one(j)
+        # Process ONE job per run. Thorough research can take many minutes; doing the whole queue in a
+        # single locked run could outlive the stale-lock window and let a second worker double-process
+        # the tail. One per tick keeps each run bounded and lets jobs flow through the Studio one at a
+        # time (the next is picked up on the following ~60s tick).
+        print(f"worker: {len(jobs)} queued; processing 1 this run")
+        process_one(jobs[0])
     finally:
         try:
             os.remove(LOCK)

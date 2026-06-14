@@ -6,7 +6,7 @@ import json
 import subprocess
 import datetime
 
-from . import db, postiz, humanize
+from . import db, postiz, humanize, registry
 
 _KNOWLEDGE_DIR = os.environ.get("KNOWLEDGE_DIR", "/opt/studio/knowledge")
 
@@ -74,6 +74,54 @@ def log_job(args, **kwargs):
     return _ok(
         job_id=job["id"], short_id=job["id"][:8], state=job["state"], brand=job["brand"], topic=job["topic"],
         message=f"Logged job {job['id'][:8]} ('{topic}') in state 'requested'.{tail}",
+    )
+
+
+def queue_content(args, **kwargs):
+    """Hand a content request to the Studio: create a QUEUED job the worker will research, draft,
+    polish, safety-check and validate, then notify when review-ready. The work flows through the
+    Studio — the agent never drafts in the chat. One call per distinct piece."""
+    topic = (args.get("topic") or "").strip()
+    if not topic:
+        return _err("topic is required")
+    brand = (args.get("brand") or "unassigned").strip() or "unassigned"
+    media = (args.get("media") or "none").strip().lower()
+    if media not in ("none", "image", "video", "carousel"):
+        media = "none"
+    raw = args.get("platforms") or []
+    if isinstance(raw, str):
+        raw = [p for p in re.split(r"[,\s]+", raw) if p]
+    known = set(registry.PLATFORM_RULES.keys())
+    platforms = [p.lower() for p in raw if isinstance(p, str) and p.lower() in known]
+    try:
+        slides = int(args.get("slides") or 4)
+    except (TypeError, ValueError):
+        slides = 4
+    created_by = str(kwargs.get("user_id") or "") or None
+
+    if brand == "unassigned":
+        choices = []
+        for b in db.known_brands(4) + ["breastfeeding-support"]:
+            if b not in choices:
+                choices.append(b)
+        return _ok(needs_brand=True, topic=topic, message=(
+            "Brand not set. Call the `clarify` tool NOW — question \"Which brand is this for?\", "
+            f"choices {choices[:4]} — then call queue_content again WITH that brand. Never queue 'unassigned'."))
+
+    try:
+        job = db.create_and_queue(topic=topic, brand=brand, source="telegram",
+                                  created_by=created_by, platforms=platforms, media=media, slides=slides)
+    except Exception as e:  # noqa: BLE001 — handler contract: never raise
+        return _err(str(e))
+
+    plat_txt = ", ".join(platforms) if platforms else "all connected platforms"
+    media_txt = "" if media == "none" else f" (+{media})"
+    return _ok(
+        job_id=job["id"], short_id=job["id"][:8], brand=brand, platforms=platforms or "all",
+        queued_action=job.get("queued_action"),
+        message=(f"Queued to the Studio: '{topic}' for {plat_txt}{media_txt}. The worker will research, draft, "
+                 "polish and validate it, then it lands in the approval queue. Tell the operator in ONE short "
+                 "line what you queued — do NOT draft or describe the post in the chat."),
     )
 
 

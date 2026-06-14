@@ -25,6 +25,11 @@ services:
       - HERMES_GID=${HERMES_GID:-1000}
       - STUDIO_DRY_RUN=true              # §4 dry-run: true = no real post (logs only); false = publish via Postiz
       - STUDIO_DB_PATH=/opt/studio/studio.db
+      # Model seam: the Studio's worker (research, drafting, polish, safety, tagging, scout) runs its
+      # text generation on THIS model; leave empty to inherit Hermes' default (= the conversational
+      # Telegram model). Set it to give the Studio its own, e.g. pricier, model — chat stays cheap.
+      # Image/video models are configured separately (config.yaml image_gen.provider / video.provider).
+      - STUDIO_TEXT_MODEL=${STUDIO_TEXT_MODEL:-}
       - POSTIZ_API_URL=${POSTIZ_API_URL:-http://localhost:4007/api/public/v1}
       - POSTIZ_API_KEY=${POSTIZ_API_KEY}   # studio is a Postiz API client; Postiz holds the platform tokens (§2c)
       - STUDIO_COCKPIT_URL=${STUDIO_COCKPIT_URL:-http://172.18.18.101:4008}  # for Telegram "Preview in cockpit" tap-throughs

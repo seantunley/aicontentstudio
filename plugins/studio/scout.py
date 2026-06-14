@@ -13,6 +13,7 @@ import subprocess
 import urllib.request
 
 import db  # same directory
+import llm  # same directory — Studio model seam (STUDIO_TEXT_MODEL)
 
 LOCK = "/tmp/studio_scout.lock"
 LOCK_STALE_SECONDS = 1800
@@ -94,8 +95,7 @@ def run_once(force=False):
     before = len(db.list_suggestions("new"))
     for niche in niches:
         try:
-            subprocess.run(["hermes", "-z", _scout_prompt(niche)],
-                           capture_output=True, text=True, timeout=RUN_TIMEOUT_SECONDS)
+            llm.run_z(_scout_prompt(niche), timeout=RUN_TIMEOUT_SECONDS)
         except subprocess.TimeoutExpired:
             print(f"scout: niche {niche['id']} timed out")
         except Exception as e:  # noqa: BLE001
