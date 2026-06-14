@@ -100,6 +100,14 @@ def _campaign_block(job):
 
 def _agent_prompt(job, with_image, with_video=False, with_carousel=False):
     targets = (job.get("target_platforms") or "").strip()
+    # Local-first research: the operator's market is South Africa; a brand pack may override the region.
+    region = "South Africa"
+    try:
+        _b = db.get_brand(job.get("brand"))
+        if _b and (_b.get("region") or "").strip():
+            region = _b["region"].strip()
+    except Exception:  # noqa: BLE001
+        pass
     if targets:
         step2 = (f"Step 2 — draft for ONLY these platforms: {targets}. For EACH, write a draft TAILORED "
                  "to it (length/tone/hashtags, within its limit), grounded only in the brief, and call "
@@ -117,7 +125,14 @@ def _agent_prompt(job, with_image, with_video=False, with_carousel=False):
         "past posts. Then search the web and read real sources, and be THOROUGH: consult several "
         "current, credible sources, dig for concrete specifics (numbers, names, recent developments), "
         "and don't settle for a shallow first pass. This is professional work, so take the time to get "
-        "it right, quality over speed. Call save_brief with cited facts (each a real source_url + "
+        "it right, quality over speed. "
+        f"CRITICAL — research from a {region} perspective for a {region} audience: prioritise {region} "
+        f"sources, outlets, experts, companies, organisations, regulators/guidelines and statistics. Put "
+        f"'{region}' and local terms into your search queries and prefer local sources (for South Africa, "
+        ".za sites and SA publications). Use international or US sources ONLY when genuinely more relevant "
+        f"and authoritative, and frame them for the {region} reader. Do NOT default to US articles, quotes, "
+        "companies or examples — defaulting to a US lens is a defect. "
+        "Call save_brief with cited facts (each a real source_url + "
         "snippet) and 2-3 distinct angles. Use METRIC units only (Celsius, km, kg, litres), convert any imperial. "
         "Write every draft like a sharp human, not an AI: no em dashes, no significance inflation "
         "('a testament to', 'plays a vital role'), no rule-of-three lists, no 'serves as' (just say "
