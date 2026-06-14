@@ -236,6 +236,9 @@ def init_db():
             # multi-image carousel (§7c): JSON array of [{id, path}] in slide order. image_id/image_path
             # stay as the PRIMARY (= images_json[0]) for single-image consumers.
             conn.execute("ALTER TABLE drafts ADD COLUMN images_json TEXT")
+        if "safety_json" not in dcols:
+            # brand-safety verdict (§6a): JSON {verdict: green|amber|red, reason, at}. Surfaced at the gate.
+            conn.execute("ALTER TABLE drafts ADD COLUMN safety_json TEXT")
         if "video_path" not in dcols:
             conn.execute("ALTER TABLE drafts ADD COLUMN video_path TEXT")  # publisher media URL (video)
         if "video_id" not in dcols:
@@ -709,7 +712,7 @@ def create_draft(job_id, platform, body, angle=None, variant=1):
 def list_drafts(job_id):
     with _db() as conn:
         return [dict(r) for r in conn.execute(
-            "SELECT id, platform, angle, body, char_count, variant, image_path, image_id, images_json, video_path, video_id, polish_json, created_at FROM drafts"
+            "SELECT id, platform, angle, body, char_count, variant, image_path, image_id, images_json, video_path, video_id, polish_json, safety_json, created_at FROM drafts"
             " WHERE job_id=? ORDER BY id", (job_id,)
         ).fetchall()]
 
@@ -722,6 +725,26 @@ def preview_drafts_unpolished(limit=12):
             "SELECT d.id, d.platform, d.body, d.job_id, j.brand FROM drafts d JOIN jobs j ON j.id = d.job_id"
             " WHERE j.state='preview' AND d.polish_json IS NULL ORDER BY d.id LIMIT ?", (limit,)
         ).fetchall()]
+
+
+def preview_drafts_unchecked(limit=12):
+    """Preview drafts not yet run through the §6a brand-safety check (any path, incl. Telegram)."""
+    with _db() as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT d.id, d.platform, d.body, d.job_id, j.brand FROM drafts d JOIN jobs j ON j.id = d.job_id"
+            " WHERE j.state='preview' AND d.safety_json IS NULL ORDER BY d.id LIMIT ?", (limit,)
+        ).fetchall()]
+
+
+def set_draft_safety(draft_id, verdict, reason):
+    """Store a draft's brand-safety verdict (§6a): green | amber | red + a one-line reason."""
+    verdict = (verdict or "amber").strip().lower()
+    if verdict not in ("green", "amber", "red"):
+        verdict = "amber"
+    with _db() as conn:
+        conn.execute("UPDATE drafts SET safety_json=? WHERE id=?",
+                     (json.dumps({"verdict": verdict, "reason": (reason or "").strip()[:400], "at": _utcnow()}), draft_id))
+    return verdict
 
 
 def mark_draft_polished(draft_id):

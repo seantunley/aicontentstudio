@@ -9,6 +9,7 @@ Run in-container, one pass, via host cron:
   cd /home/hermes/aicontentstudio && docker compose exec -T hermes python /opt/data/plugins/studio/worker.py --once
 """
 import os
+import re
 import sys
 import time
 import subprocess
@@ -175,10 +176,16 @@ def process_one(job):
         _polish_drafts(jid, job.get("brand"))  # Layer 2: psychology + humanizer passes before the operator sees it
     except Exception as e:  # noqa: BLE001
         print(f"worker: polish error (non-fatal — sweep will retry): {e}")
+    worst = "green"
+    try:
+        worst = _safety_check_drafts(jid, job.get("brand"))  # §6a stage-3 brand-safety review
+    except Exception as e:  # noqa: BLE001
+        print(f"worker: safety check error (non-fatal — sweep will retry): {e}")
     db.clear_queued(jid)  # drop the 'processing' marker so the cockpit shows it as a normal preview job
     try:
+        flag = {"amber": " ⚠️ flagged for safety review", "red": " 🛑 SAFETY HOLD — read before approving"}.get(worst, "")
         db.record_event(jid, "worker: done — draft ready for review", actor="system")
-        _telegram_notify(f'\U0001f4dd Draft ready to review: "{job["topic"]}" — it\'s in your approval queue.',
+        _telegram_notify(f'\U0001f4dd Draft ready to review: "{job["topic"]}" — it\'s in your approval queue.{flag}',
                          button=_cockpit_button(jid))
     except Exception as e:  # noqa: BLE001
         print(f"worker: post-success notify error (non-fatal): {e}")
@@ -398,6 +405,70 @@ def _reply_prompt(brand, incoming):
     )
 
 
+def _safety_check(body, brand):
+    """§6a post-generation brand-safety classifier. Returns (verdict, reason); resolves DOWN on doubt."""
+    try:
+        bsafety = humanize._brand_safety(brand)
+    except Exception:  # noqa: BLE001
+        bsafety = "Ethical only: never shame, scare, manipulate, or use false urgency."
+    prompt = (
+        "You are a brand-safety reviewer. A social post is about to reach a human for final approval. "
+        "Classify it as EXACTLY one of green, amber, or red.\n"
+        "RED (would block): graphic violence/gore; hate/discrimination; sexual/explicit; anything sexualizing "
+        "minors; instructions for illegal/dangerous acts; impersonation; harmful misinformation; unproven or "
+        "dangerous health remedies; or — for a health/breastfeeding brand — anything that reads as personalised "
+        "MEDICAL ADVICE rather than general info.\n"
+        "AMBER (needs the operator's explicit yes): breaking tragedy/disaster newsjacking; divisive politics or "
+        "religion; health/legal/financial guidance; naming real people/competitors; unapproved-sounding "
+        "endorsements or undisclosed ads; guilt-inducing or shaming tone (e.g. guilt toward formula/combo "
+        "feeding); ragebait/clickbait; risky platform imagery.\n"
+        "GREEN: clearly safe, on-brand, low-stakes.\n"
+        f"Brand rules: {bsafety}\n"
+        "When UNCERTAIN resolve DOWN (amber over green, red over amber), never up. "
+        "Reply in EXACTLY this format and nothing else:\nVERDICT: <green|amber|red>\nREASON: <one short sentence>\n\n"
+        f"POST:\n{body}"
+    )
+    try:
+        r = subprocess.run(["hermes", "-z", prompt], capture_output=True, text=True, timeout=120)
+        out = r.stdout or ""
+        v = re.search(r"VERDICT:\s*(green|amber|red)", out, re.I)
+        rs = re.search(r"REASON:\s*(.+)", out)
+        return (v.group(1).lower() if v else "amber"), (rs.group(1).strip() if rs else "")
+    except Exception:  # noqa: BLE001
+        return "amber", "automatic safety check unavailable — review manually"
+
+
+def _safety_check_one(d, brand, job_id=None):
+    if d.get("safety_json"):
+        return None
+    verdict, reason = _safety_check(d.get("body") or "", brand)
+    db.set_draft_safety(d["id"], verdict, reason)
+    jid = job_id or d.get("job_id")
+    if verdict != "green" and jid:
+        db.record_event(jid, f"brand-safety: {verdict.upper()} — {reason}", actor="system")  # audit trail (§6a)
+    print(f"worker: safety {verdict} for draft {d['id']}")
+    return verdict
+
+
+def _safety_check_drafts(job_id, brand=None):
+    worst = "green"
+    order = {"green": 0, "amber": 1, "red": 2}
+    for d in db.list_drafts(job_id):
+        v = _safety_check_one(d, brand, job_id=job_id)
+        if v and order.get(v, 0) > order.get(worst, 0):
+            worst = v
+    return worst
+
+
+def _safety_pending(limit=12):
+    """Sweep: safety-check any preview draft from ANY path (incl. Telegram) not yet checked."""
+    pending = db.preview_drafts_unchecked(limit)
+    if pending:
+        print(f"worker: safety-checking {len(pending)} draft(s)")
+    for d in pending:
+        _safety_check_one(d, d.get("brand"))
+
+
 def _process_reply_drafts():
     """§3d: draft on-brand replies to engagement (Chatwoot) conversations. The operator reviews +
     sends every draft — this only prepares the text (the human gate, §4a)."""
@@ -431,6 +502,7 @@ def main():
         _process_reply_drafts()
         _autotag_media()
         _polish_pending()  # polish drafts from ANY path (incl. Telegram) that aren't polished yet
+        _safety_pending()  # §6a brand-safety review on any preview draft not yet checked
         db.purge_trash(30)  # hard-delete trashed jobs + media older than 30 days
 
         jobs = db.get_queued_jobs()

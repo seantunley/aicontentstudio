@@ -593,6 +593,19 @@ export function DraftMedia({ draft }) {
   );
 }
 
+// §6a brand-safety verdict on a draft. Green is clean (no badge); amber = review; red = safety hold.
+export function SafetyBadge({ safety }) {
+  let s = {};
+  try { s = JSON.parse(safety || 'null') || {}; } catch { s = {}; }
+  if (!s.verdict || s.verdict === 'green') return null;
+  const red = s.verdict === 'red';
+  return (
+    <div className={`safety-flag ${red ? 'red' : 'amber'}`}>
+      <b>{red ? '🛑 Safety hold' : '⚠️ Review'}</b>{s.reason ? ` — ${s.reason}` : ''}
+    </div>
+  );
+}
+
 export function QueueItem({ job }) {
   const [open, setOpen] = useState(false);
   const d = job.draft;
@@ -618,6 +631,7 @@ export function QueueItem({ job }) {
         <div className="qcard-body">
           {d ? (
             <>
+              <SafetyBadge safety={d.safety_json} />
               <EditableDraft draftId={d.id} body={d.body} limit={lim} />
               <DraftMedia draft={d} />
               <div className="card-foot" style={lim && d.char_count > lim ? { color: 'var(--red)' } : null}>
