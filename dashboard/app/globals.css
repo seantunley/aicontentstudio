@@ -604,6 +604,18 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .valid-flag.warning { color: var(--accent-2); background: var(--accent-bg); border-color: transparent; }
 .valid-flag.info { color: var(--muted); background: var(--bg-2); border-color: var(--line); }
 
+/* §3b social pulse — "current discussion" on the job page */
+.pulse-cluster { border-left: 2px solid var(--line-2); padding: 2px 0 2px 12px; margin: 12px 0; }
+.pulse-theme { font-family: var(--serif); font-size: 15px; font-weight: 550; color: var(--fg); margin-bottom: 6px; }
+.pulse-srcs { font-family: var(--mono); font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.08em; margin-left: 8px; }
+.pulse-item { margin: 6px 0; }
+.pulse-line { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.pulse-src { font-family: var(--mono); font-size: 10px; color: var(--accent-2); background: var(--accent-bg); border-radius: 999px; padding: 1px 8px; }
+.pulse-title { font-size: 13.5px; color: var(--fg-2); text-decoration: none; }
+a.pulse-title:hover { color: var(--accent); text-decoration: underline; }
+.pulse-date { font-family: var(--mono); font-size: 10.5px; color: var(--faint); margin-left: auto; }
+.pulse-snip { font-size: 12.5px; color: var(--muted); font-style: italic; margin-top: 3px; }
+
 /* ── calendar (Postiz mirror) ──────────────────────────────────────────── */
 .cal-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .cal-nav { display: flex; align-items: center; gap: 8px; }

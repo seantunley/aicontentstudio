@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getJobById, getBrief, getDraftsFor, getEvents, costForJob, STATES, DRAFT_LIMITS } from '@/lib/db';
+import { getJobById, getBrief, getDraftsFor, getEvents, getSocialPulse, costForJob, STATES, DRAFT_LIMITS } from '@/lib/db';
 import { zar } from '@/lib/money';
 import { za } from '@/lib/time';
 import { ApprovalActions, PublishButton, ScheduleButton, EditableDraft, RetryButton, UploadMediaButton, PostPills, PlatformChip, AnglePicker, DraftMedia, SafetyBadge, ValidationBadge, PostPreview } from '@/app/components/actions';
@@ -29,6 +29,8 @@ export default async function JobPage({ params }) {
   const brief = getBrief(job.id);
   const drafts = getDraftsFor(job.id);
   const events = getEvents(job.id);
+  let pulse = null;
+  try { pulse = getSocialPulse(job.id); } catch {}
   let cost = { totalUsd: 0, entries: 0 };
   try { cost = costForJob(job.id); } catch {}
   const latestPlatform = drafts.length ? drafts[drafts.length - 1].platform : null;
@@ -109,8 +111,33 @@ export default async function JobPage({ params }) {
         )}
       </section>
 
+      {pulse && (pulse.clusters || []).length > 0 && (
+        <section className="section reveal r4">
+          <div className="section-head"><span className="idx">03</span><h2>Current discussion</h2><span className="count">last ~30 days</span><span className="rule" /></div>
+          <div className="panel">
+            <div className="card-meta">What people are actually saying now, pulled from social and correlated into the brief{pulse.range && pulse.range[0] ? ` · ${pulse.range[0]} → ${pulse.range[1]}` : ''}.</div>
+            {(pulse.clusters || []).map((cl, i) => (
+              <div className="pulse-cluster" key={i}>
+                <div className="pulse-theme">{cl.theme}{Array.isArray(cl.sources) && cl.sources.length ? <span className="pulse-srcs">{cl.sources.join(' · ')}</span> : null}</div>
+                {(cl.items || []).map((it, j) => (
+                  <div className="pulse-item" key={j}>
+                    <div className="pulse-line">
+                      <span className="pulse-src">{it.source || '—'}</span>
+                      {it.url ? <a className="pulse-title" href={it.url} target="_blank" rel="noreferrer">{it.title}</a> : <span className="pulse-title">{it.title}</span>}
+                      {it.date ? <span className="pulse-date">{String(it.date).slice(0, 10)}</span> : null}
+                    </div>
+                    {it.snippet ? <div className="pulse-snip">&ldquo;{it.snippet}&rdquo;</div> : null}
+                  </div>
+                ))}
+              </div>
+            ))}
+            {Array.isArray(pulse.freshness) && pulse.freshness.length ? <div className="card-foot" style={{ marginTop: 8 }}>{pulse.freshness.join(' · ')}</div> : null}
+          </div>
+        </section>
+      )}
+
       <section className="section reveal r4">
-        <div className="section-head"><span className="idx">03</span><h2>Timeline</h2><span className="rule" /></div>
+        <div className="section-head"><span className="idx">04</span><h2>Timeline</h2><span className="rule" /></div>
         <div className="panel">
           {events.map((e, i) => (
             <div className="tl-row" key={i}>

@@ -188,6 +188,13 @@ CREATE TABLE IF NOT EXISTS reply_drafts (
     created_at      TEXT NOT NULL,
     updated_at      TEXT
 );
+CREATE TABLE IF NOT EXISTS social_pulses (
+    job_id     TEXT PRIMARY KEY,                  -- one current-discussion pulse per job (latest)
+    topic      TEXT,
+    sources    TEXT,                               -- which sources were queried (e.g. 'reddit')
+    data_json  TEXT NOT NULL,                      -- {clusters:[{theme,score,sources,items:[…]}], freshness, range}
+    created_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state);
 CREATE INDEX IF NOT EXISTS idx_events_job ON job_events(job_id);
 CREATE INDEX IF NOT EXISTS idx_suggestions_status ON suggestions(status);
@@ -512,6 +519,29 @@ def get_job(job_id):
     with _db() as conn:
         row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
     return dict(row) if row else None
+
+
+def save_social_pulse(job_id, topic, sources, data):
+    """Store the current-discussion social pulse for a job (one per job; latest wins)."""
+    with _db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO social_pulses (job_id, topic, sources, data_json, created_at)"
+            " VALUES (?,?,?,?,?)",
+            (job_id, topic, sources, json.dumps(data or {}), _utcnow()),
+        )
+
+
+def get_social_pulse(job_id):
+    with _db() as conn:
+        row = conn.execute("SELECT * FROM social_pulses WHERE job_id=?", (job_id,)).fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    try:
+        d["data"] = json.loads(d.get("data_json") or "{}")
+    except Exception:  # noqa: BLE001
+        d["data"] = {}
+    return d
 
 
 def find_job(id_or_prefix):

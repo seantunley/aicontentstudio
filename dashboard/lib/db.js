@@ -221,6 +221,15 @@ export function getBrief(jobId) {
   try { return { ...JSON.parse(row.brief_json), recency: row.recency }; } catch { return null; }
 }
 
+// §3b social pulse: the "current discussion" the worker pulled (Reddit/social, last ~30 days).
+export function getSocialPulse(jobId) {
+  let row;
+  try { row = db().prepare('SELECT * FROM social_pulses WHERE job_id=?').get(jobId); } catch { return null; }
+  if (!row) return null;
+  try { return { created_at: row.created_at, topic: row.topic, sources: row.sources, ...JSON.parse(row.data_json || '{}') }; }
+  catch { return null; }
+}
+
 export function getDraftsFor(jobId) {
   return db().prepare('SELECT * FROM drafts WHERE job_id=? ORDER BY id').all(jobId);
 }
