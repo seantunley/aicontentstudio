@@ -308,10 +308,11 @@ export function getEvents(jobId) {
 
 // --- The Vault: catalogue of every generated/uploaded asset ---
 export function addMediaAsset({ kind, url, mediaId, source, jobId, draftId, platform, width, height, topic }) {
-  if (!url) return;
+  if (!url) return null;
   db().prepare(
     'INSERT OR IGNORE INTO media_assets (kind,url,media_id,source,job_id,draft_id,platform,width,height,topic,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
   ).run(kind, url, mediaId || null, source || null, jobId || null, draftId || null, platform || null, width || null, height || null, topic || null, new Date().toISOString());
+  return db().prepare('SELECT * FROM media_assets WHERE url=?').get(url);
 }
 export function listMedia(kind, limit = 600) {
   const d = db();

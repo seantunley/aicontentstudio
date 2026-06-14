@@ -380,6 +380,7 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 /* ── the vault ─────────────────────────────────────────────────────────── */
 .vault-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 .vault-bar .input { flex: 1 1 240px; max-width: 360px; }
+.vault-upload { margin-left: auto; white-space: nowrap; }
 .vault-tabs { display: flex; gap: 4px; border: 1px solid var(--line-2); border-radius: var(--r-lg); padding: 3px; }
 .vault-tab { padding: 6px 13px; border-radius: var(--r); background: transparent; color: var(--muted);
   font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; cursor: pointer; border: none; }

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useUI } from './ui';
 
 export function VaultGrid({ items }) {
@@ -7,6 +7,26 @@ export function VaultGrid({ items }) {
   const [q, setQ] = useState('');
   const [kind, setKind] = useState('all');
   const [list, setList] = useState(items);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
+
+  async function onUpload(e) {
+    const file = e.target.files?.[0];
+    if (e.target) e.target.value = ''; // allow re-picking the same file
+    if (!file) return;
+    setUploading(true);
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const r = await fetch('/api/vault/upload', { method: 'POST', body: fd });
+      const d = await r.json();
+      if (r.ok && d.item) {
+        setList((l) => [d.item, ...l.filter((a) => a.id !== d.item.id)]);
+        ui.toast(d.item.kind === 'image' ? 'Uploaded. Auto-tagging in the background…' : 'Uploaded to the Vault.');
+      } else ui.toast(d.error || 'Upload failed', 'err');
+    } catch { ui.toast('Upload failed', 'err'); }
+    setUploading(false);
+  }
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -41,6 +61,10 @@ export function VaultGrid({ items }) {
           ))}
         </div>
         <span className="card-foot">{filtered.length} asset{filtered.length === 1 ? '' : 's'}</span>
+        <button className="btn btn--primary btn--sm vault-upload" disabled={uploading} onClick={() => fileRef.current?.click()}>
+          {uploading ? 'Uploading…' : '↑ Upload media'}
+        </button>
+        <input ref={fileRef} type="file" accept="image/*,video/*" hidden onChange={onUpload} />
       </div>
       {filtered.length === 0 ? (
         <div className="panel"><div className="empty">{q ? 'No assets match your search.' : 'Nothing in the Vault yet. Generate or upload media and it lands here.'}</div></div>
