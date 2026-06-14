@@ -193,8 +193,10 @@ def _agent_prompt(job, with_image, with_video=False, with_carousel=False, social
         f"products, services, organisations or actions — lean toward {region} so the advice is locally "
         f"accurate and usable, with local framing. Global knowledge, {region} application. "
         + social_instr +
-        "Call save_brief with cited facts (each a real source_url + "
-        "snippet) and 2-3 distinct angles. Use METRIC units only (Celsius, km, kg, litres), convert any imperial. "
+        "Call save_brief — it MUST contain at least 3 cited facts, each a real, specific claim with a real "
+        "source_url and a verbatim snippet (NEVER an empty brief and never a bare 'Sources: WHO, CDC' list; "
+        "the brief is the evidence the post stands on), plus 2-3 distinct angles. Use METRIC units only "
+        "(Celsius, km, kg, litres), convert any imperial. "
         "Write every draft like a sharp human, not an AI: no em dashes, no significance inflation "
         "('a testament to', 'plays a vital role'), no rule-of-three lists, no 'serves as' (just say "
         "'is'), no trailing -ing filler, no AI words (delve, leverage, underscore, tapestry, landscape). "
@@ -204,11 +206,23 @@ def _agent_prompt(job, with_image, with_video=False, with_carousel=False, social
         "where they would read as flippant (sensitive health, loss or distress). Place them to "
         "punctuate or open a line, never scatter or spam them. Hashtags where they fit the platform. "
         "Make each post persuasive: open with a hook, lead with the reader's benefit (not features), "
-        "end with one clear call to action. Ethical only, never shame, scare, or use false urgency "
-        "(especially on health or sensitive topics). "
+        "end with one clear call to action. Be SHARP and specific: a strong concrete opening line, every "
+        "sentence earns its place, no filler, no vague claims, nothing obvious-to-everyone — say something "
+        "only someone who actually did the research would say, grounded in the cited facts. Ethical only, "
+        "never shame, scare, or use false urgency (especially on health or sensitive topics). "
         + _brand_block(job)
         + _campaign_block(job)
         + step2
+    )
+    img_style = (
+        "Write each image_gen prompt as a RICH, specific art-direction brief, never a vague phrase: name "
+        "the concrete subject tied to THIS post/slide and the topic, so the image is unmistakably relevant "
+        "(a breastfeeding post shows breastfeeding-relevant scenes, never a random or unrelated object), "
+        "then specify style, lighting, composition, mood and colour. Default to a polished, PROFESSIONAL, "
+        "photorealistic editorial look — natural light, real authentic people/real scenes, shallow depth of "
+        "field, tasteful and warm — unless the brand's visual identity says otherwise. Explicitly AVOID "
+        "childish, cartoonish, clip-art, 3D-render, amateur, cluttered or generic-stock looks, and do NOT "
+        "bake words or text into the image (the caption carries the copy). Safe and on-brand. "
     )
     if with_carousel:
         try:
@@ -217,12 +231,14 @@ def _agent_prompt(job, with_image, with_video=False, with_carousel=False, social
             n_slides = 4
         n_slides = max(2, min(10, n_slides))
         p += (f"Step 3 — carousel: this is a multi-image swipe post. Call image_gen {n_slides} times for "
-              f"{n_slides} DISTINCT, on-brand, safe slides that form a coherent set ({n_slides} tips/steps or a "
-              f"mini story), then call set_carousel ONCE with the {n_slides} image paths IN ORDER and a `tags` "
-              "list of visual keywords (subjects, setting, mood) for the media Vault search. ")
+              f"{n_slides} DISTINCT slides that form a coherent set ({n_slides} tips/steps or a mini story). "
+              + img_style +
+              "Keep ONE consistent style and palette across every slide so they read as a single set. "
+              f"Then call set_carousel ONCE with the {n_slides} image paths IN ORDER and a `tags` list of "
+              "visual keywords (subjects, setting, mood) for the media Vault search. ")
     elif with_image:
-        p += ("Step 3 — image: call image_gen ONCE for one relevant, on-brand, safe master image, then "
-              "call set_draft_image once with its path AND a `tags` list of visual keywords describing "
+        p += ("Step 3 — image: call image_gen ONCE for one master image. " + img_style +
+              "Then call set_draft_image once with its path AND a `tags` list of visual keywords describing "
               "what's in the image (subjects, setting, mood) for the media Vault search. ")
     if with_video:
         p += ("Step 4 — video: call make_video ONCE with the job id (it renders a branded short video "
