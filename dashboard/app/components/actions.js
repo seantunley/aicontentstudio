@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { createPortal } from 'react-dom';
 import { useUI } from './ui';
-import { SUPPORTED, PLATFORM_META, PLATFORM_LIMITS, PLATFORM_ICON } from '@/lib/platforms';
+import { SUPPORTED, PLATFORM_META, PLATFORM_LIMITS, PLATFORM_ICON, capsFor } from '@/lib/platforms';
 import { za } from '@/lib/time';
 
 // Brand logo (24x24 svg path) tinted to the platform colour. Falls back to nothing if unknown.
@@ -81,6 +81,17 @@ export function NewJobButton({ block, defaultBrand }) {
   const [selected, setSelected] = useState({});
   const [busy, setBusy] = useState(false);
 
+  const platforms = Object.keys(selected).filter((p) => selected[p]);
+  const caps = capsFor(platforms);
+  // When the platform mix changes, drop any format the new mix can't all carry, and keep the slide
+  // count within the tightest album ceiling. (A job applies one format to every platform it targets.)
+  useEffect(() => {
+    if (!caps.carousel && withCarousel) setWithCarousel(false);
+    if (!caps.video && withVideo) setWithVideo(false);
+    if (Number(slides) > caps.mediaMax) setSlides(caps.mediaMax);
+  }, [caps.carousel, caps.video, caps.mediaMax]); // eslint-disable-line react-hooks/exhaustive-deps
+  const platLabels = (ps) => ps.map((p) => PLATFORM_META[p]?.label || p).join(', ');
+
   async function load() {
     setOpen(true);
     if (channels) return;
@@ -99,7 +110,6 @@ export function NewJobButton({ block, defaultBrand }) {
   async function submit(e) {
     e?.preventDefault();
     if (!topic.trim()) return;
-    const platforms = Object.keys(selected).filter((p) => selected[p]);
     if (!platforms.length) { ui.toast('Pick at least one platform', 'err'); return; }
     setBusy(true);
     const { ok, data } = await post('/api/jobs/new', { topic, brand, withImage: withImage || withVideo || withCarousel, withVideo, withCarousel, slides: withCarousel ? slides : undefined, platforms });
@@ -126,9 +136,17 @@ export function NewJobButton({ block, defaultBrand }) {
             </div>
             <div className="field-row">
               <label className="check"><input type="checkbox" checked={withImage || withVideo} disabled={withVideo || withCarousel} onChange={(e) => { setWithImage(e.target.checked); if (e.target.checked) setWithCarousel(false); }} /> + image</label>
-              <label className="check"><input type="checkbox" checked={withVideo} disabled={withCarousel} onChange={(e) => { setWithVideo(e.target.checked); if (e.target.checked) setWithCarousel(false); }} /> + video <span className="empty" style={{ marginLeft: 4 }}>(branded clip)</span></label>
-              <label className="check"><input type="checkbox" checked={withCarousel} onChange={(e) => { setWithCarousel(e.target.checked); if (e.target.checked) { setWithImage(false); setWithVideo(false); } }} /> + carousel <span className="empty" style={{ marginLeft: 4 }}>(multi-image swipe)</span>
-                {withCarousel ? <span style={{ marginLeft: 8 }}><input type="number" className="input" min="2" max="10" value={slides} onChange={(e) => setSlides(e.target.value)} style={{ width: 56, padding: '4px 8px', display: 'inline-block' }} /> slides</span> : null}</label>
+              {caps.video ? (
+                <label className="check"><input type="checkbox" checked={withVideo} disabled={withCarousel} onChange={(e) => { setWithVideo(e.target.checked); if (e.target.checked) setWithCarousel(false); }} /> + video <span className="empty" style={{ marginLeft: 4 }}>(branded clip)</span></label>
+              ) : (
+                <label className="check check--off" title={`Video not supported by ${platLabels(caps.noVideo)}`}><input type="checkbox" disabled checked={false} readOnly /> + video <span className="empty" style={{ marginLeft: 4 }}>(not on {platLabels(caps.noVideo)})</span></label>
+              )}
+              {caps.carousel ? (
+                <label className="check"><input type="checkbox" checked={withCarousel} onChange={(e) => { setWithCarousel(e.target.checked); if (e.target.checked) { setWithImage(false); setWithVideo(false); } }} /> + carousel <span className="empty" style={{ marginLeft: 4 }}>(multi-image swipe)</span>
+                  {withCarousel ? <span style={{ marginLeft: 8 }}><input type="number" className="input" min="2" max={caps.mediaMax} value={slides} onChange={(e) => setSlides(Math.min(caps.mediaMax, Math.max(2, Number(e.target.value) || 2)))} style={{ width: 56, padding: '4px 8px', display: 'inline-block' }} /> slides <span className="empty">(max {caps.mediaMax})</span></span> : null}</label>
+              ) : (
+                <label className="check check--off" title={`Carousels not supported by ${platLabels(caps.noCarousel)}`}><input type="checkbox" disabled checked={false} readOnly /> + carousel <span className="empty" style={{ marginLeft: 4 }}>(not on {platLabels(caps.noCarousel)})</span></label>
+              )}
             </div>
             <div className="modal-acts">
               <button type="button" className="btn btn--ghost" onClick={() => setOpen(false)}>Cancel</button>
