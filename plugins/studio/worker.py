@@ -116,7 +116,11 @@ def _agent_prompt(job, with_image, with_video=False, with_carousel=False):
         "Write every draft like a sharp human, not an AI: no em dashes, no significance inflation "
         "('a testament to', 'plays a vital role'), no rule-of-three lists, no 'serves as' (just say "
         "'is'), no trailing -ing filler, no AI words (delve, leverage, underscore, tapestry, landscape). "
-        "Concrete and grounded; emojis and hashtags are fine where they fit the platform. "
+        "Concrete and grounded. Use emoji the way real accounts do on each platform: a few "
+        "well-chosen, relevant emoji (about 1-4) on visual/casual platforms (Instagram, TikTok, "
+        "Facebook, Telegram), a lighter touch on X, sparing and professional on LinkedIn, and none "
+        "where they would read as flippant (sensitive health, loss or distress). Place them to "
+        "punctuate or open a line, never scatter or spam them. Hashtags where they fit the platform. "
         "Make each post persuasive: open with a hook, lead with the reader's benefit (not features), "
         "end with one clear call to action. Ethical only, never shame, scare, or use false urgency "
         "(especially on health or sensitive topics). "
@@ -349,7 +353,8 @@ def _redraft_body(platform, limit, angle, facts_text, brand_block, current):
         "the reader's benefit, end with one clear call to action. Ethical only — never shame, scare, or use false "
         f"urgency. Use METRIC units. The post MUST be {limit or 2000} characters or fewer. Output ONLY the "
         f"rewritten post — no preamble, no surrounding quotes.\n\nCURRENT POST (rewrite it to the new angle, keep "
-        f"the platform's voice + fitting hashtags/emoji):\n{current}"
+        f"the platform's voice, fitting hashtags, and a few well-placed emoji as that platform's "
+        f"real accounts use them, none on sensitive health topics):\n{current}"
     )
     try:
         r = subprocess.run(["hermes", "-z", prompt], capture_output=True, text=True, timeout=RUN_TIMEOUT_SECONDS)
