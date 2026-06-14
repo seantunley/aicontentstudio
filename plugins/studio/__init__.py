@@ -24,4 +24,5 @@ def register(ctx):
     ctx.register_tool(name="suggest_topic", toolset="studio", schema=schemas.SUGGEST_TOPIC, handler=tools.suggest_topic)
     ctx.register_tool(name="operator_decision", toolset="studio", schema=schemas.OPERATOR_DECISION, handler=tools.operator_decision)
     ctx.register_tool(name="present_for_review", toolset="studio", schema=schemas.PRESENT_FOR_REVIEW, handler=tools.present_for_review)
+    ctx.register_tool(name="social_pulse", toolset="studio", schema=schemas.SOCIAL_PULSE, handler=tools.social_pulse)
     ctx.register_tool(name="list_channels", toolset="studio", schema=schemas.LIST_CHANNELS, handler=tools.list_channels)

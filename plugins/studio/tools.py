@@ -479,6 +479,40 @@ def present_for_review(args, **kwargs):
                         "['Approve','Reject','Defer'] to give the operator tap buttons."))
 
 
+_L30D = "/opt/data/skills/research/last30days/scripts/last30days.py"
+
+
+def social_pulse(args, **kwargs):
+    """Pull what people are ACTUALLY saying about a topic in the last ~30 days (Reddit + social),
+    clustered by theme with engagement signal, via the vetted last30days skill. Returns a current-
+    discussion brief the research agent CORRELATES with its web sources — live social signal the
+    studio's general web search misses. Research-time tool (not for casual chat)."""
+    topic = (args.get("topic") or "").strip()
+    if not topic:
+        return _err("topic is required")
+    sources = (args.get("sources") or "reddit").strip() or "reddit"
+    if not os.path.exists(_L30D):
+        return _err("last30days skill not installed")
+    try:
+        r = subprocess.run(
+            ["python3", _L30D, topic, "--search", sources, "--quick", "--emit", "context"],
+            capture_output=True, text=True, timeout=240,
+            cwd=os.path.dirname(_L30D),
+        )
+    except subprocess.TimeoutExpired:
+        return _err("social pulse timed out")
+    except Exception as e:  # noqa: BLE001 — handler contract: never raise
+        return _err(f"social pulse failed: {e}")
+    out = (r.stdout or "").strip()
+    if not out:
+        return _err(f"no social signal returned ({(r.stderr or '').strip()[:160]})")
+    return _ok(
+        topic=topic, sources=sources, brief=out[:8000],
+        message=("Current social discussion pulled. CORRELATE this with your web research — weave only "
+                 "verified, cross-checked points into the brief, cite distinct sources, never lean on one."),
+    )
+
+
 def list_channels(args, **kwargs):
     """List the social channels actually connected in Postiz (so you draft for ones that exist)."""
     try:

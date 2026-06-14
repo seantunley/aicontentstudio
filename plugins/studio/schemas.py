@@ -276,6 +276,24 @@ PRESENT_FOR_REVIEW = {
     },
 }
 
+SOCIAL_PULSE = {
+    "name": "social_pulse",
+    "description": (
+        "Pull what people are ACTUALLY saying about a topic in the last ~30 days — real Reddit/social "
+        "discussion clustered by theme with engagement signal (via the last30days research skill). Use "
+        "it during research on an assigned job to ground the post in the CURRENT conversation, then "
+        "correlate what it returns with your web sources. Returns a brief, not posts for the chat."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "topic": {"type": "string", "description": "The research topic (a few words)."},
+            "sources": {"type": "string", "description": "Comma-separated sources, default 'reddit'. Options: reddit, hackernews, polymarket (free). Keep to reddit for most consumer topics."},
+        },
+        "required": ["topic"],
+    },
+}
+
 LIST_CHANNELS = {
     "name": "list_channels",
     "description": "List the social channels actually connected in Postiz, so you draft for platforms that exist.",
