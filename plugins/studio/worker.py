@@ -216,13 +216,17 @@ def _agent_prompt(job, with_image, with_video=False, with_carousel=False, social
     )
     img_style = (
         "Write each image_gen prompt as a RICH, specific art-direction brief, never a vague phrase: name "
-        "the concrete subject tied to THIS post/slide and the topic, so the image is unmistakably relevant "
+        "the concrete subject tied to THIS post/slide and the topic so the image is unmistakably relevant "
         "(a breastfeeding post shows breastfeeding-relevant scenes, never a random or unrelated object), "
         "then specify style, lighting, composition, mood and colour. Default to a polished, PROFESSIONAL, "
         "photorealistic editorial look — natural light, real authentic people/real scenes, shallow depth of "
-        "field, tasteful and warm — unless the brand's visual identity says otherwise. Explicitly AVOID "
-        "childish, cartoonish, clip-art, 3D-render, amateur, cluttered or generic-stock looks, and do NOT "
-        "bake words or text into the image (the caption carries the copy). Safe and on-brand. "
+        "field, tasteful and warm — unless the brand's visual identity says otherwise. Show DIVERSE, "
+        "representative people: vary ethnicity, age and body type, and NEVER default everyone to one race or "
+        "stereotype a region's people. LOCALISATION IS FOR POLICY AND TEXT ONLY, NOT for who appears in the "
+        "photo — do NOT put a country or nationality on the people in an image prompt (no 'South African "
+        "mother' etc.); depict a natural, inclusive mix. AVOID childish, cartoonish, clip-art, 3D-render, "
+        "amateur, cluttered or generic-stock looks, and do NOT bake words or text into the image (the "
+        "caption carries the copy). Keep it tasteful so it passes image moderation. Safe and on-brand. "
     )
     if with_carousel:
         try:

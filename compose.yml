@@ -30,6 +30,7 @@ services:
       # Telegram model). Set it to give the Studio its own, e.g. pricier, model — chat stays cheap.
       # Image/video models are configured separately (config.yaml image_gen.provider / video.provider).
       - STUDIO_TEXT_MODEL=${STUDIO_TEXT_MODEL:-}
+      - STUDIO_TEXT_PROVIDER=${STUDIO_TEXT_PROVIDER:-}
       # Research enrichment keys (from gitignored .env). OpenRouter = reasoning/planner for the
       # last30days social-research skill; Tavily = the worker's web-search provider (upgrades the
       # keyless DuckDuckGo default). Empty if unset → falls back to prior behaviour.

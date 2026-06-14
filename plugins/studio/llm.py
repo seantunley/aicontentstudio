@@ -14,7 +14,13 @@ import subprocess
 
 def _model_args():
     m = (os.environ.get("STUDIO_TEXT_MODEL") or "").strip()
-    return ["-m", m] if m else []
+    if not m:
+        return []
+    args = ["-m", m]
+    prov = (os.environ.get("STUDIO_TEXT_PROVIDER") or "").strip()
+    if prov:  # e.g. 'openrouter' so a slug like 'anthropic/claude-sonnet-4.6' resolves there
+        args += ["--provider", prov]
+    return args
 
 
 def run_z(prompt, timeout=120, **kw):
