@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { UIProvider } from './ui';
@@ -111,6 +111,23 @@ export function AppShell({ user, counts, brands, activeBrand, children }) {
   const active = (href) => (href === '/' ? path === '/' : path.startsWith(href));
   const moreActive = MORE.some((n) => active(n.href));
 
+  // Collapsible sidebar groups. Default: "The desk" (and whichever group holds the current page)
+  // open, the rest collapsed; the operator's choices are remembered in localStorage.
+  const [collapsed, setCollapsed] = useState(() =>
+    Object.fromEntries(GROUPS.map((g) => [g.label, g.label !== 'The desk' && !g.items.some((it) => active(it.href))])),
+  );
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('nav-collapsed') || 'null');
+      if (saved && typeof saved === 'object') setCollapsed((c) => ({ ...c, ...saved }));
+    } catch {}
+  }, []);
+  const toggleGroup = (label) => setCollapsed((c) => {
+    const next = { ...c, [label]: !c[label] };
+    try { localStorage.setItem('nav-collapsed', JSON.stringify(next)); } catch {}
+    return next;
+  });
+
   const navItem = (n) => (
     <Link key={n.href} href={n.href} className={`nav-item ${active(n.href) ? 'active' : ''}`} onClick={() => setMore(false)}>
       <Icon d={ICONS[n.key]} />
@@ -133,9 +150,14 @@ export function AppShell({ user, counts, brands, activeBrand, children }) {
           <NewJobButton block defaultBrand={activeBrand} />
           <nav className="nav">
             {GROUPS.map((g) => (
-              <div key={g.label} style={{ display: 'contents' }}>
-                <div className="nav-label">{g.label}</div>
-                {g.items.map(navItem)}
+              <div key={g.label} className={`nav-group ${collapsed[g.label] ? 'collapsed' : ''}`}>
+                <button type="button" className="nav-label nav-label--btn" onClick={() => toggleGroup(g.label)} aria-expanded={!collapsed[g.label]}>
+                  <span>{g.label}</span>
+                  <svg className="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+                </button>
+                <div className="nav-group-items">
+                  {g.items.map(navItem)}
+                </div>
               </div>
             ))}
           </nav>
