@@ -95,6 +95,11 @@ services:
     container_name: studio-renderer
     restart: unless-stopped
     shm_size: "1gb"                    # Chromium needs shared memory for rendering
+    environment:
+      # Voiceover TTS: ElevenLabs (natural) when the key is set, else local Piper. Voice/model optional.
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+      - ELEVENLABS_VOICE_ID=${ELEVENLABS_VOICE_ID:-}
+      - ELEVENLABS_MODEL=${ELEVENLABS_MODEL:-}
     ports:
       - "127.0.0.1:3100:3100"          # loopback only; reached by the host-net hermes container
 

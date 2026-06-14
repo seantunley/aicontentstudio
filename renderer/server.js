@@ -22,6 +22,29 @@ function runPiper(script, outWav) {
   });
 }
 
+// Voiceover synthesis → mp3. ElevenLabs (natural) when ELEVENLABS_API_KEY is set; else local Piper.
+async function synthesizeSpeech(text, outMp3) {
+  const key = process.env.ELEVENLABS_API_KEY;
+  if (key) {
+    const voice = process.env.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
+    const model = process.env.ELEVENLABS_MODEL || 'eleven_turbo_v2_5';
+    const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_128`, {
+      method: 'POST',
+      headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, model_id: model }),
+    });
+    if (!r.ok) throw new Error(`ElevenLabs ${r.status}: ${(await r.text()).slice(0, 160)}`);
+    fs.writeFileSync(outMp3, Buffer.from(await r.arrayBuffer()));
+    return 'elevenlabs';
+  }
+  // Piper fallback (local, free) — tuned for a slightly slower, more natural read.
+  const wav = outMp3.replace(/\.mp3$/, '.wav');
+  await runPiper(text, wav);
+  execFileSync('ffmpeg', ['-y', '-i', wav, '-codec:a', 'libmp3lame', '-b:a', '128k', outMp3]);
+  fs.unlink(wav, () => {});
+  return 'piper';
+}
+
 function audioDurationSec(file) {
   const out = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]).toString().trim();
   return parseFloat(out) || 0;
@@ -136,15 +159,14 @@ app.post('/video', async (req, res) => {
   const { script = '', imageUrl = '', accent = '#c8f24e', kicker = '', width = 1080, height = 1920 } = req.body || {};
   if (!script.trim()) return res.status(400).json({ error: 'script required' });
   const stamp = `${process.pid}_${Math.round(Math.random() * 1e9)}`;
-  const wav = path.join(os.tmpdir(), `vo_${stamp}.wav`);
   const mp3 = path.join(os.tmpdir(), `vo_${stamp}.mp3`);
   const out = path.join(os.tmpdir(), `voiced_${stamp}.mp4`);
   try {
-    await runPiper(script.trim(), wav);
-    const durSec = Math.min(90, Math.max(3, audioDurationSec(wav)));
-    execFileSync('ffmpeg', ['-y', '-i', wav, '-codec:a', 'libmp3lame', '-b:a', '96k', mp3]);
+    const engine = await synthesizeSpeech(script.trim(), mp3);
+    const durSec = Math.min(90, Math.max(3, audioDurationSec(mp3)));
     const audioData = 'data:audio/mpeg;base64,' + fs.readFileSync(mp3).toString('base64');
-    fs.unlink(wav, () => {}); fs.unlink(mp3, () => {});
+    fs.unlink(mp3, () => {});
+    console.log(`/video: tts=${engine} dur=${durSec.toFixed(1)}s`);
     const captions = chunkCaptions(script, durSec);
 
     await ensureBrowser();
@@ -158,7 +180,7 @@ app.post('/video', async (req, res) => {
     res.setHeader('Content-Type', 'video/mp4');
     res.sendFile(out, () => fs.unlink(out, () => {}));
   } catch (e) {
-    [wav, mp3, out].forEach((f) => fs.unlink(f, () => {}));
+    [mp3, out].forEach((f) => fs.unlink(f, () => {}));
     console.error('video failed:', e);
     if (!res.headersSent) res.status(500).json({ error: String((e && e.message) || e) });
   }
