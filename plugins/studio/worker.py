@@ -588,6 +588,48 @@ def _validate_pending(limit=12):
         db.set_draft_validation(d["id"], registry.validate_draft(d))
 
 
+def _alt_text_pending(limit=6):
+    """Sweep: generate accessibility alt text (vision, studio model) for preview-draft images that
+    lack it, on platforms that support alt text, then re-validate so the 'no alt text' nudge clears."""
+    for d in db.preview_drafts_unalttexted(limit):
+        rules = registry.PLATFORM_RULES.get((d.get("platform") or "").lower())
+        if not rules or not rules.get("alt_text"):
+            continue  # platform doesn't carry alt text — nothing to do
+        url = None
+        try:
+            imgs = json.loads(d.get("images_json") or "null") or []
+            if imgs:
+                url = imgs[0].get("path")
+        except Exception:  # noqa: BLE001
+            pass
+        url = url or d.get("image_path")
+        if not url:
+            continue
+        prompt = ("Write concise, factual alt text for this image, for accessibility: describe what is "
+                  "actually visible in ONE sentence, max ~120 characters, no 'image of'/'photo of' prefix "
+                  f"and no commentary. Reply with the alt text only. Image: {url}")
+        try:
+            r = llm.run_z(prompt, timeout=90)
+            alt = (r.stdout or "").strip().strip('"').replace("\n", " ").strip()
+        except Exception:  # noqa: BLE001
+            continue
+        low = alt.lower()
+        # Skip non-answers (image unreachable / model refusal) so we never store junk alt text;
+        # the 'missing' nudge stays, and a later sweep can retry.
+        if (not alt or len(alt) > 300 or any(p in low for p in (
+                "inaccessible", "cannot generate", "can't generate", "cannot see", "can't see",
+                "unable to", "not able to", "no image", "couldn't", "i'm sorry", "as an ai"))):
+            continue
+        db.set_draft_alt_text(d["id"], alt)
+        # refresh the capability-registry validation so the alt_text_missing nudge clears
+        try:
+            fresh = next((x for x in db.list_drafts(d["job_id"]) if x["id"] == d["id"]), None)
+            if fresh:
+                db.set_draft_validation(d["id"], registry.validate_draft(fresh))
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def _process_reply_drafts():
     """§3d: draft on-brand replies to engagement (Chatwoot) conversations. The operator reviews +
     sends every draft — this only prepares the text (the human gate, §4a)."""
@@ -622,6 +664,7 @@ def main():
         _polish_pending()  # polish drafts from ANY path (incl. Telegram) that aren't polished yet
         _safety_pending()  # §6a brand-safety review on any preview draft not yet checked
         _validate_pending()  # platform capability registry: validate any preview draft not yet checked
+        _alt_text_pending()  # generate accessibility alt text for draft images that lack it
         db.purge_trash(30)  # hard-delete trashed jobs + media older than 30 days
 
         jobs = db.get_queued_jobs()

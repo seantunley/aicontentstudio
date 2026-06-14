@@ -820,6 +820,22 @@ def set_draft_validation(draft_id, messages):
         conn.execute("UPDATE drafts SET validation_json=? WHERE id=?", (json.dumps(messages or []), draft_id))
 
 
+def preview_drafts_unalttexted(limit=8):
+    """Preview drafts that have an image/carousel but no accessibility alt text yet (any path)."""
+    with _db() as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT d.* FROM drafts d JOIN jobs j ON j.id = d.job_id"
+            " WHERE j.state='preview' AND (d.alt_text IS NULL OR trim(d.alt_text)='')"
+            " AND (d.image_path IS NOT NULL OR d.images_json IS NOT NULL) ORDER BY d.id LIMIT ?", (limit,)
+        ).fetchall()]
+
+
+def set_draft_alt_text(draft_id, alt):
+    """Store accessibility alt text for a draft's (primary) image."""
+    with _db() as conn:
+        conn.execute("UPDATE drafts SET alt_text=? WHERE id=?", ((alt or "").strip()[:420], draft_id))
+
+
 def set_draft_safety(draft_id, verdict, reason):
     """Store a draft's brand-safety verdict (§6a): green | amber | red + a one-line reason."""
     verdict = (verdict or "amber").strip().lower()

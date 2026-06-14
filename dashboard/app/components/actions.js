@@ -757,6 +757,7 @@ export function QueueItem({ job }) {
               <ValidationBadge validation={d.validation_json} />
               <EditableDraft draftId={d.id} body={d.body} limit={lim} />
               <DraftMedia draft={d} />
+              {d.alt_text ? <div className="alt-text"><span className="alt-tag">ALT</span> {d.alt_text}</div> : null}
               <div className="actions" style={{ marginTop: 6 }}><PostPreview draft={d} handle={job.brand} /></div>
               <div className="card-foot" style={lim && d.char_count > lim ? { color: 'var(--red)' } : null}>
                 {d.char_count}{lim ? `/${lim}` : ''} chars · angle {d.angle || '—'} · brand {job.brand}

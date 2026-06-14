@@ -68,7 +68,7 @@ export default async function JobPage({ params }) {
       </section>
 
       <section className="section reveal r2">
-        <div className="section-head"><span className="idx">01</span><h2>Drafts</h2><span className="count">{drafts.length}</span><span className="rule" />{drafts.length ? <UploadMediaButton jobId={job.id} /> : null}</div>
+        <div className="section-head"><span className="idx">01</span><h2>Drafts</h2><span className="count">{drafts.length}</span><span className="rule" />{drafts.length ? <a className="btn btn--ghost btn--sm" href={`/api/jobs/${job.id}/export`} title="Download caption + media as a zip for manual posting">⬇ Export</a> : null}{drafts.length ? <UploadMediaButton jobId={job.id} /> : null}</div>
         {drafts.length === 0 ? <div className="empty">No drafts yet.</div> : drafts.map((d) => (
           <div className="card" key={d.id} style={{ marginBottom: 10 }}>
             <div className="row-between" style={{ marginBottom: 9 }}>
@@ -80,6 +80,7 @@ export default async function JobPage({ params }) {
             <EditableDraft draftId={d.id} body={d.body} limit={DRAFT_LIMITS[d.platform]} />
             <PostPills polish={d.polish_json} draftId={d.id} />
             <DraftMedia draft={d} />
+            {d.alt_text ? <div className="alt-text"><span className="alt-tag">ALT</span> {d.alt_text}</div> : null}
             <div className="actions" style={{ marginTop: 6 }}><PostPreview draft={d} handle={job.brand} /></div>
           </div>
         ))}
