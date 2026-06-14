@@ -744,6 +744,7 @@ export function QueueItem({ job }) {
         </div>
         <div className="qcard-meta">
           {flagged ? <span className="badge badge--review">review later</span> : null}
+          {job.has_pulse ? <span className="qchip-social" title="Grounded in current social discussion (last ~30 days)">📰 social</span> : null}
           {platforms.map((p) => <PlatformChip key={p} platform={p} />)}
           <span className="qcard-id">{job.id.slice(0, 8)}</span>
         </div>

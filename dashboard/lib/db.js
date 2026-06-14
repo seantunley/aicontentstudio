@@ -40,7 +40,13 @@ export function approvalQueue(brand) {
     ? db().prepare("SELECT * FROM jobs WHERE state='preview' AND brand=? ORDER BY updated_at DESC").all(brand)
     : db().prepare("SELECT * FROM jobs WHERE state='preview' ORDER BY updated_at DESC").all();
   const latestDraft = db().prepare('SELECT * FROM drafts WHERE job_id=? ORDER BY id DESC LIMIT 1');
-  return jobs.map((j) => ({ ...j, draft: latestDraft.get(j.id) || null }));
+  let pulseStmt = null;
+  try { pulseStmt = db().prepare('SELECT 1 FROM social_pulses WHERE job_id=? LIMIT 1'); } catch {}
+  return jobs.map((j) => ({
+    ...j,
+    draft: latestDraft.get(j.id) || null,
+    has_pulse: pulseStmt ? !!pulseStmt.get(j.id) : false,
+  }));
 }
 
 export function costSummary() {
