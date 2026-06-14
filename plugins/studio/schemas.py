@@ -231,10 +231,12 @@ LIST_DRAFTS = {
 PRESENT_FOR_REVIEW = {
     "name": "present_for_review",
     "description": (
-        "Push the CLEAN post preview (just the caption + the image, exactly as it will appear) to the "
-        "operator's Telegram. Do NOT paste the brief, sources, ids, angles or any behind-the-scenes "
-        "detail in chat — this tool shows them the post itself. Call this, THEN present the decision "
-        "with the clarify tool (choices: Approve, Reject, Defer)."
+        "Push the CLEAN post preview to the operator's Telegram as a styled 'as it'll appear on <platform>' "
+        "mockup card (profile header, the image/carousel, caption, action row — like seeing it in the real "
+        "app). Use this whenever the operator asks to SEE or PREVIEW a post, and at the gate before asking "
+        "for a decision. Do NOT paste the brief, sources, ids, angles or any behind-the-scenes detail in "
+        "chat — this tool shows them the post itself. Call this, THEN present the decision with the clarify "
+        "tool (choices: Approve, Reject, Defer)."
     ),
     "parameters": {
         "type": "object",

@@ -335,9 +335,29 @@ def _telegram_creds():
     return env.get("TELEGRAM_BOT_TOKEN"), env.get("TELEGRAM_ALLOWED_USERS", "").split(",")[0]
 
 
+def _render_mockup(platform, handle, body, imgs, video):
+    """Render the on-platform mockup card (what the dashboard PostPreview shows) to a PNG via the
+    renderer. Returns image bytes, or None so the caller can fall back to a raw media send."""
+    import requests
+    try:
+        payload = {
+            "platform": (platform or "instagram").lower(),
+            "handle": handle or "",
+            "body": body or "",
+            "images": [m.get("path") for m in (imgs or []) if m.get("path")][:10],
+            "video": bool(video),
+        }
+        r = requests.post(f"{RENDER_URL}/preview", json=payload, timeout=120)
+        if r.status_code == 200 and r.content:
+            return r.content
+    except Exception:  # noqa: BLE001 — renderer down/unreachable -> fall back to raw send
+        return None
+    return None
+
+
 def present_for_review(args, **kwargs):
-    """Push the CLEAN post preview (caption + image as it'll appear) to the operator's Telegram —
-    no brief, no sources, no ids. Call this, then present Approve/Reject/Defer via the clarify tool."""
+    """Push the CLEAN post preview (the on-platform mockup card as it'll appear) to the operator's
+    Telegram — no brief, no sources, no ids. Call this, then present Approve/Reject/Defer via clarify."""
     import requests
     jid = (args.get("job_id") or "").strip()
     if not jid:
@@ -361,6 +381,21 @@ def present_for_review(args, **kwargs):
         imgs = []
     if not imgs and draft.get("image_path"):
         imgs = [{"path": draft["image_path"]}]
+
+    # Preferred: a styled "as it'll appear on <platform>" mockup card rendered to a PNG.
+    png = _render_mockup(draft["platform"], job.get("brand"), cap, imgs, draft.get("video_path"))
+    if png:
+        try:
+            requests.post(f"https://api.telegram.org/bot{tok}/sendPhoto",
+                          data={"chat_id": chat, "caption": f"{draft['platform']} preview"},
+                          files={"photo": ("preview.png", png)}, timeout=30)
+            return _ok(job_id=job["id"], short_id=job["id"][:8], platform=draft["platform"],
+                       message=("On-platform preview sent to Telegram. NOW call the clarify tool with choices "
+                                "['Approve','Reject','Defer'] to give the operator tap buttons."))
+        except Exception:  # noqa: BLE001 — fall through to the raw media send below
+            pass
+
+    # Fallback: raw media + caption (renderer unreachable, or no mockup produced).
     try:
         if len(imgs) > 1:
             files, media = {}, []
