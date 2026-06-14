@@ -159,7 +159,8 @@ app.post('/preview', async (req, res) => {
 
 // POST /video -> script + image => Piper voiceover + time-synced captions => 9:16 mp4 (§7b Phase 3)
 app.post('/video', async (req, res) => {
-  const { script = '', imageUrl = '', accent = '#c8f24e', kicker = '', width = 1080, height = 1920 } = req.body || {};
+  const { script = '', imageUrl = '', accent = '#c8f24e', kicker = '', width = 1080, height = 1920,
+    captions: wantCaps = false } = req.body || {}; // captions overlay off by default
   if (!script.trim()) return res.status(400).json({ error: 'script required' });
   const stamp = `${process.pid}_${Math.round(Math.random() * 1e9)}`;
   const mp3 = path.join(os.tmpdir(), `vo_${stamp}.mp3`);
@@ -169,8 +170,8 @@ app.post('/video', async (req, res) => {
     const durSec = Math.min(90, Math.max(3, audioDurationSec(mp3)));
     const audioData = 'data:audio/mpeg;base64,' + fs.readFileSync(mp3).toString('base64');
     fs.unlink(mp3, () => {});
-    console.log(`/video: tts=${engine} dur=${durSec.toFixed(1)}s`);
-    const captions = chunkCaptions(script, durSec);
+    console.log(`/video: tts=${engine} dur=${durSec.toFixed(1)}s captions=${wantCaps}`);
+    const captions = wantCaps ? chunkCaptions(script, durSec) : [];
 
     await ensureBrowser();
     const serveUrl = await getBundle();
