@@ -119,6 +119,16 @@ function addLearning(brand, kind, platform, topic, before, after) {
   } catch { /* never block the action on a learning write */ }
 }
 
+// §7 learnings — operator feedback the Studio has captured (scoped to the active brand, or all).
+export function listLearnings(brand, limit = 80) {
+  try {
+    const d = db();
+    return brand
+      ? d.prepare('SELECT * FROM learnings WHERE brand=? ORDER BY id DESC LIMIT ?').all(brand, limit)
+      : d.prepare('SELECT * FROM learnings ORDER BY id DESC LIMIT ?').all(limit);
+  } catch { return []; }
+}
+
 export function rejectJob(jobId, who) {
   const d = db();
   const job = d.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
