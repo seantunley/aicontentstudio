@@ -124,10 +124,15 @@ def _agent_prompt(job, with_image, with_video=False, with_carousel=False):
         + step2
     )
     if with_carousel:
-        p += ("Step 3 — carousel: this is a multi-image swipe post. Call image_gen 3 times for 3 DISTINCT, "
-              "on-brand, safe slides that form a coherent set (e.g. 3 tips, 3 steps, or a mini story), then "
-              "call set_carousel ONCE with the 3 image paths IN ORDER and a `tags` list of visual keywords "
-              "(subjects, setting, mood) for the media Vault search. ")
+        try:
+            n_slides = int((json.loads(job.get("meta") or "{}")).get("carousel_slides") or 4)
+        except Exception:  # noqa: BLE001
+            n_slides = 4
+        n_slides = max(2, min(10, n_slides))
+        p += (f"Step 3 — carousel: this is a multi-image swipe post. Call image_gen {n_slides} times for "
+              f"{n_slides} DISTINCT, on-brand, safe slides that form a coherent set ({n_slides} tips/steps or a "
+              f"mini story), then call set_carousel ONCE with the {n_slides} image paths IN ORDER and a `tags` "
+              "list of visual keywords (subjects, setting, mood) for the media Vault search. ")
     elif with_image:
         p += ("Step 3 — image: call image_gen ONCE for one relevant, on-brand, safe master image, then "
               "call set_draft_image once with its path AND a `tags` list of visual keywords describing "

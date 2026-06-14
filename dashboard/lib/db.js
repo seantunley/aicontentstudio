@@ -194,15 +194,16 @@ export function retryJob(jobId) {
 }
 
 // Originate a job from the cockpit: create it + queue research+draft for the worker to pick up.
-export function createAndQueueJob(topic, brand, who, withImage, platforms, withVideo, withCarousel) {
+export function createAndQueueJob(topic, brand, who, withImage, platforms, withVideo, withCarousel, slides) {
   const d = db();
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   const action = withCarousel ? 'research_draft_carousel' : withVideo ? 'research_draft_image_video' : withImage ? 'research_draft_image' : 'research_draft';
   const targets = platforms && platforms.length ? platforms.join(',') : null;
+  const meta = withCarousel ? JSON.stringify({ carousel_slides: Math.max(2, Math.min(10, Number(slides) || 4)) }) : '{}';
   const tx = d.transaction(() => {
     d.prepare('INSERT INTO jobs (id,brand,topic,state,source,created_by,created_at,updated_at,meta,queued_action,target_platforms) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
-      .run(id, brand || 'unassigned', topic, 'requested', 'dashboard', who, now, now, '{}', action, targets);
+      .run(id, brand || 'unassigned', topic, 'requested', 'dashboard', who, now, now, meta, action, targets);
     d.prepare('INSERT INTO job_events (job_id,from_state,to_state,actor,at,detail) VALUES (?,?,?,?,?,?)')
       .run(id, null, 'requested', 'human', now, `job created + queued via dashboard by ${who}${targets ? ' for ' + targets : ''}`);
   });
