@@ -26,8 +26,11 @@ function runPiper(script, outWav) {
 async function synthesizeSpeech(text, outMp3) {
   const key = process.env.ELEVENLABS_API_KEY;
   if (key) {
-    const voice = process.env.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
-    const model = process.env.ELEVENLABS_MODEL || 'eleven_turbo_v2_5';
+    // Russian (Cyrillic) auto-routes to the Russian voice + the multilingual model; else the default voice.
+    const cyr = /[Ѐ-ӿ]/.test(text);
+    const voice = (cyr && process.env.ELEVENLABS_VOICE_ID_RU) || process.env.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
+    const model = cyr ? (process.env.ELEVENLABS_MODEL_NONEN || 'eleven_multilingual_v2')
+                      : (process.env.ELEVENLABS_MODEL || 'eleven_turbo_v2_5');
     const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_128`, {
       method: 'POST',
       headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },

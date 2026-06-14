@@ -99,7 +99,9 @@ services:
       # Voiceover TTS: ElevenLabs (natural) when the key is set, else local Piper. Voice/model optional.
       - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
       - ELEVENLABS_VOICE_ID=${ELEVENLABS_VOICE_ID:-}
+      - ELEVENLABS_VOICE_ID_RU=${ELEVENLABS_VOICE_ID_RU:-}
       - ELEVENLABS_MODEL=${ELEVENLABS_MODEL:-}
+      - ELEVENLABS_MODEL_NONEN=${ELEVENLABS_MODEL_NONEN:-}
     ports:
       - "127.0.0.1:3100:3100"          # loopback only; reached by the host-net hermes container
 
