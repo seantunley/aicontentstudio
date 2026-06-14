@@ -225,6 +225,17 @@ export function getDraftsFor(jobId) {
   return db().prepare('SELECT * FROM drafts WHERE job_id=? ORDER BY id').all(jobId);
 }
 
+// Reorder a draft's carousel slides; the first becomes the primary image (image_path/image_id).
+export function reorderDraftImages(draftId, images) {
+  const arr = (images || []).filter((m) => m && m.path).map((m) => ({ id: m.id || null, path: m.path }));
+  if (arr.length < 2) throw new Error('need at least 2 slides to reorder');
+  const primary = arr[0];
+  const r = db().prepare('UPDATE drafts SET images_json=?, image_id=?, image_path=? WHERE id=?')
+    .run(JSON.stringify(arr), primary.id, primary.path, draftId);
+  if (!r.changes) throw new Error('no such draft');
+  return { ok: true, count: arr.length };
+}
+
 // Attach operator-uploaded media to a draft (mirrors the studio plugin's setters).
 export function setDraftImageById(draftId, mediaId, path) {
   db().prepare('UPDATE drafts SET image_id=?, image_path=? WHERE id=?').run(mediaId, path, draftId);

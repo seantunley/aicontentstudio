@@ -586,10 +586,27 @@ export function DraftMedia({ draft }) {
   if (!imgs.length && draft.image_path) imgs = [{ path: draft.image_path }];
   if (!imgs.length) return null;
   if (imgs.length === 1) return <img className="draft-img" src={imgs[0].path} alt="" />;
+  async function move(i, dir) {
+    const j = i + dir;
+    if (j < 0 || j >= imgs.length) return;
+    const arr = imgs.slice();
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+    await fetch('/api/draft/reorder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ draftId: draft.id, images: arr }) }).catch(() => {});
+    window.location.reload();
+  }
   return (
-    <div className="carousel-strip" title={`${imgs.length}-image carousel`}>
+    <div className="carousel-strip" title={`${imgs.length}-image carousel — use ◀ ▶ to reorder slides`}>
       {imgs.map((m, i) => (
-        <div className="carousel-slide" key={i}><img src={m.path} alt={`slide ${i + 1}`} /><span className="carousel-n">{i + 1}/{imgs.length}</span></div>
+        <div className="carousel-slide" key={i}>
+          <img src={m.path} alt={`slide ${i + 1}`} />
+          <span className="carousel-n">{i + 1}/{imgs.length}</span>
+          {draft.id ? (
+            <div className="carousel-move">
+              <button onClick={() => move(i, -1)} disabled={i === 0} title="move slide earlier">◀</button>
+              <button onClick={() => move(i, 1)} disabled={i === imgs.length - 1} title="move slide later">▶</button>
+            </div>
+          ) : null}
+        </div>
       ))}
     </div>
   );
