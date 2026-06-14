@@ -100,7 +100,8 @@ def _campaign_block(job):
 
 def _agent_prompt(job, with_image, with_video=False, with_carousel=False):
     targets = (job.get("target_platforms") or "").strip()
-    # Local-first research: the operator's market is South Africa; a brand pack may override the region.
+    # "Set region" steers ONLY region-specific policy + suggested items, NOT the research itself
+    # (knowledge/research is worldwide). Brand pack overrides; the operator's market is South Africa.
     region = "South Africa"
     try:
         _b = db.get_brand(job.get("brand"))
@@ -126,12 +127,15 @@ def _agent_prompt(job, with_image, with_video=False, with_carousel=False):
         "current, credible sources, dig for concrete specifics (numbers, names, recent developments), "
         "and don't settle for a shallow first pass. This is professional work, so take the time to get "
         "it right, quality over speed. "
-        f"CRITICAL — research from a {region} perspective for a {region} audience: prioritise {region} "
-        f"sources, outlets, experts, companies, organisations, regulators/guidelines and statistics. Put "
-        f"'{region}' and local terms into your search queries and prefer local sources (for South Africa, "
-        ".za sites and SA publications). Use international or US sources ONLY when genuinely more relevant "
-        f"and authoritative, and frame them for the {region} reader. Do NOT default to US articles, quotes, "
-        "companies or examples — defaulting to a US lens is a defect. "
+        "CRITICAL — knowledge and research are WORLDWIDE; lean local only for policy and suggestions. "
+        "Do NOT one-shot a single article: for facts, evidence, ideas and best practice, cast a WIDE net "
+        "— gather SEVERAL independent, credible sources from DIFFERENT countries and organisations or "
+        "companies, CORRELATE them (where they agree, differ, or add nuance), and synthesise the post from "
+        "that triangulated picture, never from one source, one region, or one company. In save_brief cite "
+        "a SPREAD of distinct sources (different domains, not several links from one site/company). "
+        f"BUT for region-specific things — laws, regulations, official guidelines/policy, and any suggested "
+        f"products, services, organisations or actions — lean toward {region} so the advice is locally "
+        f"accurate and usable, with local framing. Global knowledge, {region} application. "
         "Call save_brief with cited facts (each a real source_url + "
         "snippet) and 2-3 distinct angles. Use METRIC units only (Celsius, km, kg, litres), convert any imperial. "
         "Write every draft like a sharp human, not an AI: no em dashes, no significance inflation "
