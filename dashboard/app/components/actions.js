@@ -595,6 +595,63 @@ export function DraftMedia({ draft }) {
   );
 }
 
+// A realistic "as it'll appear on the platform" popup: profile header, media (single / swipeable
+// carousel / video), action row, caption. Text-first platforms (X/Bluesky/Threads) put the caption
+// above the media; feed platforms (Instagram/Facebook/LinkedIn) below, like the real apps.
+export function PostPreview({ draft, handle }) {
+  const [open, setOpen] = useState(false);
+  const [slide, setSlide] = useState(0);
+  if (!draft) return null;
+  let imgs = [];
+  try { imgs = JSON.parse(draft.images_json || 'null') || []; } catch { imgs = []; }
+  if (!imgs.length && draft.image_path) imgs = [{ path: draft.image_path }];
+  const plat = draft.platform;
+  const meta = PLATFORM_META[plat] || { label: plat, color: '#555' };
+  const name = handle && handle !== 'unassigned' ? handle : meta.label;
+  const textFirst = ['x', 'bluesky', 'threads', 'mastodon', 'telegram'].includes(plat);
+  const n = imgs.length;
+  const go = (d) => setSlide((s) => (s + d + n) % n);
+
+  const media = draft.video_path ? (
+    <video className="pp-img" src={draft.video_path} controls muted playsInline />
+  ) : n ? (
+    <div className="pp-media">
+      <img className="pp-img" src={imgs[slide].path} alt="" />
+      {n > 1 && (
+        <>
+          <button className="pp-arrow l" onClick={() => go(-1)} aria-label="previous">‹</button>
+          <button className="pp-arrow r" onClick={() => go(1)} aria-label="next">›</button>
+          <span className="pp-count">{slide + 1}/{n}</span>
+          <div className="pp-dotrow">{imgs.map((_, i) => <span key={i} className={`pp-dot ${i === slide ? 'on' : ''}`} />)}</div>
+        </>
+      )}
+    </div>
+  ) : null;
+
+  const caption = <div className="pp-caption"><b>{name}</b> {draft.body}</div>;
+
+  return (
+    <>
+      <button className="btn btn--sm" onClick={() => { setSlide(0); setOpen(true); }}>👁 Preview</button>
+      {open && createPortal(
+        <div className="modal-back" onClick={() => setOpen(false)}>
+          <div className="pp-wrap" onClick={(e) => e.stopPropagation()}>
+            <div className="pp-bar"><PlatformLogo platform={plat} size={14} /> <span>{meta.label} preview</span><button className="pp-x" onClick={() => setOpen(false)}>✕</button></div>
+            <div className={`pp-card ${textFirst ? 'pp-text' : 'pp-feed'}`}>
+              <div className="pp-head">
+                <span className="pp-avatar" style={{ background: meta.color }}>{(name[0] || '?').toUpperCase()}</span>
+                <div className="pp-id"><span className="pp-name">{name}</span><span className="pp-handle">{textFirst ? `@${(name || '').toLowerCase().replace(/\s+/g, '')}` : 'Sponsored'}</span></div>
+                <span className="pp-more">···</span>
+              </div>
+              {textFirst ? <>{caption}{media}</> : <>{media}<div className="pp-actions"><span>♡</span><span>💬</span><span>↗</span><span className="pp-save">🔖</span></div>{caption}</>}
+              {textFirst && <div className="pp-actions pp-actions--x"><span>💬</span><span>🔁</span><span>♡</span><span>📊</span></div>}
+            </div>
+          </div>
+        </div>, document.body)}
+    </>
+  );
+}
+
 // §6a brand-safety verdict on a draft. Green is clean (no badge); amber = review; red = safety hold.
 export function SafetyBadge({ safety }) {
   let s = {};
@@ -636,6 +693,7 @@ export function QueueItem({ job }) {
               <SafetyBadge safety={d.safety_json} />
               <EditableDraft draftId={d.id} body={d.body} limit={lim} />
               <DraftMedia draft={d} />
+              <div className="actions" style={{ marginTop: 6 }}><PostPreview draft={d} handle={job.brand} /></div>
               <div className="card-foot" style={lim && d.char_count > lim ? { color: 'var(--red)' } : null}>
                 {d.char_count}{lim ? `/${lim}` : ''} chars · angle {d.angle || '—'} · brand {job.brand}
               </div>
