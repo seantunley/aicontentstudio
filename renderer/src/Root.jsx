@@ -1,5 +1,6 @@
 import { Composition } from 'remotion';
 import { SocialVideo } from './SocialVideo.jsx';
+import { VoicedVideo } from './VoicedVideo.jsx';
 import { PostMock, layout } from './PostMock.jsx';
 
 // Per-render width/height/duration come from inputProps via calculateMetadata so one comp
@@ -26,6 +27,21 @@ export const Root = () => (
         width: props.width || 1080,
         height: props.height || 1920,
         durationInFrames: Math.max(60, Math.round((props.durationSec || 6) * 30)),
+        fps: 30,
+      })}
+    />
+    <Composition
+      id="VoicedVideo"
+      component={VoicedVideo}
+      durationInFrames={300}
+      fps={30}
+      width={1080}
+      height={1920}
+      defaultProps={{ imageUrl: '', audioData: '', captions: [], accent: '#c8f24e', kicker: '', width: 1080, height: 1920, durationSec: 10 }}
+      calculateMetadata={({ props }) => ({
+        width: props.width || 1080,
+        height: props.height || 1920,
+        durationInFrames: Math.max(30, Math.round((props.durationSec || 10) * 30)),
         fps: 30,
       })}
     />

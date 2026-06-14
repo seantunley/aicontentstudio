@@ -3,8 +3,51 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { spawn, execFileSync } from 'child_process';
 import { bundle } from '@remotion/bundler';
 import { selectComposition, renderMedia, renderStill, ensureBrowser } from '@remotion/renderer';
+
+// Local TTS (Piper) → wav. No Python; the binary + voice are baked into the image.
+function runPiper(script, outWav) {
+  return new Promise((resolve, reject) => {
+    const bin = process.env.PIPER_BIN, voice = process.env.PIPER_VOICE;
+    if (!bin || !voice) return reject(new Error('PIPER_BIN/PIPER_VOICE not set'));
+    const p = spawn(bin, ['--model', voice, '--output_file', outWav]);
+    let err = '';
+    p.stderr.on('data', (d) => { err += d; });
+    p.on('error', reject);
+    p.on('close', (code) => (code === 0 ? resolve() : reject(new Error('piper exit ' + code + ': ' + err.slice(0, 200)))));
+    p.stdin.write(script);
+    p.stdin.end();
+  });
+}
+
+function audioDurationSec(file) {
+  const out = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]).toString().trim();
+  return parseFloat(out) || 0;
+}
+
+// Split a script into short caption phrases and time them proportionally across the voiceover.
+function chunkCaptions(script, totalSec) {
+  const words = script.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  const chunks = [];
+  let cur = [];
+  for (const w of words) {
+    cur.push(w);
+    if (cur.length >= 5 || /[.!?,:;]$/.test(w)) { chunks.push(cur.join(' ')); cur = []; }
+  }
+  if (cur.length) chunks.push(cur.join(' '));
+  const totalChars = chunks.reduce((s, c) => s + c.length, 0) || 1;
+  let t = 0;
+  const caps = chunks.map((c) => {
+    const dur = totalSec * (c.length / totalChars);
+    const seg = { text: c.replace(/[\s,;:.]+$/, ''), start: t, end: t + dur };
+    t += dur;
+    return seg;
+  });
+  if (caps.length) caps[caps.length - 1].end = totalSec;
+  return caps;
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -84,6 +127,38 @@ app.post('/preview', async (req, res) => {
   } catch (e) {
     fs.unlink(out, () => {});
     console.error('preview failed:', e);
+    if (!res.headersSent) res.status(500).json({ error: String((e && e.message) || e) });
+  }
+});
+
+// POST /video -> script + image => Piper voiceover + time-synced captions => 9:16 mp4 (§7b Phase 3)
+app.post('/video', async (req, res) => {
+  const { script = '', imageUrl = '', accent = '#c8f24e', kicker = '', width = 1080, height = 1920 } = req.body || {};
+  if (!script.trim()) return res.status(400).json({ error: 'script required' });
+  const stamp = `${process.pid}_${Math.round(Math.random() * 1e9)}`;
+  const wav = path.join(os.tmpdir(), `vo_${stamp}.wav`);
+  const mp3 = path.join(os.tmpdir(), `vo_${stamp}.mp3`);
+  const out = path.join(os.tmpdir(), `voiced_${stamp}.mp4`);
+  try {
+    await runPiper(script.trim(), wav);
+    const durSec = Math.min(90, Math.max(3, audioDurationSec(wav)));
+    execFileSync('ffmpeg', ['-y', '-i', wav, '-codec:a', 'libmp3lame', '-b:a', '96k', mp3]);
+    const audioData = 'data:audio/mpeg;base64,' + fs.readFileSync(mp3).toString('base64');
+    fs.unlink(wav, () => {}); fs.unlink(mp3, () => {});
+    const captions = chunkCaptions(script, durSec);
+
+    await ensureBrowser();
+    const serveUrl = await getBundle();
+    const inputProps = { imageUrl, audioData, captions, accent, kicker, width, height, durationSec: durSec };
+    const composition = await selectComposition({ serveUrl, id: 'VoicedVideo', inputProps });
+    await renderMedia({ composition, serveUrl, codec: 'h264', outputLocation: out, inputProps,
+      chromiumOptions: { gl: 'swangle' }, concurrency: 4 }); // parallelise frames across cores
+
+    res.setHeader('Content-Type', 'video/mp4');
+    res.sendFile(out, () => fs.unlink(out, () => {}));
+  } catch (e) {
+    [wav, mp3, out].forEach((f) => fs.unlink(f, () => {}));
+    console.error('video failed:', e);
     if (!res.headersSent) res.status(500).json({ error: String((e && e.message) || e) });
   }
 });

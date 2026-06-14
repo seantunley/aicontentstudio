@@ -659,8 +659,9 @@ def _video_caption(body, limit=120):
 
 def make_video(args, **kwargs):
     """Render a branded short video for each of the job's platform drafts (Remotion + ffmpeg) and
-    attach it. The draft's image becomes the moving background; a short on-screen caption is drawn.
-    Sizes per platform (§7b master-asset derivation). No TTS/voiceover yet."""
+    attach it. The draft's image becomes the moving background. If a `script` is given, it generates
+    an AI voiceover (Piper TTS) + time-synced kinetic captions; otherwise a silent on-screen caption.
+    Sizes per platform (§7b)."""
     import tempfile
     import requests
     jid = (args.get("job_id") or "").strip()
@@ -675,6 +676,7 @@ def make_video(args, **kwargs):
     kicker = (args.get("kicker") or job.get("brand") or "").strip()
     if kicker.lower() == "unassigned":
         kicker = ""
+    script = (args.get("script") or "").strip()  # spoken voiceover narration → voiced video (§7b Phase 3)
     try:
         dur = max(4.0, min(15.0, float(args.get("duration_sec") or 6)))
     except (TypeError, ValueError):
@@ -682,11 +684,17 @@ def make_video(args, **kwargs):
     done, failed = [], []
     for d in drafts:
         w, h = db.PLATFORM_VIDEO.get(d["platform"], (1080, 1920))
-        caption = (args.get("caption") or _video_caption(d["body"])).strip()
-        payload = {"imageUrl": d.get("image_path") or "", "caption": caption,
-                   "kicker": kicker, "width": w, "height": h, "durationSec": dur, "id": d["id"]}
+        if script:
+            payload = {"script": script, "imageUrl": d.get("image_path") or "",
+                       "kicker": kicker, "width": w, "height": h}
+            endpoint, vtimeout = "/video", 1200  # voiced render is frame-by-frame; allow slow CPU renders
+        else:
+            caption = (args.get("caption") or _video_caption(d["body"])).strip()
+            payload = {"imageUrl": d.get("image_path") or "", "caption": caption,
+                       "kicker": kicker, "width": w, "height": h, "durationSec": dur, "id": d["id"]}
+            endpoint, vtimeout = "/render", 300
         try:
-            r = requests.post(f"{RENDER_URL}/render", json=payload, timeout=300)
+            r = requests.post(f"{RENDER_URL}{endpoint}", json=payload, timeout=vtimeout)
             if r.status_code >= 300 or not r.headers.get("Content-Type", "").startswith("video") or not r.content:
                 detail = r.text[:140] if r.content else f"HTTP {r.status_code}"
                 failed.append(f"{d['platform']}: render failed ({detail})")

@@ -245,8 +245,10 @@ def _agent_prompt(job, with_image, with_video=False, with_carousel=False, social
               "Then call set_draft_image once with its path AND a `tags` list of visual keywords describing "
               "what's in the image (subjects, setting, mood) for the media Vault search. ")
     if with_video:
-        p += ("Step 4 — video: call make_video ONCE with the job id (it renders a branded short video "
-              "per platform draft from that image and attaches it). ")
+        p += ("Step 4 — video: write a SHORT spoken voiceover script (natural narration, ~30-55 words: a "
+              "hook, 2-3 punchy points grounded in the brief, and a close — what a presenter would SAY out "
+              "loud, NOT the caption), then call make_video ONCE with the job id AND that `script`. It makes "
+              "an AI voiceover, time-synced captions and a branded 9:16 clip per draft, and attaches it. ")
     p += "Then stop. Do NOT approve or publish — leave it in preview for the operator to review."
     return p
 
