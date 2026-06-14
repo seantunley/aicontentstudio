@@ -98,6 +98,26 @@ def _campaign_block(job):
             "others in the series (its own angle/hook). ")
 
 
+def _learnings_block(job):
+    """Inject the operator's recent feedback (drafts they rewrote, drafts they rejected) so generation
+    learns their voice and avoids rejected patterns (§7). Empty until there's feedback."""
+    try:
+        ls = db.recent_learnings(job.get("brand"), 6)
+    except Exception:  # noqa: BLE001
+        return ""
+    bits = []
+    for l in ls:
+        if l.get("kind") == "edit" and l.get("after"):
+            bits.append(f"  - operator REWROTE a draft FROM «{(l.get('before') or '')[:180]}» TO «{l['after'][:180]}»")
+        elif l.get("kind") == "reject":
+            bits.append(f"  - operator REJECTED a draft about '{l.get('topic')}': «{(l.get('before') or '')[:140]}»")
+    if not bits:
+        return ""
+    return ("LEARN FROM THE OPERATOR'S RECENT FEEDBACK on this brand — match the voice and choices in their "
+            "rewrites, and avoid what they rejected; learn the PATTERN, never copy these verbatim:\n"
+            + "\n".join(bits) + " ")
+
+
 def _run_social_pulse(topic, sources="reddit"):
     """Pull current social discussion via the last30days engine (--emit json), shaped for storage +
     display: joins each cluster to its ranked candidates. Returns {clusters, freshness, range,
@@ -212,6 +232,7 @@ def _agent_prompt(job, with_image, with_video=False, with_carousel=False, social
         "never shame, scare, or use false urgency (especially on health or sensitive topics). "
         + _brand_block(job)
         + _campaign_block(job)
+        + _learnings_block(job)
         + step2
     )
     img_style = (

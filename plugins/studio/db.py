@@ -188,6 +188,17 @@ CREATE TABLE IF NOT EXISTS reply_drafts (
     created_at      TEXT NOT NULL,
     updated_at      TEXT
 );
+CREATE TABLE IF NOT EXISTS learnings (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    brand      TEXT,
+    kind       TEXT NOT NULL,                     -- 'edit' (operator rewrote a draft) | 'reject'
+    platform   TEXT,
+    topic      TEXT,
+    before     TEXT,                               -- the AI draft
+    after      TEXT,                               -- the operator's rewrite (edit); NULL for a reject
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_learnings_brand ON learnings(brand);
 CREATE TABLE IF NOT EXISTS social_pulses (
     job_id     TEXT PRIMARY KEY,                  -- one current-discussion pulse per job (latest)
     topic      TEXT,
@@ -529,6 +540,27 @@ def save_social_pulse(job_id, topic, sources, data):
             " VALUES (?,?,?,?,?)",
             (job_id, topic, sources, json.dumps(data or {}), _utcnow()),
         )
+
+
+def add_learning(brand, kind, topic, before, after=None, platform=None):
+    """Record an operator feedback signal (§7 'rejected/edited = a learning signal'): a draft they
+    rewrote (kind='edit', before→after) or rejected (kind='reject'). Fed back into generation."""
+    with _db() as conn:
+        conn.execute(
+            "INSERT INTO learnings (brand, kind, platform, topic, before, after, created_at) VALUES (?,?,?,?,?,?,?)",
+            (brand or "unassigned", kind, platform, (topic or "")[:200],
+             (before or "")[:2000], (after[:2000] if after else None), _utcnow()),
+        )
+
+
+def recent_learnings(brand, limit=6):
+    """Most recent operator feedback for a brand — to teach generation the operator's voice/preferences."""
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT kind, platform, topic, before, after FROM learnings WHERE brand=? ORDER BY id DESC LIMIT ?",
+            (brand or "unassigned", limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def get_social_pulse(job_id):

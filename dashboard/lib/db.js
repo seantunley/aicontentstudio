@@ -109,6 +109,16 @@ export function approveJob(jobId, who) {
   return { ok: true, jobId, state: 'approved' };
 }
 
+// §7 learning signal — record operator feedback into the shared learnings table (best-effort; the
+// worker feeds recent learnings back into generation so the Studio learns the operator's voice).
+function addLearning(brand, kind, platform, topic, before, after) {
+  try {
+    db().prepare('INSERT INTO learnings (brand,kind,platform,topic,before,after,created_at) VALUES (?,?,?,?,?,?,?)')
+      .run(brand || 'unassigned', kind, platform || null, (topic || '').slice(0, 200),
+           (before || '').slice(0, 2000), after ? after.slice(0, 2000) : null, new Date().toISOString());
+  } catch { /* never block the action on a learning write */ }
+}
+
 export function rejectJob(jobId, who) {
   const d = db();
   const job = d.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
@@ -121,6 +131,8 @@ export function rejectJob(jobId, who) {
       .run(jobId, 'preview', 'cancelled', 'human', now, `rejected via dashboard by ${who}`);
   });
   tx();
+  const dr = d.prepare('SELECT body, platform FROM drafts WHERE job_id=? ORDER BY id DESC LIMIT 1').get(jobId);
+  addLearning(job.brand, 'reject', dr && dr.platform, job.topic, dr && dr.body, null);
   return { ok: true, jobId, state: 'cancelled' };
 }
 
@@ -375,6 +387,11 @@ export function updateDraftBody(draftId, body) {
       .run(draft.job_id, null, null, 'human', new Date().toISOString(), `draft edited via dashboard (${text.length} chars)`);
   });
   tx();
+  // §7 learning signal: the operator's rewrite teaches their voice. Best-effort, never breaks the save.
+  if (text !== (draft.body || '').trim()) {
+    const job = d.prepare('SELECT brand, topic FROM jobs WHERE id=?').get(draft.job_id) || {};
+    addLearning(job.brand, 'edit', draft.platform, job.topic, draft.body, text);
+  }
   return { ok: true, char_count: text.length };
 }
 
