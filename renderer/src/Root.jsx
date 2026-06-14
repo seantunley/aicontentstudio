@@ -33,16 +33,16 @@ export const Root = () => (
     <Composition
       id="VoicedVideo"
       component={VoicedVideo}
-      durationInFrames={300}
-      fps={30}
+      durationInFrames={240}
+      fps={24}
       width={1080}
       height={1920}
       defaultProps={{ imageUrl: '', audioData: '', captions: [], accent: '#c8f24e', kicker: '', width: 1080, height: 1920, durationSec: 10 }}
       calculateMetadata={({ props }) => ({
         width: props.width || 1080,
         height: props.height || 1920,
-        durationInFrames: Math.max(30, Math.round((props.durationSec || 10) * 30)),
-        fps: 30,
+        durationInFrames: Math.max(24, Math.round((props.durationSec || 10) * 24)),
+        fps: 24,
       })}
     />
     <Composition

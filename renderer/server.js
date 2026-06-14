@@ -151,8 +151,9 @@ app.post('/video', async (req, res) => {
     const serveUrl = await getBundle();
     const inputProps = { imageUrl, audioData, captions, accent, kicker, width, height, durationSec: durSec };
     const composition = await selectComposition({ serveUrl, id: 'VoicedVideo', inputProps });
+    // NOTE: this container has 1 core, so concurrency stays at the default (1); 24fps keeps frames down.
     await renderMedia({ composition, serveUrl, codec: 'h264', outputLocation: out, inputProps,
-      chromiumOptions: { gl: 'swangle' }, concurrency: 4 }); // parallelise frames across cores
+      chromiumOptions: { gl: 'swangle' } });
 
     res.setHeader('Content-Type', 'video/mp4');
     res.sendFile(out, () => fs.unlink(out, () => {}));
