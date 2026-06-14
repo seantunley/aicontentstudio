@@ -577,6 +577,43 @@ function QueueResearch({ jobId }) {
   );
 }
 
+// A reorderable carousel — drag a slide to a new spot (or use ◀ ▶). Reorders in place and saves in
+// the background; NO page reload, so the card stays open. First slide = the post's primary image.
+function CarouselStrip({ draftId, images }) {
+  const [order, setOrder] = useState(images);
+  const [dragI, setDragI] = useState(null);
+  const persist = (arr) => fetch('/api/draft/reorder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ draftId, images: arr }) }).catch(() => {});
+  function reorder(from, to) {
+    if (from == null || to == null || from === to || to < 0 || to >= order.length) return;
+    const arr = order.slice();
+    const [m] = arr.splice(from, 1);
+    arr.splice(to, 0, m);
+    setOrder(arr); persist(arr);
+  }
+  return (
+    <div className="carousel-strip" title="drag a slide to reorder (or use ◀ ▶)">
+      {order.map((m, i) => (
+        <div
+          className={`carousel-slide ${dragI === i ? 'dragging' : ''}`}
+          key={(m.id || m.path) + '-' + i}
+          draggable
+          onDragStart={() => setDragI(i)}
+          onDragEnd={() => setDragI(null)}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => { e.preventDefault(); reorder(dragI, i); setDragI(null); }}
+        >
+          <img src={m.path} alt={`slide ${i + 1}`} draggable={false} />
+          <span className="carousel-n">{i + 1}/{order.length}</span>
+          <div className="carousel-move">
+            <button onClick={() => reorder(i, i - 1)} disabled={i === 0} title="move earlier">◀</button>
+            <button onClick={() => reorder(i, i + 1)} disabled={i === order.length - 1} title="move later">▶</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Renders a draft's media: a video, a single image, or a multi-image carousel strip.
 export function DraftMedia({ draft }) {
   if (!draft) return null;
@@ -586,30 +623,7 @@ export function DraftMedia({ draft }) {
   if (!imgs.length && draft.image_path) imgs = [{ path: draft.image_path }];
   if (!imgs.length) return null;
   if (imgs.length === 1) return <img className="draft-img" src={imgs[0].path} alt="" />;
-  async function move(i, dir) {
-    const j = i + dir;
-    if (j < 0 || j >= imgs.length) return;
-    const arr = imgs.slice();
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-    await fetch('/api/draft/reorder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ draftId: draft.id, images: arr }) }).catch(() => {});
-    window.location.reload();
-  }
-  return (
-    <div className="carousel-strip" title={`${imgs.length}-image carousel — use ◀ ▶ to reorder slides`}>
-      {imgs.map((m, i) => (
-        <div className="carousel-slide" key={i}>
-          <img src={m.path} alt={`slide ${i + 1}`} />
-          <span className="carousel-n">{i + 1}/{imgs.length}</span>
-          {draft.id ? (
-            <div className="carousel-move">
-              <button onClick={() => move(i, -1)} disabled={i === 0} title="move slide earlier">◀</button>
-              <button onClick={() => move(i, 1)} disabled={i === imgs.length - 1} title="move slide later">▶</button>
-            </div>
-          ) : null}
-        </div>
-      ))}
-    </div>
-  );
+  return <CarouselStrip draftId={draft.id} images={imgs} />;
 }
 
 // A realistic "as it'll appear on the platform" popup: profile header, media (single / swipeable
@@ -669,6 +683,19 @@ export function PostPreview({ draft, handle }) {
   );
 }
 
+// Platform capability-registry validation results on a draft (errors block-worthy, warnings/info nudge).
+export function ValidationBadge({ validation }) {
+  let msgs = [];
+  try { msgs = JSON.parse(validation || 'null') || []; } catch { msgs = []; }
+  if (!msgs.length) return null;
+  const icon = { error: '⛔', warning: '⚠', info: 'ℹ' };
+  return (
+    <div className="valid-flags">
+      {msgs.map((m, i) => <div key={i} className={`valid-flag ${m.level}`}>{icon[m.level] || '•'} {m.message}</div>)}
+    </div>
+  );
+}
+
 // §6a brand-safety verdict on a draft. Green is clean (no badge); amber = review; red = safety hold.
 export function SafetyBadge({ safety }) {
   let s = {};
@@ -708,6 +735,7 @@ export function QueueItem({ job }) {
           {d ? (
             <>
               <SafetyBadge safety={d.safety_json} />
+              <ValidationBadge validation={d.validation_json} />
               <EditableDraft draftId={d.id} body={d.body} limit={lim} />
               <DraftMedia draft={d} />
               <div className="actions" style={{ marginTop: 6 }}><PostPreview draft={d} handle={job.brand} /></div>

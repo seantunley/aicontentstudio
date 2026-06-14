@@ -19,6 +19,7 @@ import urllib.request
 
 import db  # same directory
 import humanize  # same directory — the second-model humanizer pass (Principle 0)
+import registry  # same directory — platform capability registry + validation
 
 LOCK = "/tmp/studio_worker.lock"
 
@@ -186,6 +187,10 @@ def process_one(job):
         worst = _safety_check_drafts(jid, job.get("brand"))  # §6a stage-3 brand-safety review
     except Exception as e:  # noqa: BLE001
         print(f"worker: safety check error (non-fatal — sweep will retry): {e}")
+    try:
+        _validate_drafts(jid)  # platform capability registry validation
+    except Exception as e:  # noqa: BLE001
+        print(f"worker: validation error (non-fatal — sweep will retry): {e}")
     db.clear_queued(jid)  # drop the 'processing' marker so the cockpit shows it as a normal preview job
     try:
         flag = {"amber": " ⚠️ flagged for safety review", "red": " 🛑 SAFETY HOLD — read before approving"}.get(worst, "")
@@ -474,6 +479,19 @@ def _safety_pending(limit=12):
         _safety_check_one(d, d.get("brand"))
 
 
+def _validate_drafts(job_id):
+    """Check a job's drafts against the platform capability registry (no LLM — pure rules)."""
+    for d in db.list_drafts(job_id):
+        if d.get("validation_json") is None:
+            db.set_draft_validation(d["id"], registry.validate_draft(d))
+
+
+def _validate_pending(limit=12):
+    """Sweep: validate any preview draft (incl. Telegram) not yet checked against the registry."""
+    for d in db.preview_drafts_unvalidated(limit):
+        db.set_draft_validation(d["id"], registry.validate_draft(d))
+
+
 def _process_reply_drafts():
     """§3d: draft on-brand replies to engagement (Chatwoot) conversations. The operator reviews +
     sends every draft — this only prepares the text (the human gate, §4a)."""
@@ -508,6 +526,7 @@ def main():
         _autotag_media()
         _polish_pending()  # polish drafts from ANY path (incl. Telegram) that aren't polished yet
         _safety_pending()  # §6a brand-safety review on any preview draft not yet checked
+        _validate_pending()  # platform capability registry: validate any preview draft not yet checked
         db.purge_trash(30)  # hard-delete trashed jobs + media older than 30 days
 
         jobs = db.get_queued_jobs()

@@ -11,7 +11,7 @@ export default async function Queue() {
   return (
     <>
       <div className="phead">
-        <div><h1>Approval queue</h1><div className="lede">The gate. Nothing ships without your yes. Tap a post to expand it, edit the copy on its job page, then approve.</div></div>
+        <div><h1>Approval queue</h1><div className="lede">The gate. Nothing ships without your yes. Tap a post to expand it, edit the copy inline, then approve.</div></div>
         <div className="crumbs">{q.length} waiting</div>
       </div>
       {q.length === 0 ? (
