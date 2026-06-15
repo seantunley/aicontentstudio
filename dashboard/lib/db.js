@@ -119,6 +119,29 @@ function addLearning(brand, kind, platform, topic, before, after) {
   } catch { /* never block the action on a learning write */ }
 }
 
+// §9b system event log — failures/notices surfaced in the dashboard Activity view (not Telegram).
+export function logSystemEvent(level, source, message, detail, jobId) {
+  try {
+    db().prepare('INSERT INTO system_events (level,source,message,detail,job_id,seen,created_at) VALUES (?,?,?,?,?,0,?)')
+      .run(level || 'info', source || null, (message || '').slice(0, 300), detail ? String(detail).slice(0, 1500) : null, jobId || null, new Date().toISOString());
+  } catch { /* logging must never break the caller */ }
+}
+export function listSystemEvents(limit = 120, level) {
+  try {
+    const d = db();
+    return level && level !== 'all'
+      ? d.prepare('SELECT * FROM system_events WHERE level=? ORDER BY id DESC LIMIT ?').all(level, limit)
+      : d.prepare('SELECT * FROM system_events ORDER BY id DESC LIMIT ?').all(limit);
+  } catch { return []; }
+}
+export function unseenErrorCount() {
+  try { return db().prepare("SELECT COUNT(*) c FROM system_events WHERE level='error' AND seen=0").get().c; } catch { return 0; }
+}
+export function markEventsSeen() {
+  try { db().prepare('UPDATE system_events SET seen=1 WHERE seen=0').run(); } catch {}
+  return { ok: true };
+}
+
 // §7 learnings — operator feedback the Studio has captured (scoped to the active brand, or all).
 export function listLearnings(brand, limit = 80) {
   try {

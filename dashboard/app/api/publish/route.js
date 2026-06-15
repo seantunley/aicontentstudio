@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '../../../lib/session';
-import { getJobById, getDraftsFor, markPublished, getBrandBySlug } from '../../../lib/db';
+import { getJobById, getDraftsFor, markPublished, getBrandBySlug, logSystemEvent } from '../../../lib/db';
 import { findIntegration, createPost, listIntegrations } from '../../../lib/postiz';
 import { notifyTelegram } from '../../../lib/notify';
 
@@ -53,8 +53,12 @@ export async function POST(req) {
     }
   }
   if (!published.length) {
+    logSystemEvent('error', 'publish', `Publish failed: ${job.topic}`, failed.join('; '), job.id);
     await notifyTelegram(`⚠️ Publish FAILED for "${job.topic}" after retries: ${failed.join('; ')}. It stays in Ready to publish; try again.`);
     return NextResponse.json({ error: `nothing published: ${failed.join('; ')}` }, { status: 502 });
+  }
+  if (failed.length) {
+    logSystemEvent('warn', 'publish', `Partial publish: ${job.topic}`, `published to ${published.map((p) => p.platform).join(', ')}; failed: ${failed.join('; ')}`, job.id);
   }
 
   const where = published.map((p) => p.channel || p.platform).join(', ');

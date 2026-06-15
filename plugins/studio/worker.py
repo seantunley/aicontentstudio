@@ -301,16 +301,21 @@ def process_one(job):
     except subprocess.TimeoutExpired:
         db.enqueue_action(jid, "failed")
         db.record_event(jid, "worker: timed out", actor="system")
+        db.log_system_event("error", "worker", f"Job timed out: {job.get('topic')}",
+                            f"research+draft exceeded {RUN_TIMEOUT_SECONDS}s", jid)
         return
     except Exception as e:  # noqa: BLE001
         db.enqueue_action(jid, "failed")
         db.record_event(jid, f"worker: agent run error: {e}", actor="system")
+        db.log_system_event("error", "worker", f"Job failed: {job.get('topic')}", str(e), jid)
         return
 
     state = db.get_job(jid)["state"]
     if state != "preview":
         db.enqueue_action(jid, "failed")
         db.record_event(jid, f"worker: did not reach preview (state={state}, rc={r.returncode})", actor="system")
+        db.log_system_event("error", "worker", f"Job failed: {job.get('topic')}",
+                            f"never reached preview (state={state}, rc={r.returncode}); check the agent run", jid)
         return
 
     # 2) SUCCESS — the drafts are at the gate. From here NOTHING may flip the job to 'failed':
@@ -400,6 +405,7 @@ def _maybe_run_scout():
         scout.run_once(force=True)  # 'Run now' bypasses the schedule
     except Exception as e:  # noqa: BLE001
         print(f"worker: scout run error: {e}")
+        db.log_system_event("error", "scout", "Trend scout run failed", str(e))
 
 
 def _clean_tags(out):
@@ -445,6 +451,7 @@ def _check_occasions():
         due = db.due_occasions()
     except Exception as e:  # noqa: BLE001
         print(f"worker: occasions check error: {e}")
+        db.log_system_event("error", "occasions", "Occasions check failed", str(e))
         return
     if not due:
         return

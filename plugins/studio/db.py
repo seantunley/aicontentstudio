@@ -188,6 +188,17 @@ CREATE TABLE IF NOT EXISTS reply_drafts (
     created_at      TEXT NOT NULL,
     updated_at      TEXT
 );
+CREATE TABLE IF NOT EXISTS system_events (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    level      TEXT NOT NULL,                      -- 'error' | 'warn' | 'info'
+    source     TEXT,                               -- e.g. 'worker', 'video', 'image_gen', 'publish', 'fal'
+    message    TEXT NOT NULL,                      -- one-line summary
+    detail     TEXT,                               -- fuller error / context
+    job_id     TEXT,                               -- related job, if any
+    seen       INTEGER NOT NULL DEFAULT 0,         -- 0 = unseen (drives the badge), 1 = acknowledged
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sysevents_level ON system_events(level);
 CREATE TABLE IF NOT EXISTS learnings (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     brand      TEXT,
@@ -551,6 +562,20 @@ def add_learning(brand, kind, topic, before, after=None, platform=None):
             (brand or "unassigned", kind, platform, (topic or "")[:200],
              (before or "")[:2000], (after[:2000] if after else None), _utcnow()),
         )
+
+
+def log_system_event(level, source, message, detail=None, job_id=None):
+    """Record a failure/notice to the system log (surfaced in the dashboard Activity view, not Telegram).
+    NEVER raises — it's called from except blocks; a logging failure must not mask the original error."""
+    try:
+        with _db() as conn:
+            conn.execute(
+                "INSERT INTO system_events (level, source, message, detail, job_id, seen, created_at)"
+                " VALUES (?,?,?,?,?,0,?)",
+                ((level or "info"), source, (message or "")[:300], (str(detail)[:1500] if detail else None), job_id, _utcnow()),
+            )
+    except Exception:  # noqa: BLE001 — logging must never break the caller
+        pass
 
 
 def recent_learnings(brand, limit=6):

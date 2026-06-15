@@ -719,6 +719,9 @@ def make_video(args, **kwargs):
             failed.append(f"{d['platform']}: {e}")
     if done:
         db.record_event(job["id"], f"video rendered + attached: {', '.join(done)}", actor="agent")
+    if failed:
+        db.log_system_event("error" if not done else "warn", "video",
+                            f"Video render issue: {job.get('topic')}", "; ".join(failed), job["id"])
     if not done:
         return _err("no videos produced. " + "; ".join(failed))
     msg = f"Rendered + attached video to {len(done)} draft(s): {', '.join(done)}."
