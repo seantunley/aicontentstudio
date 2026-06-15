@@ -781,5 +781,13 @@ export function getReplyDraft(conversationId) {
     return db().prepare('SELECT status, draft FROM reply_drafts WHERE conversation_id=? ORDER BY id DESC LIMIT 1').get(String(conversationId)) || null;
   } catch { return null; }
 }
+// Mark the latest draft for a conversation as sent once the operator's reply goes out — keeps the
+// lifecycle clean (requested → drafted → sent) so a later inbound message drafts fresh, not deduped.
+export function markReplyDraftSent(conversationId) {
+  try {
+    db().prepare("UPDATE reply_drafts SET status='sent' WHERE id=(SELECT id FROM reply_drafts WHERE conversation_id=? ORDER BY id DESC LIMIT 1)")
+      .run(String(conversationId));
+  } catch { /* non-fatal: the reply already sent */ }
+}
 
 export { STATES };

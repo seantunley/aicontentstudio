@@ -691,6 +691,57 @@ def _alt_text_pending(limit=6):
             pass
 
 
+def _engagement_brand():
+    """Which brand voice inbound replies draft in: explicit override → the sole known brand → unassigned."""
+    env = (os.environ.get("CHATWOOT_DEFAULT_BRAND") or "").strip()
+    if env:
+        return env
+    try:
+        bs = db.known_brands(limit=2)
+        if len(bs) == 1:
+            return bs[0]
+    except Exception:  # noqa: BLE001
+        pass
+    return "unassigned"
+
+
+def _poll_engagement():
+    """§3d proactive drafting (pull model): Chatwoot's anti-SSRF guard blocks webhooks to a private
+    LAN address, so instead of being pushed to, the worker pulls the open inbox each tick and queues
+    a reply-draft for any conversation whose latest message is from the contact and has no draft
+    waiting yet. _process_reply_drafts() (next) fills them in. The operator still sends every reply."""
+    try:
+        import engagement
+    except Exception as e:  # noqa: BLE001
+        print(f"worker: engagement module load error: {e}")
+        return
+    if not engagement.configured():
+        return  # Chatwoot env not set — nothing to poll
+    try:
+        convs = engagement.open_conversations()
+    except Exception as e:  # noqa: BLE001
+        print(f"worker: engagement poll error: {e}")
+        db.log_system_event("warn", "engagement", "Couldn't read the Chatwoot inbox", str(e)[:500])
+        return
+    brand = _engagement_brand()
+    for c in convs:
+        cid = c.get("id")
+        if not cid:
+            continue
+        try:
+            last = engagement.last_message(cid)
+        except Exception as e:  # noqa: BLE001
+            print(f"worker: engagement message read error (conv {cid}): {e}")
+            continue
+        if not last or not last.get("incoming"):
+            continue  # we've already replied (last msg is ours) or nothing to reply to
+        prev = db.latest_reply_draft(str(cid))
+        if prev and prev.get("status") in ("requested", "drafted"):
+            continue  # a suggestion is already queued/waiting for the operator
+        db.create_reply_draft(str(cid), brand, (last.get("content") or "")[:2000])
+        print(f"worker: queued engagement draft for conversation {cid}")
+
+
 def _process_reply_drafts():
     """§3d: draft on-brand replies to engagement (Chatwoot) conversations. The operator reviews +
     sends every draft — this only prepares the text (the human gate, §4a)."""
@@ -720,6 +771,7 @@ def main():
         _maybe_run_scout()
         _check_occasions()
         _process_redrafts()
+        _poll_engagement()      # §3d: pull new inbound Chatwoot messages → queue reply-drafts
         _process_reply_drafts()
         _autotag_media()
         _polish_pending()  # polish drafts from ANY path (incl. Telegram) that aren't polished yet

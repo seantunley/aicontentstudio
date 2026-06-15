@@ -38,6 +38,14 @@ services:
       - TAVILY_API_KEY=${TAVILY_API_KEY:-}
       - POSTIZ_API_URL=${POSTIZ_API_URL:-http://localhost:4007/api/public/v1}
       - POSTIZ_API_KEY=${POSTIZ_API_KEY}   # studio is a Postiz API client; Postiz holds the platform tokens (§2c)
+      # §3d engagement (pull model): the worker polls the Chatwoot inbox each tick and queues on-brand
+      # reply-drafts for new inbound messages (operator still sends every reply). Host-network container,
+      # so Chatwoot is localhost:4009. Empty token/account = polling no-ops. Webhooks aren't used —
+      # Chatwoot's anti-SSRF guard refuses to POST to a private-LAN address.
+      - CHATWOOT_URL=${CHATWOOT_WORKER_URL:-http://localhost:4009}
+      - CHATWOOT_API_TOKEN=${CHATWOOT_API_TOKEN:-}
+      - CHATWOOT_ACCOUNT_ID=${CHATWOOT_ACCOUNT_ID:-}
+      - CHATWOOT_DEFAULT_BRAND=${CHATWOOT_DEFAULT_BRAND:-}
       - STUDIO_COCKPIT_URL=${STUDIO_COCKPIT_URL:-http://172.18.18.101:4008}  # for Telegram "Preview in cockpit" tap-throughs
       # Hermes' own dashboard on the LAN (operator's local network). Exposes config + API keys,
       # so it is gated by basic auth (dashboard.basic_auth in ~/.hermes/config.yaml). Interim —
@@ -80,6 +88,8 @@ services:
       - CHATWOOT_PUBLIC_URL=${CHATWOOT_PUBLIC_URL:-http://172.18.18.101:4009}     # browser-facing "Open Chatwoot" links (LAN)
       - CHATWOOT_API_TOKEN=${CHATWOOT_API_TOKEN:-}
       - CHATWOOT_ACCOUNT_ID=${CHATWOOT_ACCOUNT_ID:-}
+      - CHATWOOT_WEBHOOK_TOKEN=${CHATWOOT_WEBHOOK_TOKEN:-}   # shared secret Chatwoot carries in ?token= when it calls /api/engagement/webhook (proactive drafting)
+      - CHATWOOT_DEFAULT_BRAND=${CHATWOOT_DEFAULT_BRAND:-}   # brand voice inbound replies draft in; empty = sole brand, else "unassigned"
     extra_hosts:
       - "host.docker.internal:host-gateway"        # reach Postiz's host-published port from this bridge container
     volumes:
