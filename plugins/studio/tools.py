@@ -659,11 +659,48 @@ def _video_caption(body, limit=120):
     return body[:limit].rsplit(" ", 1)[0].strip() + "…"
 
 
+def _grok_animate(local_image_path, motion_prompt, width, height, seconds, retries=3):
+    """Animate a still into a short moving clip via xAI Grok Imagine (image-to-video, §7b). Returns a
+    video URL (vidgen.x.ai) or None. xAI's video gen is flaky (~1-in-2 first calls hit a transient
+    'internal error'), so retry. Runs on the operator's Grok subscription — no per-clip metering."""
+    import sys as _sys
+    if "/opt/hermes" not in _sys.path:
+        _sys.path.append("/opt/hermes")  # hermes 'tools'/'agent' packages the plugin imports
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("xai_vidgen", "/opt/hermes/plugins/video_gen/xai/__init__.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        prov = mod.XAIVideoGenProvider()
+    except Exception as e:  # noqa: BLE001
+        db.log_system_event("warn", "video", "Grok video backend unavailable", str(e)[:300])
+        return None
+    if not prov.is_available():
+        db.log_system_event("warn", "video", "Grok video backend not configured (no xAI credentials)", None)
+        return None
+    ar = "9:16" if height > width else ("16:9" if width > height else "1:1")
+    secs = max(3, min(15, int(round(seconds or 6))))
+    last = None
+    for _ in range(max(1, retries)):
+        try:
+            res = prov.generate(motion_prompt, image_url=local_image_path, aspect_ratio=ar,
+                                resolution="720p", duration=secs)
+        except Exception as e:  # noqa: BLE001
+            last = str(e)
+            continue
+        if isinstance(res, dict) and res.get("success") and res.get("video"):
+            return res.get("video")
+        last = (res or {}).get("error") if isinstance(res, dict) else str(res)
+    db.log_system_event("warn", "video", "Grok image-to-video failed after retries (still-image fallback used)", str(last)[:400])
+    return None
+
+
 def make_video(args, **kwargs):
     """Render a branded short video for each of the job's platform drafts (Remotion + ffmpeg) and
-    attach it. The draft's image becomes the moving background. If a `script` is given, it generates
-    an AI voiceover (Piper TTS) + time-synced kinetic captions; otherwise a silent on-screen caption.
-    Sizes per platform (§7b)."""
+    attach it. With a `script`, it generates an AI voiceover (Piper/ElevenLabs TTS) + time-synced
+    kinetic captions; the background defaults to a real Grok Imagine motion clip (image-to-video,
+    §7b) animating the draft's image — set animate=false to use the free Ken-Burns still instead.
+    Without a script: a silent on-screen caption. Sizes per platform."""
     import tempfile
     import requests
     jid = (args.get("job_id") or "").strip()
@@ -679,6 +716,7 @@ def make_video(args, **kwargs):
     if kicker.lower() == "unassigned":
         kicker = ""
     script = (args.get("script") or "").strip()  # spoken voiceover narration → voiced video (§7b Phase 3)
+    animate = bool(args.get("animate", True))     # default: real Grok motion background (image-to-video)
     try:
         dur = max(4.0, min(15.0, float(args.get("duration_sec") or 6)))
     except (TypeError, ValueError):
@@ -686,9 +724,34 @@ def make_video(args, **kwargs):
     done, failed = [], []
     for d in drafts:
         w, h = db.PLATFORM_VIDEO.get(d["platform"], (1080, 1920))
+        video_url = None
         if script:
-            payload = {"script": script, "imageUrl": d.get("image_path") or "",
-                       "kicker": kicker, "width": w, "height": h}
+            img_url = d.get("image_path") or ""
+            # Default background = a real Grok Imagine motion clip animating the draft's image. xAI
+            # can't reach our LAN, so fetch the image locally first and hand it over as base64.
+            if animate and img_url:
+                imgtmp = None
+                try:
+                    ir = requests.get(img_url, timeout=60)
+                    if ir.ok and ir.content:
+                        itf = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+                        itf.write(ir.content)
+                        itf.close()
+                        imgtmp = itf.name
+                except requests.RequestException:
+                    imgtmp = None
+                if imgtmp:
+                    secs = max(3, min(15, round(len(script.split()) / 2.6)))  # ~clip length ≈ voiceover
+                    motion = ("Gentle, slow cinematic camera push-in with soft natural light and subtle, "
+                              "lifelike motion; calm and premium." + (f" Theme: {kicker}." if kicker else ""))
+                    video_url = _grok_animate(imgtmp, motion, w, h, secs)
+                    try:
+                        os.unlink(imgtmp)
+                    except OSError:
+                        pass
+            payload = {"script": script, "imageUrl": img_url, "kicker": kicker, "width": w, "height": h}
+            if video_url:
+                payload["videoUrl"] = video_url  # renderer loops it under the voiceover + captions
             endpoint, vtimeout = "/video", 1200  # voiced render is frame-by-frame; allow slow CPU renders
         else:
             caption = (args.get("caption") or _video_caption(d["body"])).strip()
@@ -712,7 +775,7 @@ def make_video(args, **kwargs):
             db.add_media_asset("video", media.get("path"), media.get("id"), source="rendered",
                                job_id=job["id"], draft_id=d["id"], platform=d["platform"], width=w, height=h,
                                tags=(args.get("caption") or "").strip() or None)
-            done.append(f"{d['platform']} {w}x{h}")
+            done.append(f"{d['platform']} {w}x{h}{' +Grok-motion' if video_url else ''}")
         except requests.RequestException as e:
             failed.append(f"{d['platform']}: renderer unreachable ({e})")
         except postiz.PostizError as e:

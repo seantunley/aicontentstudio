@@ -62,6 +62,8 @@ def _cockpit_button(job_id, text="\U0001f50d Preview in cockpit"):
 # crash (and one job is processed per run — see main() — so each locked run stays bounded).
 LOCK_STALE_SECONDS = 2700  # 45 min — self-heals a crashed lock, but won't break a long honest run
 RUN_TIMEOUT_SECONDS = 1500  # 25 min — room for deep research + drafting, not a "slap it together" cap
+STUCK_JOB_SECONDS = RUN_TIMEOUT_SECONDS + 300  # 30 min — a job 'processing' past this = its worker died → requeue (§9b)
+MAX_JOB_ATTEMPTS = 3  # resumable loop cap: after this many passes, leave a partial job for review rather than loop (§9b)
 
 
 def _brand_block(job):
@@ -176,7 +178,7 @@ def _run_social_pulse(topic, sources="reddit"):
             "text": "\n".join(lines)[:4000]}
 
 
-def _agent_prompt(job, with_image, with_video=False, with_carousel=False, social_text=""):
+def _agent_prompt(job, with_image, with_video=False, with_carousel=False, social_text="", resume_note=""):
     targets = (job.get("target_platforms") or "").strip()
     # "Set region" steers ONLY region-specific policy + suggested items, NOT the research itself
     # (knowledge/research is worldwide). Brand pack overrides; the operator's market is South Africa.
@@ -203,6 +205,7 @@ def _agent_prompt(job, with_image, with_video=False, with_carousel=False, social
         social_instr = ("Also pull the current social discussion (via social_pulse) and correlate it with "
                         "your web sources. ")
     p = (
+        resume_note +
         f"Work on the EXISTING job {job['id']} — do NOT create a new job. "
         f"Topic: {job['topic']!r}. Brand: {job['brand']}. "
         "Step 1 — research: FIRST consult the knowledge base — use your knowledge-base tools "
@@ -258,7 +261,12 @@ def _agent_prompt(job, with_image, with_video=False, with_carousel=False, social
         "photo — do NOT put a country or nationality on the people in an image prompt (no 'South African "
         "mother' etc.); depict a natural, inclusive mix. AVOID childish, cartoonish, clip-art, 3D-render, "
         "amateur, cluttered or generic-stock looks, and do NOT bake words or text into the image (the "
-        "caption carries the copy). Keep it tasteful so it passes image moderation. Safe and on-brand. "
+        "caption carries the copy). Keep it tasteful so it passes image moderation: for any intimate or "
+        "sensitive subject (e.g. breastfeeding, bathing, a postpartum body), IMPLY it rather than expose "
+        "it — never bare breasts, nipples or genitals; use a nursing cover, blanket, swaddle, clothing, "
+        "cropping, soft focus or a side / over-the-shoulder angle, and centre the face, hands, bond and "
+        "mood instead of anatomy (this still reads as unmistakably on-topic, just modestly framed). "
+        "Safe and on-brand. "
     )
     if with_carousel:
         try:
@@ -285,15 +293,81 @@ def _agent_prompt(job, with_image, with_video=False, with_carousel=False, social
     return p
 
 
+def _resume_note(job, with_image, with_video, with_carousel):
+    """§9b ralph-loop: if a job already has partial work (from an interrupted/earlier pass), tell the
+    agent exactly what's done so it RESUMES the gaps instead of starting over. Empty for a fresh job."""
+    try:
+        drafts = db.list_drafts(job["id"])
+    except Exception:  # noqa: BLE001
+        return ""
+    if not drafts:
+        return ""
+    drafted = sorted({d.get("platform") for d in drafts if d.get("platform")})
+    have_img = sorted({d.get("platform") for d in drafts if d.get("image_path") or d.get("images_json")})
+    have_vid = sorted({d.get("platform") for d in drafts if d.get("video_path")})
+    parts = [f"drafted: {', '.join(drafted) or 'none'}"]
+    if with_image or with_carousel:
+        parts.append(f"with image/carousel: {', '.join(have_img) or 'none'}")
+    if with_video:
+        parts.append(f"with video: {', '.join(have_vid) or 'none'}")
+    return ("RESUMING AN INTERRUPTED RUN — do NOT start over and do NOT recreate anything that already "
+            "exists; skip what's listed as done and complete ONLY the missing pieces. Progress so far — "
+            + "; ".join(parts) + ". ")
+
+
+def _job_complete(job, action, drafts):
+    """Has this job produced everything its action requires? (drafts for all target platforms, plus an
+    image/carousel and/or video per draft when the action calls for them.) Drives the resumable loop."""
+    if not drafts:
+        return False
+    need_carousel = "carousel" in action
+    need_video = "video" in action
+    need_image = ("image" in action) or need_video or need_carousel
+    targets = [p.strip() for p in (job.get("target_platforms") or "").split(",") if p.strip()]
+    if targets:
+        drafted = {d.get("platform") for d in drafts}
+        if not all(p in drafted for p in targets):
+            return False
+    for d in drafts:
+        if need_carousel and not d.get("images_json"):
+            return False
+        if need_image and not (d.get("image_path") or d.get("images_json")):
+            return False
+        if need_video and not d.get("video_path"):
+            return False
+    return True
+
+
+def _requeue_or_fail(job, jid, qa, attempts, detail):
+    """A run timed out or errored. If it left partial progress and passes remain, resume next tick;
+    otherwise mark the job failed. Either way it's surfaced in the Activity log (§9b)."""
+    has_progress = False
+    try:
+        has_progress = bool(db.list_drafts(jid))
+    except Exception:  # noqa: BLE001
+        pass
+    if has_progress and attempts < MAX_JOB_ATTEMPTS:
+        db.enqueue_action(jid, qa)  # back to the queue with the original action
+        db.record_event(jid, f"worker: interrupted ({detail}) — resuming next pass (attempt {attempts}/{MAX_JOB_ATTEMPTS})", actor="system")
+        db.log_system_event("warn", "worker", f"Run interrupted, resuming: {job.get('topic')}", detail, jid)
+    else:
+        db.enqueue_action(jid, "failed")
+        db.record_event(jid, f"worker: {detail}", actor="system")
+        db.log_system_event("error", "worker", f"Job failed: {job.get('topic')}", detail, jid)
+
+
 def process_one(job):
     jid = job["id"]
     qa = job.get("queued_action") or ""
     with_video = "video" in qa
     with_carousel = "carousel" in qa
     with_image = "image" in qa or with_video or with_carousel  # video animates an image; carousel = many
-    db.enqueue_action(jid, "processing")  # claim + mark running (status the cockpit shows)
-    db.record_event(jid, "worker: starting research + draft"
-                    + (" + image" if with_image else "") + (" + video" if with_video else ""), actor="system")
+    attempts = db.bump_attempts(jid)
+    resume_note = _resume_note(job, with_image, with_video, with_carousel)  # "" on a fresh job
+    db.claim_job(jid, qa)  # claim + mark running, stashing the real action so an interrupted run recovers (§9b)
+    db.record_event(jid, ("worker: resuming" if resume_note else "worker: starting") + " research + draft"
+                    + (" + image" if with_image else "") + (" + video" if with_video else "")
+                    + (f" (attempt {attempts})" if attempts > 1 else ""), actor="system")
 
     # 1) Run the agent. Only a genuine run failure — crash, timeout, or never reaching the gate — is
     # a 'failed'. (A draft that reached preview has succeeded; see step 2.)
@@ -308,28 +382,37 @@ def process_one(job):
     social_text = social.get("text") if social else ""
 
     try:
-        r = llm.run_z(_agent_prompt(job, with_image, with_video, with_carousel, social_text=social_text), timeout=RUN_TIMEOUT_SECONDS)
+        r = llm.run_z(_agent_prompt(job, with_image, with_video, with_carousel, social_text=social_text, resume_note=resume_note), timeout=RUN_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
-        db.enqueue_action(jid, "failed")
-        db.record_event(jid, "worker: timed out", actor="system")
-        db.log_system_event("error", "worker", f"Job timed out: {job.get('topic')}",
-                            f"research+draft exceeded {RUN_TIMEOUT_SECONDS}s", jid)
+        _requeue_or_fail(job, jid, qa, attempts, f"timed out (research+draft exceeded {RUN_TIMEOUT_SECONDS}s)")
         return
     except Exception as e:  # noqa: BLE001
-        db.enqueue_action(jid, "failed")
-        db.record_event(jid, f"worker: agent run error: {e}", actor="system")
-        db.log_system_event("error", "worker", f"Job failed: {job.get('topic')}", str(e), jid)
+        _requeue_or_fail(job, jid, qa, attempts, f"agent run error: {e}")
         return
 
     state = db.get_job(jid)["state"]
-    if state != "preview":
+    drafts = db.list_drafts(jid)
+    # Genuine failure: the run produced NOTHING and never reached the gate.
+    if state != "preview" and not drafts:
         db.enqueue_action(jid, "failed")
         db.record_event(jid, f"worker: did not reach preview (state={state}, rc={r.returncode})", actor="system")
         db.log_system_event("error", "worker", f"Job failed: {job.get('topic')}",
                             f"never reached preview (state={state}, rc={r.returncode}); check the agent run", jid)
         return
 
-    # 2) SUCCESS — the drafts are at the gate. From here NOTHING may flip the job to 'failed':
+    # §9b resumable loop: drafts exist but the action's image/video pieces are still missing → send the
+    # job back to the queue to finish ONLY the gaps next pass (never restart, never silently ship partial).
+    if not _job_complete(job, qa, drafts):
+        if attempts < MAX_JOB_ATTEMPTS:
+            db.enqueue_action(jid, qa)  # requeue with the ORIGINAL action; _resume_note scopes the next pass
+            db.record_event(jid, f"worker: partial — resuming missing pieces next pass (attempt {attempts}/{MAX_JOB_ATTEMPTS})", actor="system")
+            db.log_system_event("info", "worker", f"Resuming to finish: {job.get('topic')}",
+                                f"drafts exist but image/video incomplete; attempt {attempts}/{MAX_JOB_ATTEMPTS}", jid)
+            return
+        db.log_system_event("warn", "worker", f"Left for review with missing pieces: {job.get('topic')}",
+                            f"couldn't complete image/video after {MAX_JOB_ATTEMPTS} passes; drafts are ready to review", jid)
+
+    # 2) SUCCESS (or accepted-for-review at the cap) — the drafts are at the gate. From here NOTHING may flip the job to 'failed':
     # polish and the operator ping are best-effort bookkeeping, and the polish sweep backstops any
     # draft missed here. A transient DB hiccup in this block must not bury a good, review-ready job.
     try:
@@ -392,13 +475,54 @@ def _polish_pending(limit=12):
         _polish_one_draft(d, d.get("brand"))
 
 
+def _pid_alive(pid):
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ValueError, TypeError):
+        return False
+
+
 def _locked():
+    """A run is in progress only if the lock's holder PID is BOTH fresh and still alive. A restart or
+    crash leaves a lock whose PID is now dead — we detect that, surface it in the Activity log (§9b),
+    and reclaim immediately instead of stalling the whole queue for the 45-min stale window."""
     if os.path.exists(LOCK):
-        if time.time() - os.path.getmtime(LOCK) < LOCK_STALE_SECONDS:
-            return True
+        try:
+            holder = int((open(LOCK).read() or "0").strip() or 0)
+        except (ValueError, OSError):
+            holder = 0
+        fresh = (time.time() - os.path.getmtime(LOCK)) < LOCK_STALE_SECONDS
+        if fresh and holder and holder != os.getpid() and _pid_alive(holder):
+            return True  # a genuine run is still going — wait
+        if holder and not _pid_alive(holder):  # holder died (crash/restart) — recover + make it visible
+            try:
+                db.log_system_event("warn", "worker", "Recovered an interrupted worker run",
+                                    f"stale lock from dead pid {holder} reclaimed — the queue resumes")
+            except Exception:  # noqa: BLE001
+                pass
     with open(LOCK, "w") as f:
         f.write(str(os.getpid()))
     return False
+
+
+def _recover_interrupted_jobs():
+    """§9b: any job stuck in 'processing' past STUCK_JOB_SECONDS had its worker killed mid-run
+    (crash/restart). Return it to the queue with its original action so the loop CONTINUES instead of
+    leaving it silently stuck, and surface each recovery in the Activity log."""
+    try:
+        recovered = db.recover_stuck_jobs(STUCK_JOB_SECONDS)
+    except Exception as e:  # noqa: BLE001
+        print(f"worker: stuck-job recovery error: {e}")
+        return
+    for j in recovered:
+        action = j.get("claim_action") or "research_draft"
+        topic = (j.get("topic") or "")[:60]
+        db.log_system_event("warn", "worker", f"Recovered a stuck job: {topic}",
+                            f"was 'processing' >{STUCK_JOB_SECONDS // 60}min (worker died); requeued as {action}",
+                            j.get("id"))
+        db.record_event(j.get("id"), f"worker: recovered after interruption — requeued ({action})", actor="system")
+        print(f"worker: recovered stuck job {j.get('id')}")
 
 
 def _maybe_run_scout():
@@ -768,6 +892,7 @@ def main():
         print("worker: another run is in progress, skipping")
         return
     try:
+        _recover_interrupted_jobs()  # §9b: return crashed/interrupted jobs to the queue (surfaced in Activity)
         _maybe_run_scout()
         _check_occasions()
         _process_redrafts()

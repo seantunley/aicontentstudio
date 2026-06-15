@@ -329,11 +329,12 @@ MAKE_VIDEO = {
     "name": "make_video",
     "description": (
         "Render a branded SHORT VIDEO for the job's platform drafts and attach it (Remotion + ffmpeg). "
-        "The draft's already-attached image becomes a slow-zoom background with an animated on-screen "
-        "caption, sized per platform (9:16 for TikTok/Reels, 16:9 for YouTube, etc.). Call this AFTER "
-        "set_draft_image, only when the operator asked for a video. **Pass a `script`** (spoken "
-        "narration) to get an AI voiceover + time-synced kinetic captions; omit it for a silent "
-        "caption-only clip. Publishing still requires the human gate — this only prepares the video."
+        "With a `script`, the background defaults to a real Grok Imagine motion clip animating the "
+        "draft's image (AI voiceover + time-synced kinetic captions over it), sized per platform (9:16 "
+        "for TikTok/Reels, 16:9 for YouTube, etc.). Call this AFTER set_draft_image, only when the "
+        "operator asked for a video. **Pass a `script`** (spoken narration) for the voiced video; omit "
+        "it for a silent caption-only clip. Publishing still requires the human gate — this only "
+        "prepares the video."
     ),
     "parameters": {
         "type": "object",
@@ -343,6 +344,7 @@ MAKE_VIDEO = {
             "caption": {"type": "string", "description": "Optional on-screen caption for the silent (no-script) mode. Defaults to a hook from the post body."},
             "kicker": {"type": "string", "description": "Optional small label above the caption (e.g. the brand or topic)."},
             "duration_sec": {"type": "number", "description": "Silent-mode clip length in seconds (4-15, default 6). Ignored when a script is given (length follows the voiceover)."},
+            "animate": {"type": "boolean", "description": "Default true: animate the draft's image into a real Grok Imagine motion background. Set false to use the free Ken-Burns slow-zoom of the still instead (no video generation)."},
         },
         "required": ["job_id"],
     },

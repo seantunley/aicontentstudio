@@ -256,6 +256,10 @@ def init_db():
             conn.execute("ALTER TABLE jobs ADD COLUMN campaign_id TEXT")  # links a job to a campaign arc (§7e)
         if "pillar" not in cols:
             conn.execute("ALTER TABLE jobs ADD COLUMN pillar TEXT")  # the content pillar this piece serves (§7e)
+        if "claim_action" not in cols:
+            conn.execute("ALTER TABLE jobs ADD COLUMN claim_action TEXT")  # real action stashed at claim, for crash/restart recovery (§9b)
+        if "attempts" not in cols:
+            conn.execute("ALTER TABLE jobs ADD COLUMN attempts INTEGER DEFAULT 0")  # process_one passes, for the resumable-loop cap (§9b)
         # an AI-generated image can be attached to a draft (Phase 2). Uploaded to the publisher at
         # attach-time, so we store the publisher's media reference (id + url), not the local file.
         dcols = [r[1] for r in conn.execute("PRAGMA table_info(drafts)").fetchall()]
@@ -497,6 +501,38 @@ def due_occasions():
 def enqueue_action(job_id, action="research_draft"):
     with _db() as conn:
         conn.execute("UPDATE jobs SET queued_action=?, updated_at=? WHERE id=?", (action, _utcnow(), job_id))
+
+
+def claim_job(job_id, action):
+    """Mark a job running ('processing' — the marker the cockpit shows) while STASHING its real action
+    in claim_action, so an interrupted run (crash/restart) can be returned to the queue intact (§9b)."""
+    with _db() as conn:
+        conn.execute("UPDATE jobs SET claim_action=?, queued_action='processing', updated_at=? WHERE id=?",
+                     (action, _utcnow(), job_id))
+
+
+def bump_attempts(job_id):
+    """Increment + return a job's process_one attempt count (caps the resumable loop, §9b)."""
+    with _db() as conn:
+        conn.execute("UPDATE jobs SET attempts=COALESCE(attempts,0)+1 WHERE id=?", (job_id,))
+        row = conn.execute("SELECT attempts FROM jobs WHERE id=?", (job_id,)).fetchone()
+    return (row["attempts"] if row else 1)
+
+
+def recover_stuck_jobs(max_age_seconds):
+    """Jobs stuck in 'processing' longer than any honest run could take = their worker died. Return them
+    to the queue with their original action so the loop continues instead of hanging silently. Returns
+    the recovered rows (with claim_action = the action being resumed) for surfacing in the Activity log."""
+    import datetime as _dt
+    cutoff = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(seconds=max_age_seconds)).isoformat()
+    with _db() as conn:
+        rows = [dict(r) for r in conn.execute(
+            "SELECT * FROM jobs WHERE queued_action='processing' AND claim_action IS NOT NULL AND updated_at < ?",
+            (cutoff,)).fetchall()]
+        for r in rows:
+            conn.execute("UPDATE jobs SET queued_action=claim_action, claim_action=NULL, updated_at=? WHERE id=?",
+                         (_utcnow(), r["id"]))
+    return rows
 
 
 def get_queued_jobs():

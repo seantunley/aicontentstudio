@@ -1,11 +1,11 @@
-import { AbsoluteFill, Img, Audio, useCurrentFrame, useVideoConfig, interpolate, spring } from 'remotion';
+import { AbsoluteFill, Img, OffthreadVideo, Audio, useCurrentFrame, useVideoConfig, interpolate, spring } from 'remotion';
 
 // §7b Phase 3 — a real short: AI image (Ken-Burns) + voiceover audio + time-synced kinetic captions,
 // 9:16. Captions come in pre-timed (seconds) from the /video endpoint; audio is a data URI so it
 // travels in inputProps with no asset server.
 const FONT = "'Liberation Sans', 'DejaVu Sans', 'Noto Color Emoji', sans-serif";
 
-export const VoicedVideo = ({ imageUrl, audioData, captions = [], accent = '#c8f24e', kicker = '' }) => {
+export const VoicedVideo = ({ imageUrl, videoUrl, audioData, captions = [], accent = '#c8f24e', kicker = '' }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames, width, height } = useVideoConfig();
   const t = frame / fps;
@@ -20,11 +20,19 @@ export const VoicedVideo = ({ imageUrl, audioData, captions = [], accent = '#c8f
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#0c0e10', fontFamily: FONT }}>
-      <AbsoluteFill style={{ transform: `scale(${scale}) translateY(${drift}px)` }}>
-        {imageUrl
-          ? <Img src={imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          : <AbsoluteFill style={{ background: 'radial-gradient(circle at 50% 30%, #1b2024, #0c0e10)' }} />}
-      </AbsoluteFill>
+      {videoUrl ? (
+        // Grok Imagine motion clip as the moving background — its own motion, so no Ken-Burns
+        // transform; loop + mute (our voiceover carries the audio; the clip has none).
+        <AbsoluteFill>
+          <OffthreadVideo src={videoUrl} loop muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </AbsoluteFill>
+      ) : (
+        <AbsoluteFill style={{ transform: `scale(${scale}) translateY(${drift}px)` }}>
+          {imageUrl
+            ? <Img src={imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <AbsoluteFill style={{ background: 'radial-gradient(circle at 50% 30%, #1b2024, #0c0e10)' }} />}
+        </AbsoluteFill>
+      )}
 
       {/* legibility scrim, heavier at the bottom where captions sit */}
       <AbsoluteFill style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.86) 0%, rgba(0,0,0,0.34) 45%, rgba(0,0,0,0.05) 72%)' }} />

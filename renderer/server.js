@@ -159,8 +159,8 @@ app.post('/preview', async (req, res) => {
 
 // POST /video -> script + image => Piper voiceover + time-synced captions => 9:16 mp4 (§7b Phase 3)
 app.post('/video', async (req, res) => {
-  const { script = '', imageUrl = '', accent = '#c8f24e', kicker = '', width = 1080, height = 1920,
-    captions: wantCaps = false } = req.body || {}; // captions overlay off by default
+  const { script = '', imageUrl = '', videoUrl = '', accent = '#c8f24e', kicker = '', width = 1080, height = 1920,
+    captions: wantCaps = false } = req.body || {}; // videoUrl = a moving background (Grok Imagine clip); captions overlay off by default
   if (!script.trim()) return res.status(400).json({ error: 'script required' });
   const stamp = `${process.pid}_${Math.round(Math.random() * 1e9)}`;
   const mp3 = path.join(os.tmpdir(), `vo_${stamp}.mp3`);
@@ -170,12 +170,12 @@ app.post('/video', async (req, res) => {
     const durSec = Math.min(90, Math.max(3, audioDurationSec(mp3)));
     const audioData = 'data:audio/mpeg;base64,' + fs.readFileSync(mp3).toString('base64');
     fs.unlink(mp3, () => {});
-    console.log(`/video: tts=${engine} dur=${durSec.toFixed(1)}s captions=${wantCaps}`);
+    console.log(`/video: tts=${engine} dur=${durSec.toFixed(1)}s captions=${wantCaps} bg=${videoUrl ? 'video' : (imageUrl ? 'image' : 'gradient')}`);
     const captions = wantCaps ? chunkCaptions(script, durSec) : [];
 
     await ensureBrowser();
     const serveUrl = await getBundle();
-    const inputProps = { imageUrl, audioData, captions, accent, kicker, width, height, durationSec: durSec };
+    const inputProps = { imageUrl, videoUrl, audioData, captions, accent, kicker, width, height, durationSec: durSec };
     const composition = await selectComposition({ serveUrl, id: 'VoicedVideo', inputProps });
     // NOTE: this container has 1 core, so concurrency stays at the default (1); 24fps keeps frames down.
     await renderMedia({ composition, serveUrl, codec: 'h264', outputLocation: out, inputProps,
