@@ -271,6 +271,9 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .work-row .wmeta .pchip { width: 19px; height: 19px; border-radius: 5px; }  /* slightly smaller than the picker badge for the compact row */
 .work-row .wfmt { font-family: var(--mono); font-size: 9px; letter-spacing: 0.09em; text-transform: uppercase;
   color: var(--accent); border: 1px solid rgba(201,162,39,0.35); border-radius: 99px; padding: 1px 7px; white-space: nowrap; }
+/* embedded engine UI (e.g. Mautic /funnels) — frame the real thing inside the desk */
+.embed-frame { border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: #fff; margin-top: 10px; }
+.embed-frame iframe { width: 100%; height: calc(100vh - 150px); min-height: 520px; border: 0; display: block; }
 .work-row--processing { border-color: var(--cyan); border-left: 2px solid var(--cyan); background: var(--cyan-bg); }
 .work-row--processing .ws { color: var(--cyan); font-weight: 600; }
 .work-row--failed { border-left: 2px solid var(--red); }

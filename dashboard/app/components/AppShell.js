@@ -30,6 +30,7 @@ const ICONS = {
   campaigns: <><path d="M3 11l12-5v12L3 13z" /><path d="M15 8a3 3 0 0 1 0 6" /><path d="M6 13v4a2 2 0 0 0 2 2h1" /></>,
   performance: <><path d="M3 3v18h18" /><rect x="7" y="11" width="3" height="7" /><rect x="12" y="7" width="3" height="11" /><rect x="17" y="4" width="3" height="14" /></>,
   engagement: <><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8A8.5 8.5 0 0 1 12.5 3 8.38 8.38 0 0 1 21 11.5z" /></>,
+  funnels: <><path d="M22 3H2l8 9.46V19l4 2v-8.54z" /></>,
   learnings: <><path d="M9 18h6M10 21h4" /><path d="M15.1 14c.2-1 .7-1.7 1.4-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.8 1.2 1.5 1.4 2.5" /></>,
   activity: <><path d="M3 12h4l2.5-7 5 14 2.5-7H21" /></>,
   more: <><circle cx="5" cy="12" r="1.4" /><circle cx="12" cy="12" r="1.4" /><circle cx="19" cy="12" r="1.4" /></>,
@@ -44,6 +45,7 @@ const GROUPS = [
     { href: '/upcoming', key: 'upcoming', label: 'Upcoming', countKey: 'upcoming', calm: true },
     { href: '/calendar', key: 'calendar', label: 'Calendar' },
     { href: '/engagement', key: 'engagement', label: 'Engagement' },
+    { href: '/funnels', key: 'funnels', label: 'Funnels' },
     { href: '/performance', key: 'performance', label: 'Performance' },
   ]},
   { label: 'Intake', items: [

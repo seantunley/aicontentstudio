@@ -90,6 +90,9 @@ services:
       - CHATWOOT_ACCOUNT_ID=${CHATWOOT_ACCOUNT_ID:-}
       - CHATWOOT_WEBHOOK_TOKEN=${CHATWOOT_WEBHOOK_TOKEN:-}   # shared secret Chatwoot carries in ?token= when it calls /api/engagement/webhook (proactive drafting)
       - CHATWOOT_DEFAULT_BRAND=${CHATWOOT_DEFAULT_BRAND:-}   # brand voice inbound replies draft in; empty = sole brand, else "unassigned"
+      # § funnels — Mautic (runs from mautic/docker-compose.yml on :4010). Browser-reachable LAN URL
+      # the /funnels page iframes (the real Mautic UI embedded in the desk).
+      - MAUTIC_PUBLIC_URL=${MAUTIC_PUBLIC_URL:-http://172.18.18.101:4010}
     extra_hosts:
       - "host.docker.internal:host-gateway"        # reach Postiz's host-published port from this bridge container
     volumes:
