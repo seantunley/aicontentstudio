@@ -20,3 +20,5 @@ renderer/.remotion/
 renderer/out/
 chatwoot/.env
 chatwoot/data/
+mautic/.env
+mautic/data/

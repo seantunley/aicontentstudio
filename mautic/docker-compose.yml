@@ -1,0 +1,70 @@
+# Mautic — open-source marketing-automation / funnel engine for the studio (§ funnels).
+# ─────────────────────────────────────────────────────────────────────────────
+# NOT YET ACTIVE. This is a ready-to-stand-up sibling stack (mirrors chatwoot/ and
+# postiz/). Bring it up ONLY when there's a real audience/leads to nurture — see
+# docs/mautic-integration.md. It owns the OUTBOUND funnel lane (contacts, segments,
+# scoring, drip campaigns, landing pages, forms, email/SMS); Chatwoot keeps the
+# inbox/social-DM lane and the studio keeps content creation.
+#
+# Bring up (when ready):
+#   docker compose --project-directory mautic -f mautic/docker-compose.yml --env-file mautic/.env up -d
+# First run crees the DB schema; then create the admin at http://<box-LAN-IP>:4010.
+#
+# Free + self-hosted (GPL-3.0). Two things reach OUTSIDE the box and are NOT fully local:
+#   • email sending needs an SMTP relay / Amazon SES (you can't deliverably send mail
+#     straight from a residential/LAN IP) — set it in mautic/.env.
+#   • public landing pages / forms need a public URL leads can reach (LAN-only won't do).
+# The automation/campaign engine itself runs entirely local.
+
+services:
+  mautic-db:
+    image: mariadb:11.4                       # pinned; verify the current stable before bring-up
+    container_name: mautic-db
+    restart: unless-stopped
+    environment:
+      - MARIADB_ROOT_PASSWORD=${MAUTIC_DB_ROOT_PASSWORD}
+      - MARIADB_DATABASE=${MAUTIC_DB_NAME:-mautic}
+      - MARIADB_USER=${MAUTIC_DB_USER:-mautic}
+      - MARIADB_PASSWORD=${MAUTIC_DB_PASSWORD}
+    volumes:
+      - ./data/mysql:/var/lib/mysql           # gitignored
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  mautic:                                      # web UI + API (the funnel builder)
+    image: mautic/mautic:${MAUTIC_TAG:-5-apache}   # verify + pin to the current stable digest before bring-up
+    container_name: mautic
+    restart: unless-stopped
+    depends_on:
+      mautic-db:
+        condition: service_healthy
+    environment:
+      - DOCKER_MAUTIC_ROLE=mautic_web
+      - MAUTIC_DB_HOST=mautic-db
+      - MAUTIC_DB_NAME=${MAUTIC_DB_NAME:-mautic}
+      - MAUTIC_DB_USER=${MAUTIC_DB_USER:-mautic}
+      - MAUTIC_DB_PASSWORD=${MAUTIC_DB_PASSWORD}
+      - MAUTIC_RUN_CRON_JOBS=false             # cron handled by the dedicated mautic-cron container below
+      - MAUTIC_TRUSTED_PROXIES=${MAUTIC_TRUSTED_PROXIES:-0.0.0.0/0}
+    volumes:
+      - ./data/mautic:/var/www/html            # gitignored
+    ports:
+      - "4010:80"                              # LAN cockpit; put behind the same access model as the other admin UIs
+
+  mautic-cron:                                 # runs segments/campaigns/email queue on a schedule (Mautic needs this)
+    image: mautic/mautic:${MAUTIC_TAG:-5-apache}
+    container_name: mautic-cron
+    restart: unless-stopped
+    depends_on:
+      - mautic
+    environment:
+      - DOCKER_MAUTIC_ROLE=mautic_cron
+      - MAUTIC_DB_HOST=mautic-db
+      - MAUTIC_DB_NAME=${MAUTIC_DB_NAME:-mautic}
+      - MAUTIC_DB_USER=${MAUTIC_DB_USER:-mautic}
+      - MAUTIC_DB_PASSWORD=${MAUTIC_DB_PASSWORD}
+    volumes:
+      - ./data/mautic:/var/www/html            # shares the app volume with the web container
