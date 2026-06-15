@@ -267,6 +267,10 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 .work-row .wt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
 .work-row .wsub { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.04em; color: var(--faint); white-space: nowrap; }
 .work-row .ws { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.work-row .wmeta { display: flex; gap: 5px; align-items: center; flex: none; }
+.work-row .wmeta .pchip { width: 19px; height: 19px; border-radius: 5px; }  /* slightly smaller than the picker badge for the compact row */
+.work-row .wfmt { font-family: var(--mono); font-size: 9px; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--accent); border: 1px solid rgba(201,162,39,0.35); border-radius: 99px; padding: 1px 7px; white-space: nowrap; }
 .work-row--processing { border-color: var(--cyan); border-left: 2px solid var(--cyan); background: var(--cyan-bg); }
 .work-row--processing .ws { color: var(--cyan); font-weight: 600; }
 .work-row--failed { border-left: 2px solid var(--red); }

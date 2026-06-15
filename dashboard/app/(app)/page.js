@@ -3,8 +3,19 @@ import { pipelineCounts, inProgress, recentJobs, costSummary, approvalQueue, pub
 import { zar } from '@/lib/money';
 import { za } from '@/lib/time';
 import { getActiveBrand } from '@/lib/brand';
+import { PLATFORM_META, PLATFORM_ICON } from '@/lib/platforms';
 
 export const dynamic = 'force-dynamic';
+
+// The format a job is producing, from its action (claim_action holds it while 'processing').
+function jobFormat(action) {
+  if (!action) return null;
+  if (action.includes('video')) return 'Reel';
+  if (action.includes('carousel')) return 'Carousel';
+  if (action.includes('image')) return 'Image';
+  if (action.includes('research_draft')) return 'Text';
+  return null;
+}
 
 const short = (id) => (id ? id.slice(0, 8) : '');
 const when = (s) => za(s);
@@ -111,9 +122,25 @@ export default async function Overview() {
           <>
             {work.map((j) => {
               const w = workState(j.queued_action);
+              // while 'processing' the real action is stashed in claim_action; otherwise it's the queued_action
+              const action = j.queued_action === 'processing' ? (j.claim_action || '') : (j.queued_action || '');
+              const fmt = jobFormat(action);
+              const plats = (j.target_platforms || '').split(',').map((s) => s.trim()).filter(Boolean);
               return (
                 <div className={`work-row work-row--${w.cls}`} key={j.id}>
                   <span className={`dot ${w.cls}`} />
+                  <span className="wmeta">
+                    {plats.map((p) => {
+                      const m = PLATFORM_META[p] || { color: '#555' };
+                      const d = PLATFORM_ICON[p];
+                      return (
+                        <span className="pchip" key={p} title={m.label || p} style={{ background: m.color }}>
+                          {d ? <svg width="13" height="13" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d={d} /></svg> : (m.glyph || p.slice(0, 2).toUpperCase())}
+                        </span>
+                      );
+                    })}
+                    {fmt ? <span className="wfmt">{fmt}</span> : null}
+                  </span>
                   <span className="wt"><Link href={`/job/${j.id}`}>{j.topic}</Link></span>
                   <span className="wsub">{w.sub}</span>
                   <span className="ws">{w.label}{w.cls === 'processing' ? ` · ${ago(j.updated_at)}` : ''}</span>
