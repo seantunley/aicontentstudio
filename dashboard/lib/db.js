@@ -578,6 +578,22 @@ function _nthWeekdayDate(year, month, weekday, n) {
   const lastWd = (new Date(Date.UTC(year, month - 1, dim)).getUTCDay() + 6) % 7;
   return new Date(Date.UTC(year, month - 1, dim - ((((lastWd - weekday) % 7) + 7) % 7)));
 }
+// Western (Gregorian) Easter Sunday for `year` — Anonymous Gregorian computus. Moveable feasts are a
+// day offset from this (Good Friday -2, Easter Monday +1, Shrove Tuesday -47, Ash Wednesday -46…).
+function _easterDate(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100), c = year % 100;
+  const d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(Date.UTC(year, month - 1, day));
+}
 function nextOccurrence(rule, fromDate) {
   let r = rule;
   if (typeof r === 'string') { try { r = JSON.parse(r); } catch { return null; } }
@@ -589,6 +605,8 @@ function nextOccurrence(rule, fromDate) {
       if (cand.getUTCMonth() !== r.month - 1) cand = null; // guard impossible dates (e.g. Feb 30)
     } else if (r.type === 'nth_weekday') {
       cand = _nthWeekdayDate(year, r.month, r.weekday, r.n);
+    } else if (r.type === 'easter_relative') {
+      cand = new Date(_easterDate(year).getTime() + (Number(r.offset) || 0) * 86400000);
     }
     if (cand && cand >= fromDate) return cand;
   }

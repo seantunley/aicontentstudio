@@ -337,6 +337,9 @@ _OCCASION_SEED = [
     ("New Year's Day", {"type": "fixed", "month": 1, "day": 1}, ""),
     ("Valentine's Day", {"type": "fixed", "month": 2, "day": 14}, ""),
     ("Human Rights Day", {"type": "fixed", "month": 3, "day": 21}, "ZA"),
+    ("Good Friday", {"type": "easter_relative", "offset": -2}, ""),
+    ("Easter Sunday", {"type": "easter_relative", "offset": 0}, ""),
+    ("Easter Monday / Family Day", {"type": "easter_relative", "offset": 1}, "ZA"),
     ("Workers' Day", {"type": "fixed", "month": 5, "day": 1}, "ZA"),
     ("Mother's Day", {"type": "nth_weekday", "month": 5, "weekday": 6, "n": 2}, ""),
     ("Youth Day", {"type": "fixed", "month": 6, "day": 16}, "ZA"),
@@ -374,6 +377,23 @@ def _nth_weekday_date(year, month, weekday, n):
     return datetime.date(year, month, last - (d.weekday() - weekday) % 7)
 
 
+def _easter_date(year):
+    """Western (Gregorian) Easter Sunday for `year` — Anonymous Gregorian computus. Moveable feasts
+    (Good Friday, Easter Monday, Shrove Tuesday, etc.) are expressed as a day offset from this."""
+    a = year % 19
+    b, c = divmod(year, 100)
+    d, e = divmod(b, 4)
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = divmod(c, 4)
+    el = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * el) // 451
+    month = (h + el - 7 * m + 114) // 31
+    day = ((h + el - 7 * m + 114) % 31) + 1
+    return datetime.date(year, month, day)
+
+
 def next_occurrence(rule, from_date):
     """Next date this rule fires on/after from_date (rolls into next year if this year's has passed)."""
     if isinstance(rule, str):
@@ -392,6 +412,11 @@ def next_occurrence(rule, from_date):
         elif t == "nth_weekday":
             try:
                 cand = _nth_weekday_date(year, int(rule["month"]), int(rule["weekday"]), int(rule["n"]))
+            except (ValueError, KeyError, TypeError):
+                continue
+        elif t == "easter_relative":
+            try:
+                cand = _easter_date(year) + datetime.timedelta(days=int(rule.get("offset", 0)))
             except (ValueError, KeyError, TypeError):
                 continue
         if cand and cand >= from_date:

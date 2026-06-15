@@ -5,6 +5,12 @@ import { useUI } from './ui';
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']; // 0=Mon..6=Sun
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const NTH = [{ v: 1, l: '1st' }, { v: 2, l: '2nd' }, { v: 3, l: '3rd' }, { v: 4, l: '4th' }, { v: -1, l: 'Last' }];
+// Moveable feasts, as a day offset from Easter Sunday (computed each year). Covers the common ones.
+const EASTER = [
+  { v: -47, l: 'Shrove Tuesday (Pancake Day)' }, { v: -46, l: 'Ash Wednesday' }, { v: -7, l: 'Palm Sunday' },
+  { v: -2, l: 'Good Friday' }, { v: 0, l: 'Easter Sunday' }, { v: 1, l: 'Easter Monday' },
+  { v: 39, l: 'Ascension Day' }, { v: 49, l: 'Pentecost' },
+];
 
 // Real SVG flag images (render everywhere — emoji flags don't on Windows/older browsers). flagcdn
 // is keyed by ISO 3166-1 alpha-2; no country code => a globe.
@@ -19,6 +25,11 @@ function ruleText(raw) {
   const r = parseRule(raw);
   if (r.type === 'fixed') return `${MONTHS[r.month - 1]} ${r.day}`;
   if (r.type === 'nth_weekday') return `${(NTH.find((n) => n.v === r.n) || {}).l || r.n} ${WEEKDAYS[r.weekday]} of ${MONTHS[r.month - 1]}`;
+  if (r.type === 'easter_relative') {
+    const off = Number(r.offset) || 0;
+    const named = EASTER.find((x) => x.v === off);
+    return named ? named.l : `Easter ${off > 0 ? '+' : ''}${off} day${Math.abs(off) === 1 ? '' : 's'}`;
+  }
   return '—';
 }
 function fmtDate(iso) {
@@ -35,7 +46,7 @@ function countdown(days) {
   return `in ${Math.round(days / 30)} months`;
 }
 
-const BLANK = { brand: 'all', name: '', region: '', lead_days: 14, sensitive: 0, auto_draft: 0, mode: 'fixed', month: 1, day: 1, n: 2, weekday: 6 };
+const BLANK = { brand: 'all', name: '', region: '', lead_days: 14, sensitive: 0, auto_draft: 0, mode: 'fixed', month: 1, day: 1, n: 2, weekday: 6, offset: -2 };
 
 export function OccasionsManager({ occasions, brand, countries = [] }) {
   const ui = useUI();
@@ -75,8 +86,8 @@ export function OccasionsManager({ occasions, brand, countries = [] }) {
     setEditing({
       id: o.id, brand: o.brand, name: o.name, region: o.region || '', lead_days: o.lead_days ?? 14,
       sensitive: o.sensitive, auto_draft: o.auto_draft, enabled: o.enabled,
-      mode: r.type === 'nth_weekday' ? 'nth' : 'fixed',
-      month: r.month || 1, day: r.day || 1, n: r.n || 2, weekday: r.weekday ?? 6,
+      mode: r.type === 'nth_weekday' ? 'nth' : r.type === 'easter_relative' ? 'easter' : 'fixed',
+      month: r.month || 1, day: r.day || 1, n: r.n || 2, weekday: r.weekday ?? 6, offset: r.offset ?? -2,
     });
   }
   async function save(e) {
@@ -84,7 +95,9 @@ export function OccasionsManager({ occasions, brand, countries = [] }) {
     if (!editing.name?.trim()) { ui.toast('Name is required', 'err'); return; }
     const rule = editing.mode === 'nth'
       ? { type: 'nth_weekday', month: Number(editing.month), weekday: Number(editing.weekday), n: Number(editing.n) }
-      : { type: 'fixed', month: Number(editing.month), day: Number(editing.day) };
+      : editing.mode === 'easter'
+        ? { type: 'easter_relative', offset: Number(editing.offset) }
+        : { type: 'fixed', month: Number(editing.month), day: Number(editing.day) };
     setBusy(true);
     const { ok, data } = await post({ id: editing.id, brand: editing.brand, name: editing.name.trim(), rule, region: editing.region, lead_days: Number(editing.lead_days) || 14, sensitive: editing.sensitive ? 1 : 0, auto_draft: editing.auto_draft ? 1 : 0, enabled: 1 });
     if (ok) { ui.toast('Occasion saved'); window.location.reload(); return; }
@@ -167,6 +180,7 @@ export function OccasionsManager({ occasions, brand, countries = [] }) {
                     <select className="input" value={editing.mode} onChange={set('mode')}>
                       <option value="fixed">A fixed date</option>
                       <option value="nth">A recurring weekday</option>
+                      <option value="easter">Relative to Easter</option>
                     </select>
                   </label>
                 </div>
@@ -180,7 +194,7 @@ export function OccasionsManager({ occasions, brand, countries = [] }) {
                       <input className="input" type="number" min="1" max="31" value={editing.day} onChange={set('day')} />
                     </label>
                   </div>
-                ) : (
+                ) : editing.mode === 'nth' ? (
                   <div className="field-row">
                     <label className="occ-field"><span>Which</span>
                       <select className="input" value={editing.n} onChange={set('n')}>{NTH.map((n) => <option key={n.v} value={n.v}>{n.l}</option>)}</select>
@@ -190,6 +204,12 @@ export function OccasionsManager({ occasions, brand, countries = [] }) {
                     </label>
                     <label className="occ-field"><span>Of</span>
                       <select className="input" value={editing.month} onChange={set('month')}>{MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}</select>
+                    </label>
+                  </div>
+                ) : (
+                  <div className="field-row">
+                    <label className="occ-field"><span>Easter day (date is computed each year)</span>
+                      <select className="input" value={editing.offset} onChange={set('offset')}>{EASTER.map((x) => <option key={x.v} value={x.v}>{x.l}</option>)}</select>
                     </label>
                   </div>
                 )}
