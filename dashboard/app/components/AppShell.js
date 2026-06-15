@@ -153,7 +153,7 @@ export function AppShell({ user, counts, brands, activeBrand, children }) {
             <div className="strap"><span className="pulse" /> operator&rsquo;s desk</div>
           </div>
           <BrandSwitcher brands={brands} activeBrand={activeBrand} />
-          <NewJobButton block defaultBrand={activeBrand} />
+          <NewJobButton block defaultBrand={activeBrand} brands={brands} />
           <nav className="nav">
             {GROUPS.map((g) => (
               <div key={g.label} className={`nav-group ${collapsed[g.label] ? 'collapsed' : ''}`}>
@@ -178,7 +178,7 @@ export function AppShell({ user, counts, brands, activeBrand, children }) {
           <div className="mobile-top">
             <Wordmark />
             <BrandSwitcher brands={brands} activeBrand={activeBrand} />
-            <NewJobButton defaultBrand={activeBrand} />
+            <NewJobButton defaultBrand={activeBrand} brands={brands} />
           </div>
           <main className="main">{children}</main>
         </div>

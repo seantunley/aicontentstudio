@@ -98,6 +98,16 @@ def _campaign_block(job):
             "others in the series (its own angle/hook). ")
 
 
+def _pillar_block(job):
+    """If the job is tagged with a content pillar (§7e), focus the piece squarely on that theme.
+    The brand block lists the whole pillar menu; this narrows THIS piece to one of them. Empty otherwise."""
+    p = (job.get("pillar") or "").strip()
+    if not p:
+        return ""
+    return (f"This piece serves the brand's {p!r} content pillar — keep it squarely on that theme and "
+            "angle; don't drift into the brand's other pillars. ")
+
+
 def _learnings_block(job):
     """Inject the operator's recent feedback (drafts they rewrote, drafts they rejected) so generation
     learns their voice and avoids rejected patterns (§7). Empty until there's feedback."""
@@ -232,6 +242,7 @@ def _agent_prompt(job, with_image, with_video=False, with_carousel=False, social
         "never shame, scare, or use false urgency (especially on health or sensitive topics). "
         + _brand_block(job)
         + _campaign_block(job)
+        + _pillar_block(job)
         + _learnings_block(job)
         + step2
     )

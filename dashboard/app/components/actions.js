@@ -68,11 +68,12 @@ export function PlatformPicker({ selected, onToggle }) {
   );
 }
 
-export function NewJobButton({ block, defaultBrand }) {
+export function NewJobButton({ block, defaultBrand, brands }) {
   const ui = useUI();
   const [open, setOpen] = useState(false);
   const [topic, setTopic] = useState('');
   const [brand, setBrand] = useState(defaultBrand || '');
+  const [pillar, setPillar] = useState('');
   const [withImage, setWithImage] = useState(false);
   const [withVideo, setWithVideo] = useState(false);
   const [withCarousel, setWithCarousel] = useState(false);
@@ -83,6 +84,9 @@ export function NewJobButton({ block, defaultBrand }) {
 
   const platforms = Object.keys(selected).filter((p) => selected[p]);
   const caps = capsFor(platforms);
+  // §7e content pillars for the chosen brand (stored one-per-line/comma) — offered as a datalist.
+  const brandRow = (brands || []).find((b) => b.slug === (brand || '').trim().toLowerCase());
+  const pillarOpts = (brandRow?.pillars || '').split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
   // When the platform mix changes, drop any format the new mix can't all carry, and keep the slide
   // count within the tightest album ceiling. (A job applies one format to every platform it targets.)
   useEffect(() => {
@@ -112,7 +116,7 @@ export function NewJobButton({ block, defaultBrand }) {
     if (!topic.trim()) return;
     if (!platforms.length) { ui.toast('Pick at least one platform', 'err'); return; }
     setBusy(true);
-    const { ok, data } = await post('/api/jobs/new', { topic, brand, withImage: withImage || withVideo || withCarousel, withVideo, withCarousel, slides: withCarousel ? slides : undefined, platforms });
+    const { ok, data } = await post('/api/jobs/new', { topic, brand, pillar: pillar.trim() || undefined, withImage: withImage || withVideo || withCarousel, withVideo, withCarousel, slides: withCarousel ? slides : undefined, platforms });
     if (ok) { ui.toast('Job queued. Researching in the background.'); window.location.href = '/'; return; }
     ui.toast(data.error || 'Failed to queue', 'err'); setBusy(false);
   }
@@ -128,6 +132,9 @@ export function NewJobButton({ block, defaultBrand }) {
             <input className="input" autoFocus placeholder="topic, e.g. 'latch tips for newborns'"
                    value={topic} onChange={(e) => setTopic(e.target.value)} />
             <input className="input" placeholder="brand (optional)" value={brand} onChange={(e) => setBrand(e.target.value)} />
+            <input className="input" list="njpillars" placeholder={pillarOpts.length ? 'content pillar (optional) — pick or type' : 'content pillar (optional)'}
+                   value={pillar} onChange={(e) => setPillar(e.target.value)} />
+            {pillarOpts.length ? <datalist id="njpillars">{pillarOpts.map((p) => <option key={p} value={p} />)}</datalist> : null}
             <div>
               <div className="card-foot" style={{ margin: '2px 0 7px' }}>
                 PLATFORMS {channels && channels.length ? <span className="dim">· connected are pre-selected</span> : null}
@@ -744,6 +751,7 @@ export function QueueItem({ job }) {
         </div>
         <div className="qcard-meta">
           {flagged ? <span className="badge badge--review">review later</span> : null}
+          {job.pillar ? <span className="pillar-chip" title="Content pillar this piece serves">{job.pillar}</span> : null}
           {job.has_pulse ? <span className="qchip-social" title="Grounded in current social discussion (last ~30 days)">📰 social</span> : null}
           {platforms.map((p) => <PlatformChip key={p} platform={p} />)}
           <span className="qcard-id">{job.id.slice(0, 8)}</span>

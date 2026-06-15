@@ -531,6 +531,10 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
 
 /* content pillars (§7e) — scout tagging + coverage */
 .pillar-chip { font-family: var(--mono); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-2); background: var(--accent-bg); border: 1px solid transparent; border-radius: 999px; padding: 2px 8px; }
+/* a defined pillar with nothing made yet — a visible coverage gap */
+.pillar-chip--gap { color: var(--faint); background: transparent; border-color: var(--line-2); }
+/* made, but not in the brand's current pillar list */
+.pillar-chip--extra { color: var(--muted); background: transparent; border-color: var(--line); border-style: dashed; }
 .pillar-cov { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 
 /* engagement inbox (§3d, Chatwoot) */

@@ -254,6 +254,7 @@ QUEUE_CONTENT = {
                 "description": "Format: none = text only; image = single image; video = short branded clip (reel/Short/TikTok); carousel = multi-image swipe.",
             },
             "slides": {"type": "integer", "description": "For media='carousel' only: number of slides (2-10, default 4)."},
+            "pillar": {"type": "string", "description": "Optional. The brand content pillar this piece serves, ONLY if the operator explicitly names a theme/pillar. Never invent one."},
         },
         "required": ["topic", "brand"],
     },

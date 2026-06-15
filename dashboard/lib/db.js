@@ -245,21 +245,33 @@ export function retryJob(jobId) {
 }
 
 // Originate a job from the cockpit: create it + queue research+draft for the worker to pick up.
-export function createAndQueueJob(topic, brand, who, withImage, platforms, withVideo, withCarousel, slides) {
+export function createAndQueueJob(topic, brand, who, withImage, platforms, withVideo, withCarousel, slides, pillar) {
   const d = db();
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   const action = withCarousel ? 'research_draft_carousel' : withVideo ? 'research_draft_image_video' : withImage ? 'research_draft_image' : 'research_draft';
   const targets = platforms && platforms.length ? platforms.join(',') : null;
   const meta = withCarousel ? JSON.stringify({ carousel_slides: Math.max(2, Math.min(10, Number(slides) || 4)) }) : '{}';
+  const pil = (pillar || '').trim() || null;
   const tx = d.transaction(() => {
-    d.prepare('INSERT INTO jobs (id,brand,topic,state,source,created_by,created_at,updated_at,meta,queued_action,target_platforms) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
-      .run(id, brand || 'unassigned', topic, 'requested', 'dashboard', who, now, now, meta, action, targets);
+    d.prepare('INSERT INTO jobs (id,brand,topic,state,source,created_by,created_at,updated_at,meta,queued_action,target_platforms,pillar) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(id, brand || 'unassigned', topic, 'requested', 'dashboard', who, now, now, meta, action, targets, pil);
     d.prepare('INSERT INTO job_events (job_id,from_state,to_state,actor,at,detail) VALUES (?,?,?,?,?,?)')
       .run(id, null, 'requested', 'human', now, `job created + queued via dashboard by ${who}${targets ? ' for ' + targets : ''}`);
   });
   tx();
   return { ok: true, jobId: id };
+}
+
+// §7e content-pillar coverage across the brand's live output (not just open scout ideas) — so the
+// operator can see and balance which pillars are actually getting made. [{pillar, n}], busiest first.
+export function pillarCoverage(brand) {
+  try {
+    const d = db();
+    return brand && brand !== 'all'
+      ? d.prepare("SELECT pillar, COUNT(*) n FROM jobs WHERE pillar IS NOT NULL AND pillar != '' AND state != 'cancelled' AND brand=? GROUP BY pillar ORDER BY n DESC").all(brand)
+      : d.prepare("SELECT pillar, COUNT(*) n FROM jobs WHERE pillar IS NOT NULL AND pillar != '' AND state != 'cancelled' GROUP BY pillar ORDER BY n DESC").all();
+  } catch { return []; }
 }
 
 export function latestDraft(jobId) {
@@ -320,7 +332,8 @@ export function promoteSuggestion(sid, who, opts = {}) {
   if (!s) throw new Error('no such suggestion');
   if (s.status !== 'new') throw new Error(`already ${s.status}`);
   const platforms = Array.isArray(opts.platforms) ? opts.platforms.filter(Boolean) : [];
-  const res = createAndQueueJob(s.topic, s.brand, who, !!opts.withImage || !!opts.withVideo, platforms, !!opts.withVideo);
+  // carry the scout idea's pillar onto the real job so coverage tracks actual output (§7e)
+  const res = createAndQueueJob(s.topic, s.brand, who, !!opts.withImage || !!opts.withVideo, platforms, !!opts.withVideo, false, undefined, s.pillar);
   d.prepare("UPDATE suggestions SET status='promoted', job_id=? WHERE id=?").run(res.jobId, sid);
   return { ok: true, jobId: res.jobId };
 }

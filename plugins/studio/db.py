@@ -254,6 +254,8 @@ def init_db():
             conn.execute("ALTER TABLE jobs ADD COLUMN target_platforms TEXT")  # comma-sep platforms to draft for
         if "campaign_id" not in cols:
             conn.execute("ALTER TABLE jobs ADD COLUMN campaign_id TEXT")  # links a job to a campaign arc (§7e)
+        if "pillar" not in cols:
+            conn.execute("ALTER TABLE jobs ADD COLUMN pillar TEXT")  # the content pillar this piece serves (§7e)
         # an AI-generated image can be attached to a draft (Phase 2). Uploaded to the publisher at
         # attach-time, so we store the publisher's media reference (id + url), not the local file.
         dcols = [r[1] for r in conn.execute("PRAGMA table_info(drafts)").fetchall()]
@@ -486,15 +488,15 @@ def clear_queued(job_id):
 
 
 # --- jobs -------------------------------------------------------------------
-def create_job(topic, brand="unassigned", source="telegram", created_by=None, meta=None):
+def create_job(topic, brand="unassigned", source="telegram", created_by=None, meta=None, pillar=None):
     job_id = str(uuid.uuid4())
     now = _utcnow()
     with _db() as conn:
         conn.execute(
-            "INSERT INTO jobs (id, brand, topic, state, source, created_by, created_at, updated_at, meta)"
-            " VALUES (?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO jobs (id, brand, topic, state, source, created_by, created_at, updated_at, meta, pillar)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?)",
             (job_id, brand or "unassigned", topic, "requested", source, created_by, now, now,
-             json.dumps(meta or {})),
+             json.dumps(meta or {}), (pillar or "").strip() or None),
         )
         conn.execute(
             "INSERT INTO job_events (job_id, from_state, to_state, actor, at, detail) VALUES (?,?,?,?,?,?)",
@@ -504,7 +506,7 @@ def create_job(topic, brand="unassigned", source="telegram", created_by=None, me
 
 
 def create_and_queue(topic, brand="unassigned", source="telegram", created_by=None,
-                     platforms=None, media="none", slides=4):
+                     platforms=None, media="none", slides=4, pillar=None):
     """Create a job AND queue it for the worker — the worker then researches, drafts, polishes,
     safety-checks and validates it, and pings when it's review-ready. This is how a control surface
     (Telegram, etc.) hands work to the Studio: the work flows through the Studio, nothing is done in
@@ -525,9 +527,9 @@ def create_and_queue(topic, brand="unassigned", source="telegram", created_by=No
     with _db() as conn:
         conn.execute(
             "INSERT INTO jobs (id, brand, topic, state, source, created_by, created_at, updated_at,"
-            " meta, queued_action, target_platforms) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            " meta, queued_action, target_platforms, pillar) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (job_id, brand or "unassigned", topic, "requested", source, created_by, now, now,
-             json.dumps(meta), action, targets),
+             json.dumps(meta), action, targets, (pillar or "").strip() or None),
         )
         conn.execute(
             "INSERT INTO job_events (job_id, from_state, to_state, actor, at, detail) VALUES (?,?,?,?,?,?)",
@@ -541,6 +543,28 @@ def get_job(job_id):
     with _db() as conn:
         row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
     return dict(row) if row else None
+
+
+def set_job_pillar(job_id, pillar):
+    """Tag (or clear) the content pillar a job serves (§7e)."""
+    with _db() as conn:
+        conn.execute("UPDATE jobs SET pillar=?, updated_at=? WHERE id=?",
+                     ((pillar or "").strip() or None, _utcnow(), job_id))
+
+
+def pillar_coverage(brand=None):
+    """How the brand's actual output is spread across its content pillars (§7e) — counts live jobs
+    (anything not binned) by pillar, so the operator can see and balance coverage over real work,
+    not just open scout ideas. Returns [{pillar, n}, ...] busiest first."""
+    q = ("SELECT pillar, COUNT(*) n FROM jobs WHERE pillar IS NOT NULL AND pillar != ''"
+         " AND state != 'cancelled'")
+    params = []
+    if brand and brand != "all":
+        q += " AND brand=?"
+        params.append(brand)
+    q += " GROUP BY pillar ORDER BY n DESC"
+    with _db() as conn:
+        return [dict(r) for r in conn.execute(q, params).fetchall()]
 
 
 def save_social_pulse(job_id, topic, sources, data):

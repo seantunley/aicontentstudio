@@ -98,6 +98,7 @@ def queue_content(args, **kwargs):
     except (TypeError, ValueError):
         slides = 4
     created_by = str(kwargs.get("user_id") or "") or None
+    pillar = (args.get("pillar") or "").strip() or None
 
     if brand == "unassigned":
         choices = []
@@ -110,7 +111,8 @@ def queue_content(args, **kwargs):
 
     try:
         job = db.create_and_queue(topic=topic, brand=brand, source="telegram",
-                                  created_by=created_by, platforms=platforms, media=media, slides=slides)
+                                  created_by=created_by, platforms=platforms, media=media, slides=slides,
+                                  pillar=pillar)
     except Exception as e:  # noqa: BLE001 — handler contract: never raise
         return _err(str(e))
 

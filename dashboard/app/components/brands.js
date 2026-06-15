@@ -9,7 +9,29 @@ async function post(body) {
   return { ok: r.ok, data: await r.json().catch(() => ({})) };
 }
 
-export function BrandManager({ brands }) {
+// §7e content-pillar coverage: the pillars the brand has defined, each tagged with how many live
+// jobs serve it — so gaps (a pillar at 0) are visible at a glance. Pillars seen on jobs but no
+// longer in the brand's list trail after, marked. Nothing renders until pillars are defined.
+function PillarCoverage({ pillars, cov }) {
+  const defined = (pillars || '').split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+  const counts = Object.fromEntries((cov || []).map((c) => [c.pillar, c.n]));
+  if (!defined.length && !(cov || []).length) return null;
+  const rows = defined.map((p) => ({ p, n: counts[p] || 0, extra: false }));
+  for (const c of cov || []) if (!defined.includes(c.pillar)) rows.push({ p: c.pillar, n: c.n, extra: true });
+  return (
+    <div className="card-foot pillar-cov" style={{ margin: '2px 0 0' }}>
+      pillars
+      {rows.map(({ p, n, extra }) => (
+        <span key={p} className={`pillar-chip ${n === 0 ? 'pillar-chip--gap' : ''} ${extra ? 'pillar-chip--extra' : ''}`}
+              title={extra ? 'made, but not in this brand’s pillar list' : n === 0 ? 'defined but nothing made yet' : `${n} live ${n === 1 ? 'piece' : 'pieces'}`}>
+          {p} · {n}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+export function BrandManager({ brands, coverage = {} }) {
   const ui = useUI();
   const [editing, setEditing] = useState(null); // brand object or null
   const [busy, setBusy] = useState(false);
@@ -68,7 +90,7 @@ export function BrandManager({ brands }) {
               </div>
               <div className="card-meta">{[b.region, b.audience].filter(Boolean).join(' · ') || 'no region/audience set'}</div>
               {b.voice ? <div className="card-foot" style={{ margin: '0 0 4px' }}>voice: {b.voice.slice(0, 90)}{b.voice.length > 90 ? '…' : ''}</div> : null}
-              {b.pillars ? <div className="card-foot" style={{ margin: 0 }}>pillars: {b.pillars.slice(0, 90)}</div> : null}
+              <PillarCoverage pillars={b.pillars} cov={coverage[b.slug]} />
               <div className="actions">
                 <button className="btn btn--sm" onClick={() => setEditing({ ...BLANK, ...b })}>Edit</button>
                 <button className="btn btn--ghost btn--sm" onClick={() => del(b.slug)}>Delete</button>
