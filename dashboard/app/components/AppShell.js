@@ -44,6 +44,7 @@ const GROUPS = [
     { href: '/upcoming', key: 'upcoming', label: 'Upcoming', countKey: 'upcoming', calm: true },
     { href: '/calendar', key: 'calendar', label: 'Calendar' },
     { href: '/engagement', key: 'engagement', label: 'Engagement' },
+    { href: '/performance', key: 'performance', label: 'Performance' },
   ]},
   { label: 'Intake', items: [
     { href: '/scout', key: 'scout', label: 'Scout', countKey: 'scout' },
@@ -62,7 +63,6 @@ const GROUPS = [
     { href: '/activity', key: 'activity', label: 'Activity', alertKey: 'errors' },
     { href: '/learnings', key: 'learnings', label: 'Learnings' },
     { href: '/accounts', key: 'accounts', label: 'Accounts' },
-    { href: '/performance', key: 'performance', label: 'Performance' },
     { href: '/costs', key: 'costs', label: 'Cost ledger' },
     { href: '/trash', key: 'trash', label: 'Trash', countKey: 'trash', calm: true },
   ]},
