@@ -6,7 +6,7 @@ import json
 import subprocess
 import datetime
 
-from . import db, postiz, humanize, registry
+from . import db, postiz, humanize, registry, socialpulse
 
 _KNOWLEDGE_DIR = os.environ.get("KNOWLEDGE_DIR", "/opt/studio/knowledge")
 
@@ -86,8 +86,9 @@ def queue_content(args, **kwargs):
         return _err("topic is required")
     brand = (args.get("brand") or "unassigned").strip() or "unassigned"
     media = (args.get("media") or "none").strip().lower()
-    if media not in ("none", "image", "video", "carousel"):
+    if media not in ("none", "image", "video", "carousel", "script"):
         media = "none"
+    direction = (args.get("direction") or "").strip() or None  # creative direction the bot agreed (format/look/angle)
     raw = args.get("platforms") or []
     if isinstance(raw, str):
         raw = [p for p in re.split(r"[,\s]+", raw) if p]
@@ -112,7 +113,7 @@ def queue_content(args, **kwargs):
     try:
         job = db.create_and_queue(topic=topic, brand=brand, source="telegram",
                                   created_by=created_by, platforms=platforms, media=media, slides=slides,
-                                  pillar=pillar)
+                                  pillar=pillar, direction=direction)
     except Exception as e:  # noqa: BLE001 — handler contract: never raise
         return _err(str(e))
 
@@ -493,25 +494,17 @@ def social_pulse(args, **kwargs):
     if not topic:
         return _err("topic is required")
     sources = (args.get("sources") or "reddit").strip() or "reddit"
-    if not os.path.exists(_L30D):
-        return _err("last30days skill not installed")
     try:
-        r = subprocess.run(
-            ["python3", _L30D, topic, "--search", sources, "--quick", "--emit", "context"],
-            capture_output=True, text=True, timeout=240,
-            cwd=os.path.dirname(_L30D),
-        )
-    except subprocess.TimeoutExpired:
-        return _err("social pulse timed out")
+        pulse = socialpulse.pull(topic, sources)  # runs last30days + drops off-topic trending noise
     except Exception as e:  # noqa: BLE001 — handler contract: never raise
         return _err(f"social pulse failed: {e}")
-    out = (r.stdout or "").strip()
-    if not out:
-        return _err(f"no social signal returned ({(r.stderr or '').strip()[:160]})")
+    if not pulse or not (pulse.get("text") or "").strip():
+        return _err("no relevant current social discussion found for this topic — rely on web research")
     return _ok(
-        topic=topic, sources=sources, brief=out[:8000],
-        message=("Current social discussion pulled. CORRELATE this with your web research — weave only "
-                 "verified, cross-checked points into the brief, cite distinct sources, never lean on one."),
+        topic=topic, sources=sources, brief=pulse["text"][:8000],
+        message=("Current ON-TOPIC social discussion pulled (off-topic trending posts filtered out). "
+                 "CORRELATE this with your web research — weave only verified, cross-checked points into "
+                 "the brief, cite distinct sources, never lean on one."),
     )
 
 

@@ -260,6 +260,8 @@ def init_db():
             conn.execute("ALTER TABLE jobs ADD COLUMN claim_action TEXT")  # real action stashed at claim, for crash/restart recovery (§9b)
         if "attempts" not in cols:
             conn.execute("ALTER TABLE jobs ADD COLUMN attempts INTEGER DEFAULT 0")  # process_one passes, for the resumable-loop cap (§9b)
+        if "direction" not in cols:
+            conn.execute("ALTER TABLE jobs ADD COLUMN direction TEXT")  # creative direction the bot agreed with the operator; the worker honours it
         # an AI-generated image can be attached to a draft (Phase 2). Uploaded to the publisher at
         # attach-time, so we store the publisher's media reference (id + url), not the local file.
         dcols = [r[1] for r in conn.execute("PRAGMA table_info(drafts)").fetchall()]
@@ -539,7 +541,7 @@ def get_queued_jobs():
     # Only the actionable queue values; 'processing'/'failed' are status markers, not work to pick up.
     with _db() as conn:
         return [dict(r) for r in conn.execute(
-            "SELECT * FROM jobs WHERE queued_action IN ('research_draft','research_draft_image','research_draft_image_video','research_draft_carousel')"
+            "SELECT * FROM jobs WHERE queued_action IN ('research_draft','research_draft_image','research_draft_image_video','research_draft_carousel','research_draft_script')"
             " ORDER BY created_at").fetchall()]
 
 
@@ -567,14 +569,15 @@ def create_job(topic, brand="unassigned", source="telegram", created_by=None, me
 
 
 def create_and_queue(topic, brand="unassigned", source="telegram", created_by=None,
-                     platforms=None, media="none", slides=4, pillar=None):
+                     platforms=None, media="none", slides=4, pillar=None, direction=None):
     """Create a job AND queue it for the worker — the worker then researches, drafts, polishes,
     safety-checks and validates it, and pings when it's review-ready. This is how a control surface
     (Telegram, etc.) hands work to the Studio: the work flows through the Studio, nothing is done in
-    the chat. media: 'none' | 'image' | 'video' | 'carousel'."""
+    the chat. media: 'none' | 'image' | 'video' | 'carousel' | 'script'. direction = the creative
+    direction (format/look/angle) the bot agreed with the operator; the worker honours it."""
     media = (media or "none").strip().lower()
     action = {"carousel": "research_draft_carousel", "video": "research_draft_image_video",
-              "image": "research_draft_image"}.get(media, "research_draft")
+              "image": "research_draft_image", "script": "research_draft_script"}.get(media, "research_draft")
     meta = {}
     if media == "carousel":
         try:
@@ -588,9 +591,10 @@ def create_and_queue(topic, brand="unassigned", source="telegram", created_by=No
     with _db() as conn:
         conn.execute(
             "INSERT INTO jobs (id, brand, topic, state, source, created_by, created_at, updated_at,"
-            " meta, queued_action, target_platforms, pillar) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            " meta, queued_action, target_platforms, pillar, direction) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (job_id, brand or "unassigned", topic, "requested", source, created_by, now, now,
-             json.dumps(meta), action, targets, (pillar or "").strip() or None),
+             json.dumps(meta), action, targets, (pillar or "").strip() or None,
+             (direction or "").strip() or None),
         )
         conn.execute(
             "INSERT INTO job_events (job_id, from_state, to_state, actor, at, detail) VALUES (?,?,?,?,?,?)",
@@ -904,7 +908,8 @@ def create_draft(job_id, platform, body, angle=None, variant=1):
     if not body:
         raise ValueError("draft body is empty")
     limit = PLATFORM_LIMITS.get(platform)
-    if limit and len(body) > limit:
+    is_script = bool(angle and "script" in angle.lower())  # a shoot script is a production doc, not a post — no post limit
+    if limit and len(body) > limit and not is_script:
         raise ValueError(f"{platform} limit is {limit} characters; this draft is {len(body)}")
     now = _utcnow()
     with _db() as conn:
@@ -934,7 +939,8 @@ def preview_drafts_unpolished(limit=12):
     with _db() as conn:
         return [dict(r) for r in conn.execute(
             "SELECT d.id, d.platform, d.body, d.job_id, j.brand FROM drafts d JOIN jobs j ON j.id = d.job_id"
-            " WHERE j.state='preview' AND d.polish_json IS NULL ORDER BY d.id LIMIT ?", (limit,)
+            " WHERE j.state='preview' AND d.polish_json IS NULL"
+            " AND (d.angle IS NULL OR LOWER(d.angle) NOT LIKE '%script%') ORDER BY d.id LIMIT ?", (limit,)  # scripts aren't posts — don't polish
         ).fetchall()]
 
 
@@ -952,7 +958,8 @@ def preview_drafts_unvalidated(limit=12):
     with _db() as conn:
         return [dict(r) for r in conn.execute(
             "SELECT d.* FROM drafts d JOIN jobs j ON j.id = d.job_id"
-            " WHERE j.state='preview' AND d.validation_json IS NULL ORDER BY d.id LIMIT ?", (limit,)
+            " WHERE j.state='preview' AND d.validation_json IS NULL"
+            " AND (d.angle IS NULL OR LOWER(d.angle) NOT LIKE '%script%') ORDER BY d.id LIMIT ?", (limit,)  # scripts skip platform-post validation
         ).fetchall()]
 
 

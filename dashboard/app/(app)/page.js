@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic';
 // The format a job is producing, from its action (claim_action holds it while 'processing').
 function jobFormat(action) {
   if (!action) return null;
+  if (action.includes('script')) return 'Script';
   if (action.includes('video')) return 'Reel';
   if (action.includes('carousel')) return 'Carousel';
   if (action.includes('image')) return 'Image';
