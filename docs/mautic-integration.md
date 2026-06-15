@@ -1,8 +1,9 @@
 # Mautic integration — funnel / nurture lane
 
-**Status: planned, not active.** The stack is ready in [`mautic/docker-compose.yml`](../mautic/docker-compose.yml)
-but should be stood up only when there's a real audience/leads to nurture (like the engagement
-and performance loops — no value until a source exists).
+**Status: STOOD UP + installed (15 Jun 2026).** Login is live on the LAN at
+`http://172.18.18.101:4010` (admin = the email/password in `mautic/.env`). It's idle until leads
+flow — wire the handoffs below when a platform connects. Stack in
+[`mautic/docker-compose.yml`](../mautic/docker-compose.yml).
 
 Mautic is the **open-source marketing-automation suite** (GPL-3.0, ~250k orgs). It owns the
 **outbound funnel lane**: contacts, segments, lead scoring, drip campaigns (the visual funnel
@@ -72,9 +73,28 @@ studio draft via `POST /api/emails/new` / the assets API, so the funnel sends *o
 conversation when a nurtured lead needs a human, and records conversion stats for Performance.
 
 ## Stack (see mautic/docker-compose.yml)
-- `mautic` (web + API, port **4010**) · `mautic-cron` (segments/campaigns/email queue) · `mautic-db` (MariaDB).
-- Secrets in `mautic/.env` (gitignored; template in `mautic/.env.example`).
-- Pin the `mautic/mautic` tag to the current stable digest before bring-up.
+- `mautic` (web + API, port **4010**) · `mautic-cron` (`cron -f` — segments/campaigns/email queue) · `mautic-db` (MariaDB).
+- Secrets in `mautic/.env` (gitignored; template in `mautic/.env.example`). Pin `mautic/mautic` to a stable digest.
+- **GOTCHA (already handled in the compose):** the image declares `/var/www/html/{config,docroot/media/*,var/logs}`
+  as Dockerfile VOLUMEs, so they MUST be explicit shared named volumes — otherwise web + cron each get their
+  own anonymous `config` volume and never see the same `local.php`, and the cron sits forever "Waiting for
+  Mautic to be installed." Also: the image reads `MAUTIC_DB_DATABASE` (not `_NAME`), needs `MAUTIC_DB_PORT`,
+  and `MAUTIC_VOLUME_CONFIG` must be set on the cron role.
+
+**Bring up:**
+```
+docker compose --project-directory mautic -f mautic/docker-compose.yml --env-file mautic/.env up -d
+```
+**One-off install (schema + admin)** — run after the app volume populates:
+```
+docker exec -u www-data mautic php /var/www/html/bin/console mautic:install \
+  http://172.18.18.101:4010 --force --no-interaction \
+  --db_driver=pdo_mysql --db_host=mautic-db --db_port=3306 --db_name=mautic \
+  --db_user=mautic --db_password=$MAUTIC_DB_PASSWORD \
+  --admin_email=$MAUTIC_ADMIN_EMAIL --admin_username=admin \
+  --admin_firstname=... --admin_lastname=... --admin_password=$MAUTIC_ADMIN_PASSWORD
+```
+First job after first login: **Settings → Email** — point it at an SMTP relay/SES so campaign mail sends.
 
 ## Prerequisites / reality
 - Heavier than a plugin: another DB + PHP + a cron worker + an SMTP/SES path for email.
