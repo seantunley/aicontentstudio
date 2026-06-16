@@ -108,3 +108,18 @@ First job after first login: **Settings → Email** — point it at an SMTP rela
 - **B (when a platform + leads exist):** stand up the stack; wire Chatwoot→Mautic lead handoff +
   a "Funnels" link/panel in the desk; studio pushes lead-magnet assets.
 - **C:** pipe Mautic conversion stats into the Performance loop (§7f).
+
+## Enabling the REST API (one-time, required for the native Funnels mirror)
+
+The studio renders Mautic natively by calling its REST API server-side. Mautic ships with the API
+OFF. Enable it once (it persists on the `mautic_config` named volume):
+
+```bash
+# add api_enabled + api_enable_basic_auth to config/local.php, preserving existing config
+docker exec -u www-data mautic php -r '$f="/var/www/html/config/local.php";$parameters=array();include $f;$parameters["api_enabled"]=true;$parameters["api_enable_basic_auth"]=true;file_put_contents($f,"<?php\n\$parameters = ".var_export($parameters,true).";\n");'
+docker exec -u www-data -w /var/www/html mautic php bin/console cache:clear --no-warmup
+```
+
+Then set in the root `.env` (gitignored): `MAUTIC_API_URL` (server-side, e.g. `http://host.docker.internal:4010`),
+`MAUTIC_API_USER=admin`, `MAUTIC_API_PASSWORD=<admin password>`. The dashboard uses HTTP Basic auth.
+Lead capture from Typebot posts to `/api/funnels/capture?token=$FUNNEL_CAPTURE_TOKEN`.

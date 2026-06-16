@@ -93,6 +93,13 @@ services:
       # § funnels — Mautic (runs from mautic/docker-compose.yml on :4010). Browser-reachable LAN URL
       # the /funnels page iframes (the real Mautic UI embedded in the desk).
       - MAUTIC_PUBLIC_URL=${MAUTIC_PUBLIC_URL:-http://172.18.18.101:4010}
+      # Mautic REST API — server-side calls so the native Funnels pages render Mautic data in the
+      # studio's own UI (no Mautic login for the operator). Creds in the gitignored root .env.
+      - MAUTIC_API_URL=${MAUTIC_API_URL:-http://host.docker.internal:4010}
+      - MAUTIC_API_USER=${MAUTIC_API_USER:-}
+      - MAUTIC_API_PASSWORD=${MAUTIC_API_PASSWORD:-}
+      # shared token Typebot/flows present when POSTing captured leads to /api/funnels/capture
+      - FUNNEL_CAPTURE_TOKEN=${FUNNEL_CAPTURE_TOKEN:-}
       # § flows — Typebot visual funnel builder (runs from typebot/docker-compose.yml). Builder is
       # framed at /flows via its X-Frame-Options-stripping proxy (:4011); Mailpit (:4013) is the
       # local login inbox where the magic-link sign-in arrives.
