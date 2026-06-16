@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
-import { approvalQueue, publishable, scheduledJobs, listSuggestions, mediaCounts, trashedJobs, trashedMedia, listBrands, unseenErrorCount } from '@/lib/db';
+import { approvalQueue, publishable, scheduledJobs, listSuggestions, mediaCounts, trashedJobs, trashedMedia, listBrands, unseenErrorCount, getSetting } from '@/lib/db';
 import { getActiveBrand } from '@/lib/brand';
 import { AppShell } from '@/app/components/AppShell';
 
@@ -13,6 +13,8 @@ export default async function AppLayout({ children }) {
   const brand = await getActiveBrand();
   let counts = { queue: 0, ready: 0, upcoming: 0, scout: 0, vault: 0, trash: 0, errors: 0 };
   let brands = [];
+  let studioName = 'The Studio';
+  try { studioName = getSetting('studio_name', 'The Studio') || 'The Studio'; } catch {}
   try {
     counts = {
       queue: approvalQueue(brand).length,
@@ -26,5 +28,5 @@ export default async function AppLayout({ children }) {
     brands = listBrands();
   } catch {}
 
-  return <AppShell user={session.user.name} counts={counts} brands={brands} activeBrand={brand}>{children}</AppShell>;
+  return <AppShell user={session.user.name} counts={counts} brands={brands} activeBrand={brand} studioName={studioName}>{children}</AppShell>;
 }

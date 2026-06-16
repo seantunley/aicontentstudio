@@ -33,6 +33,7 @@ const ICONS = {
   funnels: <><path d="M22 3H2l8 9.46V19l4 2v-8.54z" /></>,
   learnings: <><path d="M9 18h6M10 21h4" /><path d="M15.1 14c.2-1 .7-1.7 1.4-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.8 1.2 1.5 1.4 2.5" /></>,
   activity: <><path d="M3 12h4l2.5-7 5 14 2.5-7H21" /></>,
+  settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></>,
   more: <><circle cx="5" cy="12" r="1.4" /><circle cx="12" cy="12" r="1.4" /><circle cx="19" cy="12" r="1.4" /></>,
 };
 
@@ -67,6 +68,7 @@ const GROUPS = [
     { href: '/accounts', key: 'accounts', label: 'Accounts' },
     { href: '/costs', key: 'costs', label: 'Cost ledger' },
     { href: '/trash', key: 'trash', label: 'Trash', countKey: 'trash', calm: true },
+    { href: '/settings', key: 'settings', label: 'Settings' },
   ]},
 ];
 
@@ -86,10 +88,11 @@ const MORE = [
   { href: '/accounts', key: 'accounts', label: 'Accounts' },
   { href: '/costs', key: 'costs', label: 'Cost ledger' },
   { href: '/trash', key: 'trash', label: 'Trash' },
+  { href: '/settings', key: 'settings', label: 'Settings' },
 ];
 
-function Wordmark() {
-  return <span className="wordmark">The Studio<em>.</em></span>;
+function Wordmark({ name }) {
+  return <span className="wordmark">{name || 'The Studio'}<em>.</em></span>;
 }
 
 // Active-brand switcher (§1b: always explicit, deliberate switch). Scopes the cockpit to one brand.
@@ -111,7 +114,7 @@ function BrandSwitcher({ brands, activeBrand }) {
   );
 }
 
-export function AppShell({ user, counts, brands, activeBrand, children }) {
+export function AppShell({ user, counts, brands, activeBrand, studioName, children }) {
   const path = usePathname();
   const [more, setMore] = useState(false);
   const active = (href) => (href === '/' ? path === '/' : path.startsWith(href));
@@ -151,7 +154,7 @@ export function AppShell({ user, counts, brands, activeBrand, children }) {
       <div className="layout">
         <aside className="sidebar">
           <div className="masthead">
-            <Wordmark />
+            <Wordmark name={studioName} />
             <div className="strap"><span className="pulse" /> operator&rsquo;s desk</div>
           </div>
           <BrandSwitcher brands={brands} activeBrand={activeBrand} />
@@ -178,7 +181,7 @@ export function AppShell({ user, counts, brands, activeBrand, children }) {
 
         <div style={{ minWidth: 0 }}>
           <div className="mobile-top">
-            <Wordmark />
+            <Wordmark name={studioName} />
             <BrandSwitcher brands={brands} activeBrand={activeBrand} />
             <NewJobButton defaultBrand={activeBrand} brands={brands} />
           </div>

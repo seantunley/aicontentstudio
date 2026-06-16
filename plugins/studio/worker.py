@@ -131,10 +131,12 @@ def _learnings_block(job):
             + "\n".join(bits) + " ")
 
 
-def _run_social_pulse(topic, sources="reddit"):
+def _run_social_pulse(topic, sources=None):
     """Pull current social discussion via the last30days engine, KEEPING ONLY posts relevant to the
     topic (the skill ranks by trend, not relevance — see socialpulse). Returns the structured pulse
-    or None. Best-effort — never breaks research."""
+    or None. Best-effort — never breaks research. Sources come from the /settings page (default reddit)."""
+    if not sources:
+        sources = (db.get_setting("social_pulse_sources") or "reddit").strip() or "reddit"
     try:
         return socialpulse.pull(topic, sources)
     except Exception:  # noqa: BLE001
@@ -153,8 +155,8 @@ def _direction_block(job):
 def _agent_prompt(job, with_image, with_video=False, with_carousel=False, social_text="", resume_note="", with_script=False):
     targets = (job.get("target_platforms") or "").strip()
     # "Set region" steers ONLY region-specific policy + suggested items, NOT the research itself
-    # (knowledge/research is worldwide). Brand pack overrides; the operator's market is South Africa.
-    region = "South Africa"
+    # (knowledge/research is worldwide). Brand pack overrides; the default region is the /settings value.
+    region = (db.get_setting("default_region") or "South Africa").strip() or "South Africa"
     try:
         _b = db.get_brand(job.get("brand"))
         if _b and (_b.get("region") or "").strip():
@@ -803,10 +805,10 @@ def _alt_text_pending(limit=6):
 
 
 def _engagement_brand():
-    """Which brand voice inbound replies draft in: explicit override → the sole known brand → unassigned."""
-    env = (os.environ.get("CHATWOOT_DEFAULT_BRAND") or "").strip()
-    if env:
-        return env
+    """Which brand voice inbound replies draft in: /settings override → env → the sole known brand → unassigned."""
+    override = (db.get_setting("engagement_default_brand") or os.environ.get("CHATWOOT_DEFAULT_BRAND") or "").strip()
+    if override:
+        return override
     try:
         bs = db.known_brands(limit=2)
         if len(bs) == 1:

@@ -709,7 +709,9 @@ def make_video(args, **kwargs):
     if kicker.lower() == "unassigned":
         kicker = ""
     script = (args.get("script") or "").strip()  # spoken voiceover narration → voiced video (§7b Phase 3)
-    animate = bool(args.get("animate", True))     # default: real Grok motion background (image-to-video)
+    # animate / captions default from the /settings page when the caller doesn't say; explicit arg wins.
+    animate = bool(args["animate"]) if "animate" in args else db.get_setting_bool("video_animate", True)
+    captions = bool(args["captions"]) if "captions" in args else db.get_setting_bool("video_captions", False)
     try:
         dur = max(4.0, min(15.0, float(args.get("duration_sec") or 6)))
     except (TypeError, ValueError):
@@ -742,7 +744,8 @@ def make_video(args, **kwargs):
                         os.unlink(imgtmp)
                     except OSError:
                         pass
-            payload = {"script": script, "imageUrl": img_url, "kicker": kicker, "width": w, "height": h}
+            payload = {"script": script, "imageUrl": img_url, "kicker": kicker, "width": w, "height": h,
+                       "captions": captions}  # captions toggle from /settings (default on)
             if video_url:
                 payload["videoUrl"] = video_url  # renderer loops it under the voiceover + captions
             endpoint, vtimeout = "/video", 1200  # voiced render is frame-by-frame; allow slow CPU renders

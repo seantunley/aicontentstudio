@@ -217,6 +217,11 @@ CREATE TABLE IF NOT EXISTS social_pulses (
     data_json  TEXT NOT NULL,                      -- {clusters:[{theme,score,sources,items:[…]}], freshness, range}
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS settings (
+    key        TEXT PRIMARY KEY,                   -- operator-configurable runtime setting (the /settings page)
+    value      TEXT,
+    updated_at TEXT
+);
 CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state);
 CREATE INDEX IF NOT EXISTS idx_events_job ON job_events(job_id);
 CREATE INDEX IF NOT EXISTS idx_suggestions_status ON suggestions(status);
@@ -227,6 +232,31 @@ CREATE INDEX IF NOT EXISTS idx_reply_drafts_conv ON reply_drafts(conversation_id
 
 def _utcnow():
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
+# --- operator-configurable runtime settings (the /settings page; env is the fallback) ---
+def get_setting(key, default=None):
+    try:
+        with _db() as conn:
+            r = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+        return r["value"] if r and r["value"] is not None else default
+    except Exception:  # noqa: BLE001 — settings must never break the worker
+        return default
+
+
+def get_setting_bool(key, default=False):
+    v = get_setting(key)
+    if v is None:
+        return default
+    return str(v).strip().lower() in ("1", "true", "yes", "on")
+
+
+def set_setting(key, value):
+    with _db() as conn:
+        conn.execute(
+            "INSERT INTO settings (key, value, updated_at) VALUES (?,?,?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+            (key, None if value is None else str(value), _utcnow()))
 
 
 @contextlib.contextmanager

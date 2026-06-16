@@ -19,6 +19,32 @@ function db() {
   return _db;
 }
 
+// --- operator-configurable runtime settings (the /settings page). Shared with the worker (db.py). ---
+function ensureSettings() {
+  db().exec('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT)');
+}
+export function getSetting(key, fallback = null) {
+  ensureSettings();
+  const r = db().prepare('SELECT value FROM settings WHERE key=?').get(key);
+  return r && r.value != null ? r.value : fallback;
+}
+export function getSettingBool(key, fallback = false) {
+  const v = getSetting(key);
+  if (v == null) return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(String(v).trim().toLowerCase());
+}
+export function setSetting(key, value) {
+  ensureSettings();
+  db().prepare('INSERT INTO settings (key, value, updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at')
+    .run(key, value == null ? null : String(value), new Date().toISOString());
+}
+export function allSettings() {
+  ensureSettings();
+  const o = {};
+  for (const r of db().prepare('SELECT key, value FROM settings').all()) o[r.key] = r.value;
+  return o;
+}
+
 // All pipeline reads take an optional `brand` slug (§1b active-brand scope). null/undefined = all brands.
 export function pipelineCounts(brand) {
   const rows = brand

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { costSummary, costThisMonth, costByBrand, costByOperation, recentCosts } from '@/lib/db';
-import { zar, ZAR_PER_USD } from '@/lib/money';
+import { zar, zarRate } from '@/lib/money';
 import { za } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
@@ -23,7 +23,7 @@ export default function Costs() {
     <>
       <div className="phead">
         <div><h1>Cost ledger</h1><div className="lede">Every API call, attributed per job and per brand, so you can see what each published piece cost.</div></div>
-        <div className="crumbs">{total.entries} entries · R{ZAR_PER_USD.toFixed(2)}/$</div>
+        <div className="crumbs">{total.entries} entries · R{zarRate().toFixed(2)}/$</div>
       </div>
 
       <section className="section reveal r1">
