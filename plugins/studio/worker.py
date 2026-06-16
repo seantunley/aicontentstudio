@@ -388,19 +388,22 @@ def _claude_write(job, social_text=""):
         + "\nReply with ONLY strict JSON (no prose, no code fences):\n"
           '{"brief":{"facts":[{"claim":"<specific claim>","source_url":"<real https URL>","snippet":"<short verbatim evidence from that source>"}],'
           '"angles":[{"name":"<angle>","hook":"<one-line hook>"}],"recency":"<how current>"},'
-          '"drafts":[{"platform":"<a target platform>","body":"<full caption, on-brand, within the platform limit, hashtags where apt>",'
-          '"image_brief":"<rich art-direction tied to THIS post: subject, style, lighting, mood; no words baked into the image>"}]}\n'
-          "At least 3 grounded facts (each a real clickable source_url + snippet) and 2 distinct angles. One draft per target platform."
+          '"drafts":[{"platform":"<a target platform>","body":"<full caption WITH PERSONALITY and a scroll-stopping hook; energy matched to the moment (a launch should feel exciting and alive); benefit-led, NOT a flat spec list; on-brand, within the platform limit, hashtags where apt>",'
+          '"image_brief":"<bold, VIBRANT art-direction tied to THIS post: subject, style, lighting, mood, plus a rich COLOUR palette with energy and movement; striking and scroll-stopping, editorial but alive, never flat/grey/generic corporate stock; no words baked into the image>"}],'
+          '"reference_images":["<direct https image URL (ending .jpg/.png/.webp) of the ACTUAL product/subject from the BRAND\'S OWN website found in your research — real hero product photos, not stock>"]}\n'
+          "At least 3 grounded facts (each a real clickable source_url + snippet) and 2 distinct angles. One draft per target platform. "
+          "For reference_images: give 1-6 REAL, direct image URLs of the actual product from the brand's own site (open the brand pages you cite and read the real <img> srcs) so the Studio builds brand-accurate visuals from the real thing, not an invented one. Empty list only if the brand truly has no product photos online."
     )
     data = claude.draft(prompt, timeout=RUN_TIMEOUT_SECONDS)
     if not isinstance(data, dict):
         return None
     brief = data.get("brief") or {}
     facts, angles, drafts = brief.get("facts") or [], brief.get("angles") or [], data.get("drafts") or []
+    refs = [u for u in (data.get("reference_images") or []) if isinstance(u, str) and u.strip().startswith("http")]
     if not facts or len(angles) < 2 or not drafts:
         return None
     try:
-        db.save_brief(jid, facts, angles, recency=brief.get("recency"))  # raises if §3c not met → fallback
+        db.save_brief(jid, facts, angles, recency=brief.get("recency"), reference_images=refs)  # §3c enforced; stores the brand's real product images for reference-conditioned visuals
         image_briefs = {}
         for d in drafts:
             plat = (d.get("platform") or "").strip()
@@ -421,7 +424,7 @@ def _claude_write(job, social_text=""):
 
 def _media_only_prompt(job, image_briefs, with_video, with_carousel):
     """Agent prompt for when Claude already wrote + saved the drafts: visuals ONLY, no re-drafting."""
-    lines = "\n".join(f"- {p}: {image_briefs[p] or 'on-topic professional editorial photo'}" for p in image_briefs)
+    lines = "\n".join(f"- {p}: {image_briefs[p] or 'on-topic, vibrant and dynamic editorial photo with bold colour and energy'}" for p in image_briefs)
     p = (f"The drafts for this job ('{job.get('topic')}') are ALREADY written and saved. Do NOT research, do NOT "
          "call save_brief or create_draft, do NOT change any copy. Your ONLY task is the VISUALS.\n"
          "For EACH platform draft, generate the image with image_gen using the art-direction below, then attach it "
@@ -429,8 +432,9 @@ def _media_only_prompt(job, image_briefs, with_video, with_carousel):
     if with_video:
         p += "Then call make_video for the video draft(s).\n"
     p += ("ART-DIRECTION per platform:\n" + lines + "\n"
-          "Image rules: rich, specific, photoreal editorial; real diverse people; localise context but never label "
-          "nationality on people; no text baked into the image; tasteful + brand-safe. Then stop.")
+          "Image rules: rich, specific, photoreal editorial WITH ENERGY — bold vibrant colour, dynamic composition, "
+          "great light, a scroll-stopping look (never flat, grey or generic corporate stock); real diverse people; "
+          "localise context but never label nationality on people; no text baked into the image; tasteful + brand-safe. Then stop.")
     return p
 
 
@@ -610,6 +614,130 @@ def _fit_check(jid, job):
         pass
 
 
+def _fetch_ua(url):
+    """Fetch bytes with a browser UA (some brand CDNs 403 a bare urllib)."""
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=30) as r:
+            return r.read()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _validate_launch_image(job, master_path, reference_urls):
+    """Vision check: does the generated launch image faithfully show the REAL product, with realistic people
+    and launch energy? Returns (ok, issue). Best-effort — (True, '') if it can't run (never blocks)."""
+    try:
+        ref = _fetch_ua(reference_urls[0]) if reference_urls else None
+        with open(master_path, "rb") as f:
+            mb = f.read()
+        if not ref or not mb or not claude.vision_available():
+            return True, ""
+        prompt = ("Image 1 = the REAL product reference. Image 2 = a generated launch image. Judge Image 2 strictly: "
+                  "is it the SAME product faithfully (no wrong size/parts/colour), are any people realistic (NOT "
+                  "distorted), and does it read as an exciting launch? Reply ONLY JSON: "
+                  '{"ok": true|false, "issue": "<one short line, empty if fine>"}.')
+        out = claude.ask_image(prompt, [(ref, "image/jpeg"), (mb, "image/png")], timeout=180)
+        if not out:
+            return True, ""
+        m = re.search(r"\{.*\}", out, re.S)
+        j = json.loads(m.group(0)) if m else {}
+        return bool(j.get("ok", True)), (j.get("issue") or "").strip()
+    except Exception:  # noqa: BLE001
+        return True, ""
+
+
+def _fal_launch_media(job, image_briefs, with_video):
+    """§ imaging — render a brand-accurate launch IMAGE (reference-edit from the brand's REAL product photos +
+    Claude's art-direction), vision-validate it (re-roll once), attach per platform; and for a video job, a
+    people-free hero animated by the video model. Returns True if it attached, else False (caller then falls
+    back to the standard agent visuals). Never raises out — the generator must never break."""
+    try:
+        import falimg
+        import postiz
+        import tempfile
+    except Exception:  # noqa: BLE001
+        return False
+    if not falimg.configured():
+        return False
+    jid = job["id"]
+    brand = (job.get("brand") or "").strip()
+    refs = []
+    # 1) per-brand product photos (set once per brand, the reliable source): Settings key brand_ref_images:<slug>
+    try:
+        bri = db.get_setting("brand_ref_images:" + brand) if brand else None
+        if bri:
+            refs = [u for u in json.loads(bri) if isinstance(u, str) and u.startswith("http")]
+    except Exception:  # noqa: BLE001
+        refs = []
+    # 2) else whatever Claude captured in the brief during research (best-effort)
+    if not refs:
+        b = db.get_brief(jid)
+        if b:
+            try:
+                refs = [u for u in (json.loads(b["brief_json"]).get("reference_images") or []) if str(u).startswith("http")]
+            except Exception:  # noqa: BLE001
+                refs = []
+    if not refs:
+        db.record_event(jid, "worker: no brand reference photos (set them per brand in Settings → Media) → standard visuals", actor="system")
+        return False
+    drafts = db.list_drafts(jid)
+    if not drafts:
+        return False
+    art = next((image_briefs[p] for p in image_briefs if image_briefs.get(p)), "") if image_briefs else ""
+    # 1) launch IMAGE (with people) — validate + re-roll once
+    master, issue = None, ""
+    for attempt in (1, 2):
+        fd, p = tempfile.mkstemp(suffix=".png"); os.close(fd)
+        _url, got = falimg.edit_image(refs, art + (f" Fix from last attempt: {issue}" if issue else ""), p,
+                                      people=True, timeout=RUN_TIMEOUT_SECONDS)
+        if not got:
+            break
+        master = got
+        ok, why = _validate_launch_image(job, master, refs)
+        db.record_event(jid, f"launch image attempt {attempt}: " + ("✓ on-brand" if ok else f"⚠ {why} — re-rolling"), actor="claude")
+        if ok:
+            break
+        issue = why
+    if not master:
+        return False
+    attached = []
+    for d in drafts:
+        tw, th = db.PLATFORM_IMAGE.get(d["platform"], (1080, 1080))
+        try:
+            media = postiz.upload_image(falimg.derive(master, tw, th))
+            db.set_draft_image_by_id(d["id"], media.get("id"), media.get("path"))
+            db.add_media_asset("image", media.get("path"), media.get("id"), source="fal:" + falimg.image_model(),
+                               job_id=jid, draft_id=d["id"], platform=d["platform"], width=tw, height=th)
+            attached.append(d["platform"])
+        except Exception as e:  # noqa: BLE001
+            db.record_event(jid, f"launch image attach failed for {d['platform']}: {e}", actor="system")
+    if not attached:
+        return False
+    db.record_build_step(jid, "image", model=falimg.image_model() + " (reference-conditioned)", provider="fal.ai",
+                         params={"references": len(refs), "attached": attached})
+    db.record_event(jid, f"✦ launch image built from the brand's real product photo + attached: {', '.join(attached)}", actor="claude")
+    # 2) launch VIDEO (people-free hero -> video model) for video jobs (Veo blocks animating people)
+    if with_video:
+        try:
+            fd, hp = tempfile.mkstemp(suffix=".png"); os.close(fd)
+            hero_url, _hero = falimg.edit_image(refs, art, hp, people=False, timeout=RUN_TIMEOUT_SECONDS)
+            if hero_url:
+                fd, vp = tempfile.mkstemp(suffix=".mp4"); os.close(fd)
+                vid = falimg.animate(hero_url, vp, timeout=RUN_TIMEOUT_SECONDS)
+                if vid:
+                    vmedia = postiz.upload_video(vid)
+                    for d in drafts:
+                        db.set_draft_video_by_id(d["id"], vmedia.get("id"), vmedia.get("path"))
+                    db.record_build_step(jid, "video", model=falimg.video_model() + " (people-free hero reveal)",
+                                         provider="fal.ai", params={"hero": "people-free"})
+                    db.record_event(jid, "✦ launch video (product-hero reveal) built + attached", actor="claude")
+                else:
+                    db.record_event(jid, "worker: launch video render returned nothing (image attached)", actor="system")
+        except Exception as e:  # noqa: BLE001
+            db.record_event(jid, f"worker: launch video error, image still attached ({e})", actor="system")
+    return True
+
+
 def process_one(job):
     jid = job["id"]
     qa = job.get("queued_action") or ""
@@ -657,7 +785,16 @@ def process_one(job):
     try:
         if claude_briefs is not None:
             db.record_event(jid, f"worker: ✦ Claude wrote the brief + {len(claude_briefs)} draft(s) — generating visuals", actor="claude")
-            if with_image or with_video or with_carousel:
+            used_fal = False
+            if (with_image or with_video) and not with_carousel and db.get_setting_bool("fal_reference_images", True):
+                try:
+                    used_fal = _fal_launch_media(job, claude_briefs, with_video)
+                except Exception as e:  # noqa: BLE001
+                    db.record_event(jid, f"worker: fal launch media error → standard visuals ({e})", actor="system")
+                    used_fal = False
+            if used_fal:
+                r = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")  # fal built + attached the launch media
+            elif with_image or with_video or with_carousel:
                 r = llm.run_z(_media_only_prompt(job, claude_briefs, with_video, with_carousel), timeout=RUN_TIMEOUT_SECONDS)
             else:
                 r = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")  # text-only: no media run needed

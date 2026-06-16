@@ -61,6 +61,28 @@ export const EDITABLE_TABS = [
     ],
   },
   {
+    id: 'media',
+    label: 'Media (fal.ai)',
+    fields: [
+      { key: 'fal_reference_images', label: 'Build visuals from the brand’s real product photos', type: 'bool', default: 'true',
+        help: 'On: the Studio finds the brand’s REAL product images in research and renders launch visuals from them (reference-conditioned) — the actual product, not an invented one. Off: standard generated visuals.' },
+      { key: 'fal_image_model', label: 'Image model (reference edit)', type: 'select', default: 'fal-ai/nano-banana-2/edit',
+        options: [
+          { value: 'fal-ai/nano-banana-2/edit', label: 'nano-banana 2 (Gemini) — best people + fidelity' },
+          { value: 'fal-ai/bytedance/seedream/v4/edit', label: 'Seedream 4 — photoreal alternative' },
+          { value: 'fal-ai/flux-pro/kontext/max', label: 'FLUX Kontext max' },
+        ],
+        help: 'The fal model that restages the brand’s real product into the launch scene. nano-banana 2 won in testing.' },
+      { key: 'fal_video_model', label: 'Video model (image → video)', type: 'select', default: 'fal-ai/veo3/image-to-video',
+        options: [
+          { value: 'fal-ai/veo3/image-to-video', label: 'Veo 3 — premium, with sound (no people)' },
+          { value: 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video', label: 'Kling 2.5 — allows people' },
+          { value: 'fal-ai/bytedance/seedance/v1/pro/image-to-video', label: 'Seedance — allows people' },
+        ],
+        help: 'The fal model that animates the launch image into a reveal video. Veo 3 is premium but blocks animating people/minors (the Studio renders a people-free hero for it); Kling/Seedance allow people.' },
+    ],
+  },
+  {
     id: 'pipeline',
     label: 'Content pipeline',
     fields: [

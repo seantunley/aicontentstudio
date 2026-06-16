@@ -42,6 +42,12 @@ services:
       # activates without a hermes restart. Token in the gitignored .env.
       - CLAUDE_BRIDGE_URL=${CLAUDE_BRIDGE_URL:-http://127.0.0.1:4014}
       - CLAUDE_BRIDGE_TOKEN=${CLAUDE_BRIDGE_TOKEN:-}
+      # fal.ai reference-conditioned launch media — image: nano-banana-2 edit (the brand's REAL product
+      # photo from research, not an invented one); video: Veo 3 product-hero reveal. Models are
+      # operator-settable in Settings → Media (fal_image_model / fal_video_model); these are the fallbacks.
+      - FAL_KEY=${FAL_KEY:-}
+      - FAL_EDIT_MODEL=${FAL_EDIT_MODEL:-fal-ai/nano-banana-2/edit}
+      - FAL_VIDEO_MODEL=${FAL_VIDEO_MODEL:-fal-ai/veo3/image-to-video}
       # Research enrichment keys (from gitignored .env). OpenRouter = reasoning/planner for the
       # last30days social-research skill; Tavily = the worker's web-search provider (upgrades the
       # keyless DuckDuckGo default). Empty if unset → falls back to prior behaviour.

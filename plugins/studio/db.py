@@ -949,7 +949,7 @@ def record_cost(job_id, provider, model, operation, units, cost_usd, brand=None,
 
 
 # --- research briefs (Phase 1, §3c) -----------------------------------------
-def save_brief(job_id, facts, angles, unverified=None, recency=None):
+def save_brief(job_id, facts, angles, unverified=None, recency=None, reference_images=None):
     """Persist a structured, cited brief and advance the job to 'researched'.
     Enforces §3c mechanically: every fact must carry a source_url + snippet, and
     at least two distinct angles are required (no uncited claims, no single reword)."""
@@ -969,7 +969,8 @@ def save_brief(job_id, facts, angles, unverified=None, recency=None):
     for i, a in enumerate(angles):
         if not isinstance(a, dict) or not a.get("name") or not a.get("hook"):
             raise ValueError(f"angle #{i + 1} must have a name and a hook")
-    brief = {"facts": facts, "angles": angles, "unverified": unverified or [], "recency": recency or ""}
+    brief = {"facts": facts, "angles": angles, "unverified": unverified or [], "recency": recency or "",
+             "reference_images": [u for u in (reference_images or []) if isinstance(u, str) and u.strip()]}
     now = _utcnow()
     with _db() as conn:
         conn.execute(

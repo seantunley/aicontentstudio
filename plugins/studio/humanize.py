@@ -54,17 +54,28 @@ def _split_notes(raw):
 
 
 def _run_pass(body, platform, limit, instructions, timeout=120):
-    """One model rewrite pass. Returns {after, notes} or None to skip the pass."""
+    """One model rewrite pass. Returns {after, notes} or None to skip the pass. Runs on the Claude brain
+    (Opus, the subscription) when configured — the same strong model that wrote the draft, so the de-slop
+    REFINES without flattening — and falls back to the Studio model seam (llm.run_z) otherwise."""
     body = (body or "").strip()
     if not body:
         return None
     prompt = instructions.format(platform=platform or "social", body=body, limit=limit or 2000)
+    raw = None
     try:
-        import llm  # Studio model seam; imported here so humanize stays usable in both load contexts
-        r = llm.run_z(prompt, timeout=timeout)
-    except Exception:  # noqa: BLE001 — a polish failure never breaks the pipeline
-        return None
-    after, notes = _split_notes(r.stdout or "")
+        import claude  # studio brain seam — prefer the strong model so polish doesn't flatten good copy
+        if claude.configured():
+            raw = claude.ask(prompt, timeout=timeout)
+    except Exception:  # noqa: BLE001
+        raw = None
+    if raw is None:
+        try:
+            import llm  # Studio model seam; fallback when the brain isn't configured
+            r = llm.run_z(prompt, timeout=timeout)
+            raw = r.stdout or ""
+        except Exception:  # noqa: BLE001 — a polish failure never breaks the pipeline
+            return None
+    after, notes = _split_notes(raw or "")
     after = scrub(_strip_wrapping(after))
     if not after:
         return None
@@ -86,25 +97,32 @@ def _brand_safety(brand):
 
 
 _MARKETING = (
-    "You are a direct-response marketer applying behavioural psychology to a social post. Rewrite the POST "
-    "to be more compelling: lead with the reader's outcome or benefit (not features), open with a strong hook, "
-    "build interest and desire, and end with ONE clear, specific call to action (AIDA). Prefer concrete "
-    "specifics over vague claims. {safety} Keep every fact intact, use metric units, and keep the platform's "
-    "natural voice and any hashtags. Do NOT add a preamble or surrounding quotes. Output the rewritten post, "
-    "then a line with exactly '---NOTES---', then ONE short sentence naming what you changed and the principle "
-    "you applied. The post MUST be {limit} characters or fewer.\n\nPLATFORM: {platform}\n\nPOST:\n{body}"
+    "You are a direct-response marketer applying behavioural psychology to a social post. Rewrite the POST to be "
+    "more compelling AND to have real personality: open with a scroll-stopping hook, lead with the reader's "
+    "outcome or benefit (NOT a spec list), build desire, and end with ONE clear, specific call to action (AIDA). "
+    "Match the energy to the moment — a launch or announcement should feel genuinely exciting and alive; a "
+    "sensitive topic stays warm and calm. Prefer concrete, vivid specifics over vague claims, and keep a strong "
+    "human voice. {safety} Keep every fact intact, use metric units, and keep the platform's natural voice and "
+    "any hashtags. Do NOT add a preamble or surrounding quotes. Output the rewritten post, then a line with "
+    "exactly '---NOTES---', then ONE short sentence naming what you changed and the principle you applied. The "
+    "post MUST be {limit} characters or fewer.\n\nPLATFORM: {platform}\n\nPOST:\n{body}"
 )
 
 _HUMANIZE = (
-    "You are an editor removing signs of AI-generated writing from a social media post (Wikipedia's 'Signs of "
-    "AI writing'). Rewrite the POST so a sharp human wrote it. Remove: em/en dashes (use commas/periods), "
-    "significance inflation ('a testament to', 'plays a vital role'), promotional fluff ('vibrant', 'nestled', "
-    "'stands as'), copula avoidance (say 'is', not 'serves as'), rule-of-three lists and 'not just X but Y', "
-    "trailing -ing filler, AI vocabulary (delve, leverage, underscore, tapestry, landscape, foster), vague "
-    "hedging, and chatbot tone. Keep the meaning, facts, metric units, platform voice, hashtags, and any "
-    "genuinely-fitting emoji (this is social media, not an encyclopedia). Do NOT add a preamble or quotes. "
-    "Output the rewritten post, then a line with exactly '---NOTES---', then ONE short sentence naming what you "
-    "changed. The post MUST be {limit} characters or fewer.\n\nPLATFORM: {platform}\n\nPOST:\n{body}"
+    "You are a sharp human copywriter doing a FINAL light edit — not a rewrite, and definitely not a flattening. "
+    "Your only job is to remove the tells of AI writing while KEEPING all the life that's already there: the "
+    "opening hook, the voice, the rhythm, the energy, and any genuinely-fitting emoji. De-slop, do NOT "
+    "de-energize. If the post opens with a punchy hook, KEEP it (sharpen it if anything) — never replace it with "
+    "a flat 'X has arrived' statement, and NEVER turn the post into a dry list of specs or features. Match the "
+    "post's existing tone: leave a lively launch lively, leave a gentle or supportive post gentle. The result "
+    "should read like a great human wrote it WITH FLAIR, not like an encyclopedia entry. "
+    "Remove ONLY these tells: em/en dashes (use commas or periods), significance inflation ('a testament to', "
+    "'plays a vital role', 'stands as'), EMPTY filler adjectives that carry no real information, copula avoidance "
+    "('serves as' -> 'is'), rule-of-three lists and 'not just X but Y', trailing -ing filler clauses, AI "
+    "vocabulary (delve, leverage, underscore, tapestry, landscape, foster), vague hedging and chatbot tone. Keep "
+    "the meaning, facts, metric units, platform voice and hashtags. Do NOT add a preamble or quotes. Output the "
+    "rewritten post, then a line with exactly '---NOTES---', then ONE short sentence naming what you changed. The "
+    "post MUST be {limit} characters or fewer.\n\nPLATFORM: {platform}\n\nPOST:\n{body}"
 )
 
 
