@@ -365,6 +365,14 @@ def process_one(job):
     attempts = db.bump_attempts(jid)
     resume_note = _resume_note(job, with_image, with_video, with_carousel)  # "" on a fresh job
     db.claim_job(jid, qa)  # claim + mark running, stashing the real action so an interrupted run recovers (§9b)
+    db.record_build_step(jid, "config",
+                         model=(os.environ.get("STUDIO_TEXT_MODEL") or "inherited chat model"),
+                         provider=(os.environ.get("STUDIO_TEXT_PROVIDER") or "default"),
+                         params={"action": qa, "image": with_image, "video": with_video, "carousel": with_carousel,
+                                 "script": with_script, "video_animate": db.get_setting_bool("video_animate", True),
+                                 "video_captions": db.get_setting_bool("video_captions", False),
+                                 "image_engine": "xAI Grok Imagine", "polish": db.get_setting_bool("polish_enabled", True),
+                                 "region": (db.get_setting("default_region") or "South Africa")})
     db.record_event(jid, ("worker: resuming" if resume_note else "worker: starting") + " research + draft"
                     + (" + image" if with_image else "") + (" + video" if with_video else "")
                     + (f" (attempt {attempts})" if attempts > 1 else ""), actor="system")

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getJobById, getBrief, getDraftsFor, getEvents, getSocialPulse, costForJob, STATES, DRAFT_LIMITS } from '@/lib/db';
+import { getJobById, getBrief, getDraftsFor, getEvents, getSocialPulse, costForJob, buildSteps, STATES, DRAFT_LIMITS } from '@/lib/db';
 import { zar } from '@/lib/money';
 import { za } from '@/lib/time';
 import { ApprovalActions, PublishButton, ScheduleButton, EditableDraft, RetryButton, UploadMediaButton, PostPills, PlatformChip, AnglePicker, DraftMedia, SafetyBadge, ValidationBadge, PostPreview } from '@/app/components/actions';
@@ -29,6 +29,8 @@ export default async function JobPage({ params }) {
   const brief = getBrief(job.id);
   const drafts = getDraftsFor(job.id);
   const events = getEvents(job.id);
+  let trace = [];
+  try { trace = buildSteps(job.id); } catch {}
   let pulse = null;
   try { pulse = getSocialPulse(job.id); } catch {}
   let cost = { totalUsd: 0, entries: 0 };
@@ -148,6 +150,27 @@ export default async function JobPage({ params }) {
               <span className="d">{e.detail}</span>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="section reveal r4">
+        <div className="section-head"><span className="idx">05</span><h2>Build trace</h2><span className="count">how this post was made</span><span className="rule" /></div>
+        <div className="panel" style={{ padding: 0 }}>
+          {trace.length === 0 ? <div className="empty" style={{ padding: 16 }}>No build trace yet — new posts record the model + settings behind each piece here.</div> : (
+            <table className="table">
+              <thead><tr><th className="hide-sm">When</th><th>Step</th><th>Model</th><th>Details</th></tr></thead>
+              <tbody>
+                {trace.map((s) => (
+                  <tr key={s.id}>
+                    <td className="id hide-sm">{when(s.at)}</td>
+                    <td><span className="badge">{s.step}</span></td>
+                    <td>{s.model || '—'}{s.provider ? <span className="dim"> · {s.provider}</span> : ''}</td>
+                    <td className="id">{Object.entries(s.params || {}).map(([k, v]) => `${k}=${v}`).join(' · ') || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </section>
     </>

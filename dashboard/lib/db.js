@@ -127,6 +127,18 @@ export function updateUser(id, fields) {
 }
 export function deleteUser(id) { ensureUsers(); db().prepare('DELETE FROM users WHERE id=?').run(id); }
 
+// --- build trace: which model/params built each piece of a post (§ observability) ---
+export function buildSteps(jobId) {
+  try {
+    db().exec('CREATE TABLE IF NOT EXISTS build_steps (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT, step TEXT, model TEXT, provider TEXT, params TEXT, at TEXT)');
+    return db().prepare('SELECT * FROM build_steps WHERE job_id=? ORDER BY id').all(jobId).map((r) => {
+      let params = {};
+      try { params = JSON.parse(r.params || '{}'); } catch {}
+      return { ...r, params };
+    });
+  } catch { return []; }
+}
+
 // All pipeline reads take an optional `brand` slug (§1b active-brand scope). null/undefined = all brands.
 export function pipelineCounts(brand) {
   const rows = brand

@@ -773,6 +773,11 @@ def make_video(args, **kwargs):
                                job_id=job["id"], draft_id=d["id"], platform=d["platform"], width=w, height=h,
                                tags=(args.get("caption") or "").strip() or None)
             done.append(f"{d['platform']} {w}x{h}{' +Grok-motion' if video_url else ''}")
+            db.record_build_step(job["id"], "video",
+                                 model=("xAI Grok Imagine — image→video motion" if video_url else "Ken-Burns still (no motion)"),
+                                 provider=("xai" if video_url else "renderer"),
+                                 params={"platform": d["platform"], "dimensions": f"{w}x{h}", "duration_sec": round(dur, 1),
+                                         "animate": animate, "grok_motion": bool(video_url), "captions": captions})
         except requests.RequestException as e:
             failed.append(f"{d['platform']}: renderer unreachable ({e})")
         except postiz.PostizError as e:

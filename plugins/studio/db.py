@@ -222,6 +222,16 @@ CREATE TABLE IF NOT EXISTS settings (
     value      TEXT,
     updated_at TEXT
 );
+CREATE TABLE IF NOT EXISTS build_steps (             -- per-post build trace: which model/params built each piece (§ observability)
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id   TEXT NOT NULL,
+    step     TEXT NOT NULL,                          -- 'config' | 'image' | 'video' | ...
+    model    TEXT,
+    provider TEXT,
+    params   TEXT,                                   -- JSON of the key params (animate, duration, dims, ...)
+    at       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_build_steps_job ON build_steps(job_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state);
 CREATE INDEX IF NOT EXISTS idx_events_job ON job_events(job_id);
 CREATE INDEX IF NOT EXISTS idx_suggestions_status ON suggestions(status);
@@ -257,6 +267,17 @@ def set_setting(key, value):
             "INSERT INTO settings (key, value, updated_at) VALUES (?,?,?) "
             "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
             (key, None if value is None else str(value), _utcnow()))
+
+
+def record_build_step(job_id, step, model=None, provider=None, params=None):
+    """Build trace (§ observability): record which model/params built a piece of a post. Best-effort."""
+    try:
+        with _db() as conn:
+            conn.execute(
+                "INSERT INTO build_steps (job_id, step, model, provider, params, at) VALUES (?,?,?,?,?,?)",
+                (job_id, step, model, provider, json.dumps(params or {}), _utcnow()))
+    except Exception:  # noqa: BLE001 — a trace failure must never break generation
+        pass
 
 
 @contextlib.contextmanager
