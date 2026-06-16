@@ -40,6 +40,16 @@ def _bridge_cfg():
     return url, token
 
 
+def _brain_model():
+    """Which Claude model the studio's brain runs on — operator-settable (default Opus, the strongest)."""
+    return (_setting("studio_brain_model") or os.environ.get("STUDIO_BRAIN_MODEL") or "opus").strip()
+
+
+def _brain_effort():
+    """Optional reasoning-effort level (low|medium|high); empty = the CLI default."""
+    return (_setting("studio_brain_effort") or os.environ.get("STUDIO_BRAIN_EFFORT") or "").strip()
+
+
 def _have_cli():
     return bool(shutil.which(CLAUDE_BIN))
 
@@ -74,7 +84,7 @@ def _via_bridge(prompt, timeout):
     url, token = _bridge_cfg()
     if not url:
         return None
-    body = json.dumps({"prompt": prompt, "timeout": timeout}).encode()
+    body = json.dumps({"prompt": prompt, "timeout": timeout, "model": _brain_model(), "effort": _brain_effort()}).encode()
     req = urllib.request.Request(f"{url}/ask", data=body,
                                  headers={"Content-Type": "application/json", "X-Bridge-Token": token})
     with urllib.request.urlopen(req, timeout=timeout + 15) as resp:
@@ -107,7 +117,7 @@ def _via_bridge_vision(prompt, images, timeout):
     url, token = _bridge_cfg()
     if not url:
         return None
-    payload = {"prompt": prompt, "timeout": timeout,
+    payload = {"prompt": prompt, "timeout": timeout, "model": _brain_model(), "effort": _brain_effort(),
                "images": [{"b64": base64.b64encode(b).decode(), "media_type": mt} for b, mt in images]}
     body = json.dumps(payload).encode()
     req = urllib.request.Request(f"{url}/ask-vision", data=body,

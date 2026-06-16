@@ -27,16 +27,21 @@ _EXT = {"image/jpeg": ".jpg", "image/jpg": ".jpg", "image/png": ".png",
         "image/webp": ".webp", "image/gif": ".gif"}
 
 
-def _run_claude(prompt, timeout, allow_read=False):
+def _run_claude(prompt, timeout, allow_read=False, model=None, effort=None):
     """Run `claude --print`. allow_read whitelists the Read tool (so it can open image temp files in
     headless mode without an interactive permission prompt). Because `--allowedTools <tools...>` is
     variadic and would swallow a positional prompt, the vision call passes the prompt via stdin.
-    Returns (ok, text_or_err)."""
+    model/effort let the studio choose the brain model (e.g. opus) + reasoning effort. Returns (ok, text)."""
+    base = [CLAUDE, "--print"]
+    if model:
+        base += ["--model", model, "--fallback-model", "sonnet"]
+    if effort:
+        base += ["--effort", effort]
     if allow_read:
-        r = subprocess.run([CLAUDE, "--print", "--allowedTools", "Read"],
+        r = subprocess.run(base + ["--allowedTools", "Read"],
                            input=prompt, capture_output=True, text=True, timeout=timeout)
     else:
-        r = subprocess.run([CLAUDE, "--print", prompt], capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(base + [prompt], capture_output=True, text=True, timeout=timeout)
     if r.returncode == 0:
         return True, r.stdout.strip()
     return False, (r.stderr or "claude error")[:300]
@@ -73,20 +78,22 @@ class Handler(BaseHTTPRequestHandler):
         if not prompt:
             return self._send(400, {"error": "empty prompt"})
         timeout = min(int(body.get("timeout") or 180), 600)
+        model = (body.get("model") or "").strip() or None
+        effort = (body.get("effort") or "").strip() or None
         if self.path == "/ask":
-            return self._ask(prompt, timeout)
-        return self._ask_vision(prompt, timeout, body.get("images") or [])
+            return self._ask(prompt, timeout, model, effort)
+        return self._ask_vision(prompt, timeout, body.get("images") or [], model, effort)
 
-    def _ask(self, prompt, timeout):
+    def _ask(self, prompt, timeout, model=None, effort=None):
         try:
-            ok, out = _run_claude(prompt, timeout)
+            ok, out = _run_claude(prompt, timeout, model=model, effort=effort)
             self._send(200 if ok else 502, {"text": out} if ok else {"error": out})
         except subprocess.TimeoutExpired:
             self._send(504, {"error": "claude timed out"})
         except Exception as e:  # noqa: BLE001
             self._send(500, {"error": str(e)[:200]})
 
-    def _ask_vision(self, prompt, timeout, images):
+    def _ask_vision(self, prompt, timeout, images, model=None, effort=None):
         if not images:
             return self._send(400, {"error": "no images"})
         paths = []
@@ -105,7 +112,7 @@ class Handler(BaseHTTPRequestHandler):
             full = (prompt + "\n\nThe rendered media is saved as the image file(s) below. Use the Read "
                     "tool to open EACH path, then judge strictly based on what you actually SEE:\n"
                     + "\n".join(paths))
-            ok, out = _run_claude(full, timeout, allow_read=True)
+            ok, out = _run_claude(full, timeout, allow_read=True, model=model, effort=effort)
             self._send(200 if ok else 502, {"text": out} if ok else {"error": out})
         except subprocess.TimeoutExpired:
             self._send(504, {"error": "claude timed out"})

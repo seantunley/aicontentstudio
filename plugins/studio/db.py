@@ -598,7 +598,8 @@ def recover_stuck_jobs(max_age_seconds):
     cutoff = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(seconds=max_age_seconds)).isoformat()
     with _db() as conn:
         rows = [dict(r) for r in conn.execute(
-            "SELECT * FROM jobs WHERE queued_action='processing' AND claim_action IS NOT NULL AND updated_at < ?",
+            "SELECT * FROM jobs WHERE queued_action='processing' AND claim_action IS NOT NULL"
+            " AND state NOT IN ('cancelled','published','failed') AND updated_at < ?",  # never resurrect a finished/rejected job
             (cutoff,)).fetchall()]
         for r in rows:
             conn.execute("UPDATE jobs SET queued_action=claim_action, claim_action=NULL, updated_at=? WHERE id=?",
@@ -611,7 +612,7 @@ def get_queued_jobs():
     with _db() as conn:
         return [dict(r) for r in conn.execute(
             "SELECT * FROM jobs WHERE queued_action IN ('research_draft','research_draft_image','research_draft_image_video','research_draft_carousel','research_draft_script')"
-            " ORDER BY created_at").fetchall()]
+            " AND state NOT IN ('cancelled','published','failed') ORDER BY created_at").fetchall()]
 
 
 def clear_queued(job_id):
@@ -869,8 +870,13 @@ def advance_job(job_id, to_state, actor="agent", detail=None):
         legal = ", ".join(sorted(LEGAL_TRANSITIONS.get(frm, set()))) or "(none — terminal state)"
         raise ValueError(f"illegal transition '{frm}' -> '{to_state}'. From '{frm}' you may go to: {legal}")
     now = _utcnow()
+    terminal = to_state in ("cancelled", "published", "failed")
     with _db() as conn:
-        conn.execute("UPDATE jobs SET state=?, updated_at=? WHERE id=?", (to_state, now, job_id))
+        if terminal:  # drop queue/claim markers so a finished or rejected job can't be re-picked or recovered
+            conn.execute("UPDATE jobs SET state=?, queued_action=NULL, claim_action=NULL, updated_at=? WHERE id=?",
+                         (to_state, now, job_id))
+        else:
+            conn.execute("UPDATE jobs SET state=?, updated_at=? WHERE id=?", (to_state, now, job_id))
         conn.execute(
             "INSERT INTO job_events (job_id, from_state, to_state, actor, at, detail) VALUES (?,?,?,?,?,?)",
             (job_id, frm, to_state, actor, now, detail),

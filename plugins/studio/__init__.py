@@ -27,5 +27,5 @@ def register(ctx):
     ctx.register_tool(name="social_pulse", toolset="studio", schema=schemas.SOCIAL_PULSE, handler=tools.social_pulse)
     ctx.register_tool(name="list_channels", toolset="studio", schema=schemas.LIST_CHANNELS, handler=tools.list_channels)
     # §org (Phase B): the CEO delegates content to Nancy + follows up to close the loop.
-    ctx.register_tool(name="delegate", toolset="studio", schema=schemas.DELEGATE, handler=tools.delegate)
+    ctx.register_tool(name="delegate_to_nancy", toolset="studio", schema=schemas.DELEGATE, handler=tools.delegate)
     ctx.register_tool(name="delegations", toolset="studio", schema=schemas.DELEGATIONS, handler=tools.delegations)

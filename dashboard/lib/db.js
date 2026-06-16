@@ -279,7 +279,8 @@ export function rejectJob(jobId, who) {
   if (job.state !== 'preview') throw new Error(`job is '${job.state}', not awaiting approval`);
   const now = new Date().toISOString();
   const tx = d.transaction(() => {
-    d.prepare('UPDATE jobs SET state=?, updated_at=? WHERE id=?').run('cancelled', now, jobId);
+    // clear the worker queue/claim markers so a rejected job can't be re-picked or recovered
+    d.prepare('UPDATE jobs SET state=?, queued_action=NULL, claim_action=NULL, updated_at=? WHERE id=?').run('cancelled', now, jobId);
     d.prepare('INSERT INTO job_events (job_id,from_state,to_state,actor,at,detail) VALUES (?,?,?,?,?,?)')
       .run(jobId, 'preview', 'cancelled', 'human', now, `rejected via dashboard by ${who}`);
   });
@@ -333,9 +334,10 @@ export function scheduledJobs(brand) {
 // Order: the job actually being processed first, then waiting, then failed.
 export function inProgress(brand) {
   const order = " ORDER BY CASE queued_action WHEN 'processing' THEN 0 WHEN 'failed' THEN 2 ELSE 1 END, updated_at DESC";
+  const alive = " AND state NOT IN ('cancelled','published','failed')";  // a finished/rejected job isn't 'in progress' even if a marker lingers
   return brand
-    ? db().prepare("SELECT * FROM jobs WHERE queued_action IS NOT NULL AND brand=?" + order).all(brand)
-    : db().prepare("SELECT * FROM jobs WHERE queued_action IS NOT NULL" + order).all();
+    ? db().prepare("SELECT * FROM jobs WHERE queued_action IS NOT NULL" + alive + " AND brand=?" + order).all(brand)
+    : db().prepare("SELECT * FROM jobs WHERE queued_action IS NOT NULL" + alive + order).all();
 }
 
 // Worker liveness: the .worker_heartbeat file the worker writes each run. null if never run.

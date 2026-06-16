@@ -148,7 +148,10 @@ def studio_state():
         brands = [b.get("name") or b.get("slug") for b in db.list_brands()]
     except Exception:  # noqa: BLE001
         brands = []
-    lines.append("BRANDS: " + (", ".join(b for b in brands if b) or "none set (jobs need a brand)"))
+    seen = sorted({j.get("brand") for j in jobs if j.get("brand") and j.get("brand") != "unassigned"})
+    lines.append("BRANDS (registered): " + (", ".join(b for b in brands if b) or "none registered"))
+    if seen:
+        lines.append("BRANDS SEEN ON RECENT JOBS (use as clarify options when asking which brand): " + ", ".join(seen))
     lines.append("RECENT JOBS:")
     for j in jobs[:6]:
         lines.append(f"  • [{j['id'][:8]}] {j['topic']} — {j['state']} ({j['brand']})")
@@ -170,8 +173,13 @@ def studio_state():
 
 # ----------------------------------------------------------------------------- the brain (subscription)
 def run_claude(prompt, timeout=200):
-    cmd = [CLAUDE, "--print", "--model", MODEL, "--exclude-dynamic-system-prompt-sections",
-           "--system-prompt-file", PERSONA, "--disallowedTools", *DISALLOWED]
+    # read fresh each turn so a Settings change takes effect on the next message (no restart)
+    model = (db.get_setting("studio_brain_model") or os.environ.get("NANCY_MODEL") or "opus").strip()
+    effort = (db.get_setting("studio_brain_effort") or "").strip()
+    cmd = [CLAUDE, "--print", "--model", model, "--fallback-model", "sonnet"]
+    if effort:
+        cmd += ["--effort", effort]
+    cmd += ["--exclude-dynamic-system-prompt-sections", "--system-prompt-file", PERSONA, "--disallowedTools", *DISALLOWED]
     try:
         r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
@@ -458,7 +466,9 @@ def main():
         sys.exit(1)
     me = _tg("getMe", timeout=15)
     who = (me or {}).get("result", {}).get("username", "?")
-    print(f"nancy: up as @{who}; brain={MODEL} (subscription); db={DB_PATH}; allow={sorted(ALLOWED) or 'ANY'}", flush=True)
+    eff_model = (db.get_setting("studio_brain_model") or os.environ.get("NANCY_MODEL") or "opus").strip()
+    eff_effort = (db.get_setting("studio_brain_effort") or "").strip() or "default"
+    print(f"nancy: up as @{who}; brain={eff_model} effort={eff_effort} (subscription); db={DB_PATH}; allow={sorted(ALLOWED) or 'ANY'}", flush=True)
     offset = None
     while True:
         _poll_delegations()

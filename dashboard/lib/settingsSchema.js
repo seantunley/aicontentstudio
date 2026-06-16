@@ -24,6 +24,25 @@ export const EDITABLE_TABS = [
     ],
   },
   {
+    id: 'intelligence',
+    label: 'Brain (Claude)',
+    fields: [
+      { key: 'studio_brain_model', label: 'Claude model', type: 'select', default: 'opus',
+        options: [
+          { value: 'opus', label: 'Opus 4.8 — strongest (best judgement, voice, follow-through)' },
+          { value: 'sonnet', label: 'Sonnet 4.6 — faster, lighter' },
+        ],
+        help: 'Which Claude model the studio brain runs on (your subscription) — both Nancy’s chat AND the worker’s research, writing and fit-check. Opus is the strongest. Takes effect on the next message/job, no restart. If the brain ever stops responding, the subscription login may have lapsed — run `claude login` on the host (type `! claude login` here) to re-authenticate.' },
+      { key: 'studio_brain_effort', label: 'Reasoning effort', type: 'select', default: 'high',
+        options: [
+          { value: 'high', label: 'High — most thorough (best quality)' },
+          { value: 'medium', label: 'Medium — balanced' },
+          { value: 'low', label: 'Low — fastest' },
+        ],
+        help: 'How hard Claude thinks per step. High = richest reasoning and copy, a little slower; Low = snappier, lighter.' },
+    ],
+  },
+  {
     id: 'generation',
     label: 'Generation & Media',
     fields: [

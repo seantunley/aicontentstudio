@@ -388,7 +388,7 @@ SET_CAROUSEL = {
     },
 }
 DELEGATE = {
-    "name": "delegate",
+    "name": "delegate_to_nancy",
     "description": (
         "Hand a CONTENT task to Nancy, your Head of Content (she runs on Claude and owns all content). "
         "As CEO you delegate content rather than doing it — use this for any post / campaign / idea the "
