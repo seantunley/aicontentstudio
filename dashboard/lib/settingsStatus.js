@@ -4,6 +4,7 @@
 import Holidays from 'date-holidays';
 import { getSetting } from './db';
 import { PLATFORM_META, PLATFORM_LIMITS, PLATFORM_IMAGE, PLATFORM_CAPS } from './platforms';
+import { CITY_NAMES } from './cities';
 
 // Country list for the region dropdown — from date-holidays (the same source the occasions feature
 // already uses), so it's a real, complete list rather than a typed free-text city.
@@ -94,5 +95,5 @@ export function settingsStatus() {
     workerEnv,
   };
 
-  return { integrations, system, registry: platformRegistry(), options: { regions: regionOptions() } };
+  return { integrations, system, registry: platformRegistry(), options: { regions: regionOptions(), cities: CITY_NAMES } };
 }

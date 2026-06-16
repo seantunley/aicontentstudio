@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { findCity } from '@/lib/cities';
 
 const TZ = 'Africa/Johannesburg';
 
@@ -56,13 +57,21 @@ export function Weather({ location = 'Johannesburg' }) {
     let live = true;
     async function load() {
       try {
-        const g = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=en`).then((r) => r.json());
-        const loc = g.results && g.results[0];
-        if (!loc) return;
-        const w = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=7`).then((r) => r.json());
+        // Curated cities carry their own coordinates → no geocoding (no spelling-error failures).
+        // A custom value still works via the geocoding fallback.
+        let lat, lon, place, country = '';
+        const c = findCity(location);
+        if (c) { lat = c.lat; lon = c.lon; place = c.name; }
+        else {
+          const g = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=en`).then((r) => r.json());
+          const loc = g.results && g.results[0];
+          if (!loc) return;
+          lat = loc.latitude; lon = loc.longitude; place = loc.name; country = loc.country_code || '';
+        }
+        const w = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=7`).then((r) => r.json());
         if (!live || !w.current) return;
         const days = (w.daily?.time || []).map((d, i) => ({ date: d, code: w.daily.weather_code[i], hi: Math.round(w.daily.temperature_2m_max[i]), lo: Math.round(w.daily.temperature_2m_min[i]) }));
-        setData({ place: loc.name, country: loc.country_code || '', t: Math.round(w.current.temperature_2m), code: w.current.weather_code, days });
+        setData({ place, country, t: Math.round(w.current.temperature_2m), code: w.current.weather_code, days });
       } catch { /* best effort */ }
     }
     load();

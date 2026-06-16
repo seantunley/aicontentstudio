@@ -19,8 +19,8 @@ export const EDITABLE_TABS = [
         help: 'Country the worker leans on for local policy / suggested products when a brand has none set.' },
       { key: 'zar_per_usd', label: 'ZAR per USD', type: 'number', default: '16.28',
         help: 'Exchange rate the cost ledger uses to show Rands. Update as it moves.' },
-      { key: 'weather_location', label: 'Weather location', type: 'text', default: 'Johannesburg',
-        help: 'City shown in the top-bar weather widget (geocoded automatically). E.g. “Cape Town” or “London, UK”.' },
+      { key: 'weather_location', label: 'Weather location', type: 'select', optionsKey: 'cities', default: 'Johannesburg',
+        help: 'City shown in the top-bar weather widget. Pick from the list (each has built-in coordinates, so it always resolves).' },
     ],
   },
   {

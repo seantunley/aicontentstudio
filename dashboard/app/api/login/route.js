@@ -29,7 +29,7 @@ export async function POST(req) {
       const b64 = process.env.DASH_PASSWORD_HASH_B64 || '';
       hash = b64 ? Buffer.from(b64, 'base64').toString('utf8') : '';
     }
-    if (envUser && hash && username === envUser && bcrypt.compareSync(password, hash)) {
+    if (envUser && hash && username.toLowerCase() === envUser.toLowerCase() && bcrypt.compareSync(password, hash)) {
       authed = { name: envUser, username: envUser, role: 'admin' };
     }
   }
