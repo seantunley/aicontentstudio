@@ -37,6 +37,11 @@ services:
       - STUDIO_BRAIN=${STUDIO_BRAIN:-auto}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - STUDIO_CLAUDE_MODEL=${STUDIO_CLAUDE_MODEL:-claude-sonnet-4-6}
+      # Path B: the host claude-bridge (scripts/claude-bridge.py) exposes the host's authed `claude`
+      # (your subscription) to the host-networked worker at 127.0.0.1. Also stored as DB settings so it
+      # activates without a hermes restart. Token in the gitignored .env.
+      - CLAUDE_BRIDGE_URL=${CLAUDE_BRIDGE_URL:-http://127.0.0.1:4014}
+      - CLAUDE_BRIDGE_TOKEN=${CLAUDE_BRIDGE_TOKEN:-}
       # Research enrichment keys (from gitignored .env). OpenRouter = reasoning/planner for the
       # last30days social-research skill; Tavily = the worker's web-search provider (upgrades the
       # keyless DuckDuckGo default). Empty if unset → falls back to prior behaviour.
