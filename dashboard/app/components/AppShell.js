@@ -99,6 +99,44 @@ function Wordmark({ name }) {
   return <span className="wordmark">{name || 'The Studio'}<em>.</em></span>;
 }
 
+// Top-right operator menu: avatar → dropdown (name, Settings, Account, Log out). Sits beside the gear.
+function UserMenu({ user }) {
+  const [open, setOpen] = useState(false);
+  const initial = (user || '?')[0].toUpperCase();
+  return (
+    <div className="usermenu">
+      <button className="usermenu-btn" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label="Operator menu">
+        <span className="av">{initial}</span>
+        <span className="usermenu-name">{user}</span>
+        <svg className="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+      </button>
+      {open && <div className="um-back" onClick={() => setOpen(false)} />}
+      {open && (
+        <div className="usermenu-pop">
+          <div className="usermenu-head">
+            <span className="av">{initial}</span>
+            <div><div className="um-name">{user}</div><div className="um-role">operator</div></div>
+          </div>
+          <Link href="/settings" className="um-item" onClick={() => setOpen(false)}><Icon d={ICONS.settings} /> Settings</Link>
+          <Link href="/settings" className="um-item" onClick={() => setOpen(false)}><Icon d={ICONS.accounts} /> Account &amp; password</Link>
+          <div className="um-sep" />
+          <div className="um-item um-logout"><LogoutButton /></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// The top bar that carries the gear + operator menu, top-right of the page (desktop).
+function TopBar({ user }) {
+  return (
+    <div className="topbar">
+      <Link className="iconbtn" href="/settings" title="Settings" aria-label="Settings"><Icon d={ICONS.settings} /></Link>
+      <UserMenu user={user} />
+    </div>
+  );
+}
+
 // Active-brand switcher (§1b: always explicit, deliberate switch). Scopes the cockpit to one brand.
 function BrandSwitcher({ brands, activeBrand }) {
   async function change(e) {
@@ -177,13 +215,12 @@ export function AppShell({ user, counts, brands, activeBrand, studioName, childr
             ))}
           </nav>
           <div className="side-foot">
-            <div className="who"><span className="av">{(user || '?')[0].toUpperCase()}</span>{user}</div>
-            <LogoutButton />
             <div className="colophon">est. 2026 · vol. II</div>
           </div>
         </aside>
 
         <div style={{ minWidth: 0 }}>
+          <TopBar user={user} />
           <div className="mobile-top">
             <Wordmark name={studioName} />
             <BrandSwitcher brands={brands} activeBrand={activeBrand} />

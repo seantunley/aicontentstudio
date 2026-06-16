@@ -8,6 +8,7 @@
 // and PKCE (S256) support. Not a general multi-tenant IdP — extend the client registry if needed.
 import * as jose from 'jose';
 import crypto from 'crypto';
+import { getSetting } from './db';
 
 export const ISSUER = process.env.STUDIO_OIDC_ISSUER || 'http://172.18.18.101:4008/api/oidc';
 export const CLIENT_ID = process.env.STUDIO_OIDC_CLIENT_ID || '';
@@ -68,10 +69,12 @@ export async function signIdToken({ sub, email, name, nonce }) {
 // is this same email, so SSO lands in the existing workspace rather than making a new one).
 export function operatorClaims(sessionUser) {
   const name = sessionUser?.name || 'operator';
+  let email = '';
+  try { email = getSetting('operator_email') || ''; } catch {}
   return {
     sub: process.env.STUDIO_OIDC_SUB || name,
     name,
-    email: process.env.OPERATOR_EMAIL || `${name}@studio.local`,
+    email: email || process.env.OPERATOR_EMAIL || `${name}@studio.local`,
   };
 }
 

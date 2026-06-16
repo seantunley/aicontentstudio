@@ -61,10 +61,19 @@ def _cockpit_button(job_id, text="\U0001f50d Preview in cockpit"):
 # Quality over speed: a single thorough research+draft run may take many minutes. Per-job timeout is
 # generous; the stale-lock window sits above it so a legitimately long run is never mistaken for a
 # crash (and one job is processed per run — see main() — so each locked run stays bounded).
-LOCK_STALE_SECONDS = 2700  # 45 min — self-heals a crashed lock, but won't break a long honest run
-RUN_TIMEOUT_SECONDS = 1500  # 25 min — room for deep research + drafting, not a "slap it together" cap
-STUCK_JOB_SECONDS = RUN_TIMEOUT_SECONDS + 300  # 30 min — a job 'processing' past this = its worker died → requeue (§9b)
-MAX_JOB_ATTEMPTS = 3  # resumable loop cap: after this many passes, leave a partial job for review rather than loop (§9b)
+def _int_setting(key, default):
+    """Operator-tunable integer (the /settings 'Worker & jobs' tab); falls back to the default."""
+    try:
+        v = db.get_setting(key)
+        return int(v) if v not in (None, "") else default
+    except Exception:  # noqa: BLE001 — a bad value must never break the worker
+        return default
+
+# Defaults are the safe values; the /settings Worker tab can override them (read per run/tick).
+LOCK_STALE_SECONDS = _int_setting("worker_lock_stale", 2700)   # self-heals a crashed lock, won't break a long honest run
+RUN_TIMEOUT_SECONDS = _int_setting("worker_run_timeout", 1500) # room for deep research + drafting, not a "slap it together" cap
+STUCK_JOB_SECONDS = RUN_TIMEOUT_SECONDS + 300                  # a job 'processing' past this = its worker died → requeue (§9b)
+MAX_JOB_ATTEMPTS = _int_setting("worker_max_attempts", 3)      # resumable loop cap (§9b)
 
 
 def _brand_block(job):
@@ -254,6 +263,9 @@ def _agent_prompt(job, with_image, with_video=False, with_carousel=False, social
         "mood instead of anatomy (this still reads as unmistakably on-topic, just modestly framed). "
         "Safe and on-brand. "
     )
+    _art = (db.get_setting("image_art_direction") or "").strip()
+    if _art:
+        img_style += f"HOUSE ART-DIRECTION, apply to every image unless the brand's identity overrides: {_art} "
     if with_carousel:
         try:
             n_slides = int((json.loads(job.get("meta") or "{}")).get("carousel_slides") or 4)
@@ -359,7 +371,7 @@ def process_one(job):
     # 1) Run the agent. Only a genuine run failure — crash, timeout, or never reaching the gate — is
     # a 'failed'. (A draft that reached preview has succeeded; see step 2.)
     # Pull + store the current social discussion (shown on the job page), then inject it into research.
-    social = _run_social_pulse(job["topic"])
+    social = _run_social_pulse(job["topic"]) if db.get_setting_bool("social_pulse_enabled", True) else None
     if social:
         try:
             db.save_social_pulse(jid, job["topic"], social.get("sources", "reddit"), social)
@@ -402,7 +414,8 @@ def process_one(job):
     # 2) SUCCESS (or accepted-for-review at the cap) — the drafts are at the gate. From here NOTHING may flip the job to 'failed':
     # polish and the operator ping are best-effort bookkeeping, and the polish sweep backstops any
     # draft missed here. A transient DB hiccup in this block must not bury a good, review-ready job.
-    if not with_script:  # a shoot script isn't a platform post — skip the post-only polish + char/format validation
+    # Polish is post-only and operator-toggleable (/settings → Content pipeline). Scripts skip it.
+    if not with_script and db.get_setting_bool("polish_enabled", True):
         try:
             _polish_drafts(jid, job.get("brand"))  # Layer 2: psychology + humanizer passes before the operator sees it
         except Exception as e:  # noqa: BLE001
@@ -885,7 +898,8 @@ def main():
         _maybe_run_scout()
         _check_occasions()
         _process_redrafts()
-        _poll_engagement()      # §3d: pull new inbound Chatwoot messages → queue reply-drafts
+        if db.get_setting_bool("engagement_autodraft", True):
+            _poll_engagement()  # §3d: pull new inbound Chatwoot messages → queue reply-drafts
         _process_reply_drafts()
         _autotag_media()
         _polish_pending()  # polish drafts from ANY path (incl. Telegram) that aren't polished yet

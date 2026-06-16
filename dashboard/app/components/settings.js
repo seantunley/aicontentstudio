@@ -20,6 +20,18 @@ function Toggle({ on, onChange, id }) {
 
 function Field({ field, value, onChange }) {
   const isBool = field.type === 'bool';
+  if (field.type === 'textarea') {
+    return (
+      <div className="set-row set-row--stack">
+        <div className="set-row-main">
+          <label className="set-label" htmlFor={`f_${field.key}`}>{field.label}</label>
+          {field.help ? <div className="set-help">{field.help}</div> : null}
+        </div>
+        <textarea id={`f_${field.key}`} className="ta" rows={3}
+                  value={value ?? ''} onChange={(e) => onChange(field.key, e.target.value)} />
+      </div>
+    );
+  }
   return (
     <div className={`set-row ${isBool ? 'set-row--bool' : ''}`}>
       <div className="set-row-main">
@@ -128,8 +140,10 @@ function SystemTab({ system }) {
         </div>
       </div>
       <div className="panel set-panel">
-        <div className="set-grouphead">Storage</div>
-        <div className="set-status-detail">Studio database: <span className="kbd">{system.dbPath}</span> (SQLite, WAL mode — shared by the worker and this cockpit).</div>
+        <div className="set-grouphead">Storage &amp; environment</div>
+        <div className="set-status-detail" style={{ marginBottom: 6 }}>Studio database: <span className="kbd">{system.dbPath}</span> (SQLite, WAL — shared by the worker and this cockpit).</div>
+        <div className="set-status-detail" style={{ marginBottom: 6 }}>Knowledge base: <span className="kbd">{system.knowledgeDir}</span></div>
+        <div className="set-status-detail">Display timezone: <span className="kbd">{system.timezone}</span> — fixed; per-operator timezone is a future enhancement.</div>
       </div>
     </>
   );
@@ -137,7 +151,7 @@ function SystemTab({ system }) {
 
 export function SettingsPanel({ tabs, values, integrations, system }) {
   const ui = useUI();
-  const allTabs = useMemo(() => [...tabs.map((t) => ({ id: t.id, label: t.label })), ...SPECIAL], [tabs]);
+  const allTabs = useMemo(() => [...tabs.map((t) => ({ id: t.id, label: t.label, tier: t.tier })), ...SPECIAL], [tabs]);
   const [active, setActive] = useState(allTabs[0]?.id);
   const [vals, setVals] = useState(values);
   const [baseline, setBaseline] = useState(values);
@@ -173,7 +187,7 @@ export function SettingsPanel({ tabs, values, integrations, system }) {
       <nav className="set-tabs">
         {allTabs.map((t) => (
           <button key={t.id} className={`set-tab ${active === t.id ? 'active' : ''}`} onClick={() => setActive(t.id)}>
-            {t.label}
+            {t.label}{t.tier === 'admin' ? <span className="set-tab-tag">admin</span> : null}
           </button>
         ))}
       </nav>

@@ -713,7 +713,7 @@ def make_video(args, **kwargs):
     animate = bool(args["animate"]) if "animate" in args else db.get_setting_bool("video_animate", True)
     captions = bool(args["captions"]) if "captions" in args else db.get_setting_bool("video_captions", False)
     try:
-        dur = max(4.0, min(15.0, float(args.get("duration_sec") or 6)))
+        dur = max(4.0, min(15.0, float(args.get("duration_sec") or db.get_setting("video_default_seconds") or 6)))
     except (TypeError, ValueError):
         dur = 6.0
     done, failed = [], []
