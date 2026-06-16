@@ -387,3 +387,40 @@ SET_CAROUSEL = {
         "required": ["job_id", "image_paths"],
     },
 }
+DELEGATE = {
+    "name": "delegate",
+    "description": (
+        "Hand a CONTENT task to Nancy, your Head of Content (she runs on Claude and owns all content). "
+        "As CEO you delegate content rather than doing it — use this for any post / campaign / idea the "
+        "operator brings, unless they explicitly tell YOU to do it. Nancy picks it up automatically, "
+        "tells the operator she's on it, and (if you pinned the brand) queues it straight into the "
+        "Studio. Afterwards, track it with the 'delegations' tool and close the loop. ONE call per piece."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "task": {"type": "string", "description": "The content brief in a line — what to make (e.g. 'budget winter warmth tips post')."},
+            "brand": {"type": "string", "description": "Brand slug. Pin it: with a brand Nancy auto-queues; without one she has to chase the operator for it first."},
+            "platforms": {"type": "array", "items": {"type": "string"}, "description": "Target platforms, e.g. ['instagram']. Optional."},
+            "media": {"type": "string", "enum": ["none", "image", "video", "carousel", "script"], "description": "Format, if you have a steer. Optional — Nancy decides as content director if omitted."},
+            "direction": {"type": "string", "description": "Any creative steer to pass along (angle, look, hook). Optional — it's really Nancy's call."},
+            "note": {"type": "string", "description": "Anything else for Nancy. Optional."},
+        },
+        "required": ["task"],
+    },
+}
+DELEGATIONS = {
+    "name": "delegations",
+    "description": (
+        "Follow up on what you've handed to Nancy — your open loops. Returns each delegation with its "
+        "status: open (Nancy hasn't queued it yet), accepted (in the Studio, being made), done "
+        "(delivered — the draft reached review). Use it to CLOSE THE LOOP: chase anything stuck and tell "
+        "the operator what's delivered and waiting on their approval. Auto-updates each time you call it."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "status": {"type": "string", "enum": ["open", "accepted", "done", "cancelled"], "description": "Optional filter; omit to see them all."},
+        },
+    },
+}

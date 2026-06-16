@@ -231,12 +231,30 @@ CREATE TABLE IF NOT EXISTS build_steps (             -- per-post build trace: wh
     params   TEXT,                                   -- JSON of the key params (animate, duration, dims, ...)
     at       TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS delegations (             -- §org: CEO (Zingo) -> Head of Content (Nancy) hand-off, tracked end to end (Phase B)
+    id          TEXT PRIMARY KEY,
+    from_agent  TEXT NOT NULL,                        -- 'zingo'
+    to_agent    TEXT NOT NULL,                        -- 'nancy'
+    task        TEXT NOT NULL,                        -- the content brief (a line)
+    brand       TEXT,
+    platforms   TEXT,                                 -- comma-joined, optional
+    media       TEXT,                                 -- none|image|video|carousel|script, optional
+    direction   TEXT,                                 -- creative direction, optional
+    note        TEXT,
+    status      TEXT NOT NULL DEFAULT 'open',         -- open -> accepted -> done | cancelled
+    job_id      TEXT,                                 -- linked once the assignee queues it
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    closed_at   TEXT
+);
 CREATE INDEX IF NOT EXISTS idx_build_steps_job ON build_steps(job_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state);
 CREATE INDEX IF NOT EXISTS idx_events_job ON job_events(job_id);
 CREATE INDEX IF NOT EXISTS idx_suggestions_status ON suggestions(status);
 CREATE INDEX IF NOT EXISTS idx_occasions_brand ON occasions(brand);
 CREATE INDEX IF NOT EXISTS idx_reply_drafts_conv ON reply_drafts(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_delegations_to ON delegations(to_agent, status);
+CREATE INDEX IF NOT EXISTS idx_delegations_from ON delegations(from_agent);
 """
 
 
@@ -599,6 +617,75 @@ def get_queued_jobs():
 def clear_queued(job_id):
     with _db() as conn:
         conn.execute("UPDATE jobs SET queued_action=NULL WHERE id=?", (job_id,))
+
+
+# --- §org: CEO -> Head-of-Content delegations (Phase B), tracked end to end -------------------
+def create_delegation(task, brand=None, from_agent="zingo", to_agent="nancy",
+                      platforms=None, media=None, direction=None, note=None):
+    """Zingo (CEO) hands a content task to Nancy. Returns the delegation row."""
+    did = str(uuid.uuid4())
+    now = _utcnow()
+    plats = (",".join([p.strip() for p in platforms if p and p.strip()])
+             if isinstance(platforms, list) else (platforms or None)) or None
+    with _db() as conn:
+        conn.execute(
+            "INSERT INTO delegations (id, from_agent, to_agent, task, brand, platforms, media, direction, note,"
+            " status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?, 'open', ?, ?)",
+            (did, from_agent, to_agent, task, (brand or None), plats, (media or None),
+             (direction or None), (note or None), now, now))
+    return get_delegation(did)
+
+
+def get_delegation(did):
+    with _db() as conn:
+        r = conn.execute("SELECT * FROM delegations WHERE id=?", (did,)).fetchone()
+    return dict(r) if r else None
+
+
+def open_delegations(to_agent="nancy"):
+    """Delegations still needing the assignee to act (not yet queued)."""
+    with _db() as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT * FROM delegations WHERE to_agent=? AND status='open' ORDER BY created_at", (to_agent,)).fetchall()]
+
+
+def link_delegation(did, job_id):
+    """Assignee accepted + queued the work — link the job and mark it in-flight."""
+    with _db() as conn:
+        conn.execute("UPDATE delegations SET job_id=?, status='accepted', updated_at=? WHERE id=? AND status='open'",
+                     (job_id, _utcnow(), did))
+    return get_delegation(did)
+
+
+def sync_delegations():
+    """Close any accepted delegation whose linked job reached the gate (preview/approved/published) —
+    the content was delivered. Idempotent; safe from either bot. Returns the ids it closed."""
+    closed = []
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT d.id FROM delegations d JOIN jobs j ON j.id = d.job_id"
+            " WHERE d.status='accepted' AND j.state IN ('preview','approved','published')").fetchall()
+        now = _utcnow()
+        for r in rows:
+            conn.execute("UPDATE delegations SET status='done', closed_at=?, updated_at=? WHERE id=?",
+                         (now, now, r["id"]))
+            closed.append(r["id"])
+    return closed
+
+
+def list_delegations(from_agent=None, status=None, limit=20):
+    """For the CEO's follow-up view. Auto-syncs (closes delivered) before returning."""
+    sync_delegations()
+    q, params, cl = "SELECT * FROM delegations", [], []
+    if from_agent:
+        cl.append("from_agent=?"); params.append(from_agent)
+    if status:
+        cl.append("status=?"); params.append(status)
+    if cl:
+        q += " WHERE " + " AND ".join(cl)
+    q += " ORDER BY created_at DESC LIMIT ?"; params.append(limit)
+    with _db() as conn:
+        return [dict(r) for r in conn.execute(q, params).fetchall()]
 
 
 # --- jobs -------------------------------------------------------------------
@@ -985,7 +1072,7 @@ def create_draft(job_id, platform, body, angle=None, variant=1):
 def list_drafts(job_id):
     with _db() as conn:
         return [dict(r) for r in conn.execute(
-            "SELECT id, platform, angle, body, char_count, variant, image_path, image_id, images_json, video_path, video_id, polish_json, safety_json, validation_json, alt_text, created_at FROM drafts"
+            "SELECT id, job_id, platform, angle, body, char_count, variant, image_path, image_id, images_json, video_path, video_id, polish_json, safety_json, validation_json, alt_text, created_at FROM drafts"
             " WHERE job_id=? ORDER BY id", (job_id,)
         ).fetchall()]
 

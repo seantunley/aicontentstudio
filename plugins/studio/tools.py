@@ -637,6 +637,44 @@ def suggest_topic(args, **kwargs):
                message=f"Suggested '{topic}' for {brand} — it's in the operator's ideas list.")
 
 
+def delegate(args, **kwargs):
+    """§org (Phase B) — the CEO hands a CONTENT task to Nancy (Head of Content). Records a tracked
+    delegation; Nancy's bot picks it up automatically. Zingo does NOT produce content himself — this
+    is the hand-off, and he follows up via the delegations tool to close the loop."""
+    task = (args.get("task") or "").strip()
+    if not task:
+        return _err("task is required — what should Nancy make?")
+    brand = (args.get("brand") or "").strip() or None
+    try:
+        d = db.create_delegation(task, brand=brand, from_agent="zingo", to_agent="nancy",
+                                 platforms=args.get("platforms") or None,
+                                 media=(args.get("media") or "").strip().lower() or None,
+                                 direction=(args.get("direction") or "").strip() or None,
+                                 note=(args.get("note") or "").strip() or None)
+    except Exception as e:  # noqa: BLE001
+        return _err(str(e))
+    tail = (f" for {brand}" if brand else " — no brand pinned, so Nancy will chase the operator for it first")
+    return _ok(delegation_id=d["id"][:8], task=task, brand=brand, status=d["status"],
+               message=f"Handed to Nancy: \"{task}\"{tail}. She picks it up automatically; follow up with the delegations tool.")
+
+
+def delegations(args, **kwargs):
+    """§org (Phase B) — the CEO's follow-up view: what's been handed to Nancy and where it stands.
+    Auto-closes any delegation whose content has reached the gate. Use it to close the loop."""
+    status = (args.get("status") or "").strip() or None
+    try:
+        rows = db.list_delegations(from_agent="zingo", status=status, limit=30)
+    except Exception as e:  # noqa: BLE001
+        return _err(str(e))
+    items = [{"id": r["id"][:8], "task": r["task"], "brand": r.get("brand"), "status": r["status"],
+              "job": (r.get("job_id") or "")[:8] or None} for r in rows]
+    o = sum(1 for r in rows if r["status"] == "open")
+    a = sum(1 for r in rows if r["status"] == "accepted")
+    done = sum(1 for r in rows if r["status"] == "done")
+    return _ok(count=len(items), open=o, in_progress=a, delivered=done, delegations=items,
+               message=f"{o} not started, {a} being made, {done} delivered. Delivered ones are sitting in review — chase the operator to approve them in the cockpit.")
+
+
 RENDER_URL = os.environ.get("STUDIO_RENDER_URL", "http://127.0.0.1:3100").rstrip("/")
 
 

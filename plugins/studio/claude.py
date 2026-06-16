@@ -15,6 +15,7 @@ This lives OUTSIDE the Hermes agent loop — the studio's own brain, not the Tel
 """
 import os
 import json
+import base64
 import shutil
 import subprocess
 import urllib.request
@@ -98,6 +99,80 @@ def _via_api(prompt, timeout):
         d = json.loads(resp.read())
     parts = [c.get("text", "") for c in d.get("content", []) if c.get("type") == "text"]
     return ("\n".join(parts).strip() or None)
+
+
+def _via_bridge_vision(prompt, images, timeout):
+    """images = [(bytes, media_type), ...]. The host bridge writes them to temp files and lets the
+    subscription `claude` actually SEE them (Read tool). Uses YOUR subscription — no per-token cost."""
+    url, token = _bridge_cfg()
+    if not url:
+        return None
+    payload = {"prompt": prompt, "timeout": timeout,
+               "images": [{"b64": base64.b64encode(b).decode(), "media_type": mt} for b, mt in images]}
+    body = json.dumps(payload).encode()
+    req = urllib.request.Request(f"{url}/ask-vision", data=body,
+                                 headers={"Content-Type": "application/json", "X-Bridge-Token": token})
+    with urllib.request.urlopen(req, timeout=timeout + 20) as resp:
+        d = json.loads(resp.read())
+    return (d.get("text") or "").strip() or None
+
+
+def _via_api_vision(prompt, images, timeout):
+    """Metered fallback — Anthropic Messages API with image content blocks."""
+    content = [{"type": "text", "text": prompt}]
+    for b, mt in images:
+        content.append({"type": "image", "source": {"type": "base64", "media_type": mt,
+                                                     "data": base64.b64encode(b).decode()}})
+    body = json.dumps({"model": CLAUDE_MODEL, "max_tokens": 700,
+                       "messages": [{"role": "user", "content": content}]}).encode()
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages", data=body,
+        headers={"x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        d = json.loads(resp.read())
+    parts = [c.get("text", "") for c in d.get("content", []) if c.get("type") == "text"]
+    return ("\n".join(parts).strip() or None)
+
+
+def vision_available():
+    """True if a path that can actually SEE an image is usable (bridge or API; the bare CLI seam isn't
+    wired for image input, so it doesn't count)."""
+    if BRAIN == "off":
+        return False
+    url, _ = _bridge_cfg()
+    if BRAIN in ("auto", "bridge") and url:
+        return True
+    return BRAIN in ("auto", "claude-api") and bool(ANTHROPIC_KEY)
+
+
+def vision_mode():
+    url, _ = _bridge_cfg()
+    if BRAIN in ("auto", "bridge") and url:
+        return "claude-bridge vision (subscription)"
+    if BRAIN in ("auto", "claude-api") and ANTHROPIC_KEY:
+        return f"claude-api vision ({CLAUDE_MODEL})"
+    return "off"
+
+
+def ask_image(prompt, images, timeout=240):
+    """Ask Claude about ACTUAL rendered media. images = [(bytes, media_type), ...]. Returns text or
+    None (never raises). Bridge (subscription) first, metered API as fallback — same priority as ask()."""
+    if BRAIN == "off" or not images:
+        return None
+    url, _ = _bridge_cfg()
+    if BRAIN in ("auto", "bridge") and url:
+        try:
+            out = _via_bridge_vision(prompt, images, timeout)
+            if out:
+                return out
+        except Exception:  # noqa: BLE001
+            pass
+    if BRAIN in ("auto", "claude-api") and ANTHROPIC_KEY:
+        try:
+            return _via_api_vision(prompt, images, timeout)
+        except Exception:  # noqa: BLE001
+            pass
+    return None
 
 
 def draft(prompt, timeout=300):

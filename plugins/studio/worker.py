@@ -408,7 +408,13 @@ def _claude_write(job, social_text=""):
             if plat in targets and body:
                 db.create_draft(jid, plat, body)
                 image_briefs[plat] = (d.get("image_brief") or "").strip()
-        return image_briefs or None
+        if not image_briefs:
+            return None
+        # Make the Build trace name Claude as the author (not just the fallback agent's config row).
+        db.record_build_step(jid, "write", model="Claude", provider=claude.mode(),
+                             params={"platforms": list(image_briefs.keys()),
+                                     "facts": len(facts), "angles": len(angles)})
+        return image_briefs
     except Exception:  # noqa: BLE001
         return None
 
@@ -428,12 +434,107 @@ def _media_only_prompt(job, image_briefs, with_video, with_carousel):
     return p
 
 
+def _fetch_media_bytes(url_or_path, cap=26_214_400):
+    """Bytes of a rendered asset from a Postiz URL or a local path. The worker is host-networked, so a
+    URL stored with the internal container IP is retried via the published port (127.0.0.1:4007).
+    Returns bytes (<= cap) or None."""
+    if not url_or_path:
+        return None
+    if str(url_or_path).startswith("http"):
+        candidates = [url_or_path]
+        m = re.match(r"(https?://)([^/]+)(/.*)", url_or_path)
+        if m and "127.0.0.1" not in m.group(2):
+            candidates.append(m.group(1) + "127.0.0.1:4007" + m.group(3))
+        for u in candidates:
+            try:
+                with urllib.request.urlopen(u, timeout=20) as r:
+                    data = r.read(cap + 1)
+                if data and len(data) <= cap:
+                    return data
+            except Exception:  # noqa: BLE001
+                continue
+        return None
+    try:
+        if os.path.exists(url_or_path) and os.path.getsize(url_or_path) <= cap:
+            with open(url_or_path, "rb") as f:
+                return f.read()
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
+def _media_type_for(path):
+    p = (path or "").lower()
+    if p.endswith(".png"):
+        return "image/png"
+    if p.endswith(".webp"):
+        return "image/webp"
+    if p.endswith(".gif"):
+        return "image/gif"
+    return "image/jpeg"
+
+
+def _video_frame_bytes(video_bytes):
+    """One representative frame (~1s in) from video bytes as JPEG, via the worker container's ffmpeg.
+    Lets the fit-check SEE the video's look (motion treatment still comes from the build facts)."""
+    import tempfile
+    vin = fout = None
+    try:
+        fd, vin = tempfile.mkstemp(suffix=".mp4"); os.close(fd)
+        with open(vin, "wb") as f:
+            f.write(video_bytes)
+        fd, fout = tempfile.mkstemp(suffix=".jpg"); os.close(fd)
+        r = subprocess.run(["ffmpeg", "-y", "-ss", "1", "-i", vin, "-frames:v", "1", "-q:v", "3", fout],
+                           capture_output=True, timeout=60)
+        if r.returncode == 0 and os.path.exists(fout) and os.path.getsize(fout) > 0:
+            with open(fout, "rb") as f:
+                return f.read()
+    except Exception:  # noqa: BLE001
+        pass
+    finally:
+        for p in (vin, fout):
+            if p:
+                try:
+                    os.unlink(p)
+                except OSError:
+                    pass
+    return None
+
+
+def _media_for_fitcheck(d):
+    """Best-effort (bytes, media_type) of the draft's rendered media so the fit-check can SEE it:
+    image → the image; carousel → first slide; video → one extracted frame. None if nothing usable."""
+    imgs = d.get("images_json")
+    if imgs:
+        try:
+            arr = json.loads(imgs) if isinstance(imgs, str) else imgs
+            first = arr[0] if arr else None
+            url = (first.get("url") or first.get("path")) if isinstance(first, dict) else first
+            b = _fetch_media_bytes(url)
+            if b:
+                return (b, _media_type_for(url))
+        except Exception:  # noqa: BLE001
+            pass
+    if d.get("image_path"):
+        b = _fetch_media_bytes(d["image_path"])
+        if b:
+            return (b, _media_type_for(d["image_path"]))
+    if d.get("video_path"):
+        vb = _fetch_media_bytes(d["video_path"])
+        if vb:
+            fb = _video_frame_bytes(vb)
+            if fb:
+                return (fb, "image/jpeg")
+    return None
+
+
 def _fit_check(jid, job):
     """§ intelligence — a Claude creative-director review of whether the generated media FITS the post's
-    intent + treatment, BEFORE the human gate. Records a 'fit-check' build step and a warning event when
-    the fit is poor. Best-effort; skipped gracefully when the Claude brain isn't configured."""
+    intent + treatment, BEFORE the human gate. Prefers to actually SEE the rendered image/video frame
+    (subscription bridge, else metered API); falls back to spec-only reasoning. Records a 'fit-check'
+    build step + a warning event when fit is poor. Best-effort; skipped when the brain isn't configured."""
     try:
-        import claude  # studio brain seam (subscription CLI or Anthropic API)
+        import claude  # studio brain seam (subscription bridge / CLI / Anthropic API)
     except Exception:  # noqa: BLE001
         return
     if not claude.configured():
@@ -456,17 +557,36 @@ def _fit_check(jid, job):
     except Exception:  # noqa: BLE001
         pass
     media_desc = "; ".join(facts) or "no media facts recorded"
-    prompt = (
+    base = (
         "You are a senior creative director doing a final fit-check on a social post BEFORE it ships. "
         f"POST INTENT/TOPIC: {job.get('topic')!r}.\n"
         f"CAPTION: {caption!r}.\n"
-        f"HOW THE MEDIA WAS BUILT: {media_desc}.\n\n"
-        "Does the media FIT the intent — subject, energy and TREATMENT? Be strict and concrete: e.g. a "
-        "slow gentle image-to-video drift does NOT fit a 'high-speed' concept; an off-topic or generic "
-        "image does not fit. Reply with ONLY compact JSON: "
-        '{"fit": <0-5 integer>, "issue": "<one short line, empty if fine>", "fix": "<one short suggestion, empty if fine>"}.'
+        f"HOW THE MEDIA WAS BUILT: {media_desc}.\n"
     )
-    out = claude.ask(prompt)
+    json_instr = ('\nReply with ONLY compact JSON: {"fit": <0-5 integer>, '
+                  '"issue": "<one short line, empty if fine>", "fix": "<one short suggestion, empty if fine>"}.')
+    # Prefer SEEING the rendered media; fall back to spec-only reasoning if vision isn't available/usable.
+    media, out, model = None, None, "Claude"
+    if claude.vision_available():
+        try:
+            media = _media_for_fitcheck(d)
+        except Exception:  # noqa: BLE001
+            media = None
+    if media:
+        vprompt = (base +
+                   "The ACTUAL rendered media is attached. Judge STRICTLY on what you SEE — subject, composition, "
+                   "quality, any garbled text/artefacts, on-topic-ness, AND whether the visual matches the caption's "
+                   "promise and the local context (right place/season, no foreign or stock-photo mismatch). For a "
+                   "video the frame shows the look — use the build facts for the motion treatment." + json_instr)
+        out = claude.ask_image(vprompt, [media], timeout=240)
+        if out:
+            model = "Claude (vision)"
+    if not out:  # no media, vision unavailable, or the vision call failed → spec-only
+        out = claude.ask(base +
+                         "Does the media FIT the intent — subject, energy and TREATMENT? Be strict and concrete: a "
+                         "slow gentle image-to-video drift does NOT fit a 'high-speed' concept; an off-topic or "
+                         "generic image does not fit." + json_instr)
+        model = "Claude"
     if not out:
         db.record_build_step(jid, "fit-check", model="(no response)", provider=claude.mode(), params={})
         return
@@ -477,8 +597,10 @@ def _fit_check(jid, job):
         fit = j.get("fit"); issue = (j.get("issue") or "").strip(); fix = (j.get("fix") or "").strip()
     except Exception:  # noqa: BLE001
         issue = out[:160]
-    db.record_build_step(jid, "fit-check", model="Claude", provider=claude.mode(),
-                         params={"fit": fit, "issue": issue or "(ok)", "fix": fix})
+    saw = bool(media) and model == "Claude (vision)"
+    db.record_build_step(jid, "fit-check", model=model,
+                         provider=(claude.vision_mode() if saw else claude.mode()),
+                         params={"fit": fit, "issue": issue or "(ok)", "fix": fix, "saw_media": saw})
     try:
         if isinstance(fit, (int, float)) and fit < 3:
             db.record_event(jid, f"fit-check: ⚠ media may not fit ({fit}/5) — {issue}" + (f" · fix: {fix}" if fix else ""), actor="claude")
