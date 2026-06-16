@@ -1,6 +1,7 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useUI } from './ui';
+import { EDITABLE_TABS } from '@/lib/settingsSchema';
 
 // The full tab list: the editable groups (from the schema) plus three special, mostly read-only tabs.
 const SPECIAL = [
@@ -149,10 +150,10 @@ function SystemTab({ system }) {
   );
 }
 
-export function SettingsPanel({ tabs, values, integrations, system }) {
+export function SettingsPanel({ tabs, values, integrations, system, initialTab }) {
   const ui = useUI();
   const allTabs = useMemo(() => [...tabs.map((t) => ({ id: t.id, label: t.label, tier: t.tier })), ...SPECIAL], [tabs]);
-  const [active, setActive] = useState(allTabs[0]?.id);
+  const [active, setActive] = useState(initialTab || allTabs[0]?.id);
   const [vals, setVals] = useState(values);
   const [baseline, setBaseline] = useState(values);
   const [busy, setBusy] = useState(false);
@@ -217,6 +218,37 @@ export function SettingsPanel({ tabs, values, integrations, system }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// The Settings panel as a top-right modal. Fetches everything (values + status) in one call when opened.
+export function SettingsModal({ open, onClose, initialTab }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState(null);
+  useEffect(() => {
+    if (!open) { setData(null); setErr(null); return; }
+    let live = true;
+    fetch('/api/settings').then((r) => r.json()).then((d) => {
+      if (!live) return;
+      if (d.error) setErr(d.error); else setData(d);
+    }).catch(() => { if (live) setErr('Failed to load settings'); });
+    return () => { live = false; };
+  }, [open]);
+
+  if (!open) return null;
+  return (
+    <div className="modal-back" onClick={onClose}>
+      <div className="modal modal--wide" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-bar"><span className="led" /> settings
+          <button className="modal-x" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div className="modal-body modal-body--scroll">
+          {err ? <div className="empty" style={{ padding: 24 }}>{err}</div>
+            : !data ? <div className="empty" style={{ padding: 48 }}>Loading settings…</div>
+            : <SettingsPanel tabs={EDITABLE_TABS} values={data.values} integrations={data.integrations} system={data.system} initialTab={initialTab} />}
+        </div>
+      </div>
     </div>
   );
 }

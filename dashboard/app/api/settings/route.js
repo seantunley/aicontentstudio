@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { allSettings, setSetting } from '@/lib/db';
 import { EDITABLE_TABS, EDITABLE_KEYS } from '@/lib/settingsSchema';
+import { settingsStatus } from '@/lib/settingsStatus';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,8 @@ function currentValues() {
 export async function GET() {
   const session = await getSession();
   if (!session.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  return NextResponse.json({ values: currentValues() });
+  // Everything the modal needs in one call: editable values + integration/system status.
+  return NextResponse.json({ values: currentValues(), ...settingsStatus() });
 }
 
 // Coerce/validate a single field by its declared type. Returns the canonical string to store, or

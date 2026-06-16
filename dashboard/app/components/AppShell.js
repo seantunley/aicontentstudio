@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { UIProvider } from './ui';
 import { NewJobButton, LogoutButton } from './actions';
+import { SettingsModal } from './settings';
+import { TrashModal } from './trash';
 
 function Icon({ d, className = 'ico' }) {
   return (
@@ -71,8 +73,6 @@ const GROUPS = [
     { href: '/learnings', key: 'learnings', label: 'Learnings' },
     { href: '/accounts', key: 'accounts', label: 'Accounts' },
     { href: '/costs', key: 'costs', label: 'Cost ledger' },
-    { href: '/trash', key: 'trash', label: 'Trash', countKey: 'trash', calm: true },
-    { href: '/settings', key: 'settings', label: 'Settings' },
   ]},
 ];
 
@@ -91,8 +91,6 @@ const MORE = [
   { href: '/brands', key: 'brands', label: 'Brands' },
   { href: '/accounts', key: 'accounts', label: 'Accounts' },
   { href: '/costs', key: 'costs', label: 'Cost ledger' },
-  { href: '/trash', key: 'trash', label: 'Trash' },
-  { href: '/settings', key: 'settings', label: 'Settings' },
 ];
 
 function Wordmark({ name }) {
@@ -100,7 +98,7 @@ function Wordmark({ name }) {
 }
 
 // Top-right operator menu: avatar → dropdown (name, Settings, Account, Log out). Sits beside the gear.
-function UserMenu({ user }) {
+function UserMenu({ user, onOpenSettings }) {
   const [open, setOpen] = useState(false);
   const initial = (user || '?')[0].toUpperCase();
   return (
@@ -117,8 +115,8 @@ function UserMenu({ user }) {
             <span className="av">{initial}</span>
             <div><div className="um-name">{user}</div><div className="um-role">operator</div></div>
           </div>
-          <Link href="/settings" className="um-item" onClick={() => setOpen(false)}><Icon d={ICONS.settings} /> Settings</Link>
-          <Link href="/settings" className="um-item" onClick={() => setOpen(false)}><Icon d={ICONS.accounts} /> Account &amp; password</Link>
+          <button className="um-item" onClick={() => { setOpen(false); onOpenSettings(); }}><Icon d={ICONS.settings} /> Settings</button>
+          <button className="um-item" onClick={() => { setOpen(false); onOpenSettings('account'); }}><Icon d={ICONS.accounts} /> Account &amp; password</button>
           <div className="um-sep" />
           <div className="um-item um-logout"><LogoutButton /></div>
         </div>
@@ -127,12 +125,16 @@ function UserMenu({ user }) {
   );
 }
 
-// The top bar that carries the gear + operator menu, top-right of the page (desktop).
-function TopBar({ user }) {
+// The top bar (desktop): trash + settings gear (both open modals) + the operator menu, top-right.
+function TopBar({ user, onOpenSettings, onOpenTrash, trashCount }) {
   return (
     <div className="topbar">
-      <Link className="iconbtn" href="/settings" title="Settings" aria-label="Settings"><Icon d={ICONS.settings} /></Link>
-      <UserMenu user={user} />
+      <button className="iconbtn" onClick={onOpenTrash} title="Trash" aria-label="Trash">
+        <Icon d={ICONS.trash} />
+        {trashCount ? <span className="iconbtn-badge">{trashCount}</span> : null}
+      </button>
+      <button className="iconbtn" onClick={() => onOpenSettings()} title="Settings" aria-label="Settings"><Icon d={ICONS.settings} /></button>
+      <UserMenu user={user} onOpenSettings={onOpenSettings} />
     </div>
   );
 }
@@ -159,6 +161,10 @@ function BrandSwitcher({ brands, activeBrand }) {
 export function AppShell({ user, counts, brands, activeBrand, studioName, children }) {
   const path = usePathname();
   const [more, setMore] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState(undefined);
+  const [trashOpen, setTrashOpen] = useState(false);
+  const openSettings = (tab) => { setSettingsTab(typeof tab === 'string' ? tab : undefined); setSettingsOpen(true); };
   const active = (href) => (href === '/' ? path === '/' : path.startsWith(href));
   const moreActive = MORE.some((n) => active(n.href));
 
@@ -220,7 +226,7 @@ export function AppShell({ user, counts, brands, activeBrand, studioName, childr
         </aside>
 
         <div style={{ minWidth: 0 }}>
-          <TopBar user={user} />
+          <TopBar user={user} onOpenSettings={openSettings} onOpenTrash={() => setTrashOpen(true)} trashCount={counts.trash} />
           <div className="mobile-top">
             <Wordmark name={studioName} />
             <BrandSwitcher brands={brands} activeBrand={activeBrand} />
@@ -252,6 +258,8 @@ export function AppShell({ user, counts, brands, activeBrand, studioName, childr
             More
           </button>
         </nav>
+        <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} initialTab={settingsTab} />
+        <TrashModal open={trashOpen} onClose={() => setTrashOpen(false)} />
       </div>
     </UIProvider>
   );

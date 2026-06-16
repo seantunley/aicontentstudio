@@ -940,7 +940,8 @@ a.pulse-title:hover { color: var(--accent); text-decoration: underline; }
 .um-name { font-size: 13px; color: var(--fg); font-weight: 500; }
 .um-role { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 1px; }
 .um-item { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: var(--r);
-  color: var(--fg-2); text-decoration: none; font-size: 13px; cursor: pointer; }
+  color: var(--fg-2); text-decoration: none; font-size: 13px; cursor: pointer;
+  background: none; border: none; width: 100%; text-align: left; font-family: inherit; }
 .um-item:hover { background: var(--bg-2); color: var(--fg); }
 .um-item .ico { width: 16px; height: 16px; color: var(--muted); }
 .um-sep { height: 1px; background: var(--line); margin: 4px 0; }
@@ -967,3 +968,14 @@ a.pulse-title:hover { color: var(--accent); text-decoration: underline; }
 .eng-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; box-shadow: 0 0 6px rgba(227,167,63,0.6); }
 .kb-item--unread { border-left: 2px solid var(--accent); }
 .kb-item--unread .eng-contact { color: var(--fg); font-weight: 600; }
+
+/* ── Settings / Trash modals (wide, scrollable) + top-bar badge ──────────── */
+.modal--wide { max-width: 920px; width: 94vw; position: relative; }
+.modal-body--scroll { max-height: 80vh; overflow-y: auto; }
+.modal-x { position: absolute; top: 9px; right: 12px; background: none; border: none; color: var(--muted);
+  font-size: 15px; cursor: pointer; line-height: 1; padding: 4px 6px; border-radius: var(--r); }
+.modal-x:hover { color: var(--fg); background: var(--bg-2); }
+.iconbtn { position: relative; }
+.iconbtn-badge { position: absolute; top: -3px; right: -3px; min-width: 15px; height: 15px; padding: 0 3px;
+  border-radius: 999px; background: var(--accent); color: #14110d; font-family: var(--mono); font-size: 9px;
+  font-weight: 700; line-height: 15px; text-align: center; }
