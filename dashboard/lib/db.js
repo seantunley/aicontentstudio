@@ -77,6 +77,21 @@ export function oauthUserByToken(token) {
   return { sub: r.sub, email: r.email, name: r.name };
 }
 
+// --- broadcasts (Telegram/WhatsApp bulk campaigns; §broadcast-loop). One row per send, with tallies. ---
+function ensureBroadcasts() {
+  db().exec('CREATE TABLE IF NOT EXISTS broadcasts (id INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT, audience TEXT, message TEXT, total INTEGER, sent INTEGER, failed INTEGER, status TEXT, detail TEXT, created_at TEXT)');
+}
+export function saveBroadcast({ channel, audience, message, total, sent, failed, status, detail }) {
+  ensureBroadcasts();
+  const r = db().prepare('INSERT INTO broadcasts (channel,audience,message,total,sent,failed,status,detail,created_at) VALUES (?,?,?,?,?,?,?,?,?)')
+    .run(channel, audience, message, total, sent, failed, status, detail || null, new Date().toISOString());
+  return r.lastInsertRowid;
+}
+export function listBroadcasts(limit = 30) {
+  ensureBroadcasts();
+  return db().prepare('SELECT * FROM broadcasts ORDER BY id DESC LIMIT ?').all(limit);
+}
+
 // All pipeline reads take an optional `brand` slug (§1b active-brand scope). null/undefined = all brands.
 export function pipelineCounts(brand) {
   const rows = brand
