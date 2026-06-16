@@ -697,8 +697,14 @@ def log_system_event(level, source, message, detail=None, job_id=None):
         pass
 
 
-def recent_learnings(brand, limit=6):
-    """Most recent operator feedback for a brand — to teach generation the operator's voice/preferences."""
+def recent_learnings(brand, limit=None):
+    """Most recent operator feedback for a brand — to teach generation the operator's voice/preferences.
+    The count is operator-tunable via the /settings Content pipeline tab (recent_learnings_count)."""
+    if limit is None:
+        try:
+            limit = int(get_setting("recent_learnings_count") or 6)
+        except Exception:  # noqa: BLE001
+            limit = 6
     with _db() as conn:
         rows = conn.execute(
             "SELECT kind, platform, topic, before, after FROM learnings WHERE brand=? ORDER BY id DESC LIMIT ?",

@@ -33,6 +33,10 @@ export const EDITABLE_TABS = [
         help: 'Default duration for a generated short when the request does not specify one (4–15).' },
       { key: 'image_art_direction', label: 'Default image art-direction', type: 'textarea', default: '',
         help: 'Extra house style appended to every image prompt (look, lighting, palette, mood). Empty = the worker’s built-in “polished, professional” default.' },
+      { key: 'carousel_default_slides', label: 'Default carousel slides', type: 'number', default: '4',
+        help: 'How many slides a carousel gets when the request doesn’t specify (clamped 2–10).' },
+      { key: 'video_max_seconds', label: 'Max video length (seconds)', type: 'number', default: '15',
+        help: 'Upper bound on generated video duration. The default length setting sits within this cap.' },
     ],
   },
   {
@@ -45,6 +49,8 @@ export const EDITABLE_TABS = [
         help: 'Pull the last-30-days social pulse (on-topic only) into the worker’s research. Off = web research only.' },
       { key: 'social_pulse_sources', label: 'Social-pulse sources', type: 'text', default: 'reddit',
         help: 'Comma-separated, for the current-discussion research: reddit, hackernews, polymarket.' },
+      { key: 'recent_learnings_count', label: 'Operator feedback fed to drafting', type: 'number', default: '6',
+        help: 'How many of your most recent edits/rejections per brand the worker feeds back into drafting to learn your voice.' },
     ],
   },
   {
@@ -55,6 +61,26 @@ export const EDITABLE_TABS = [
         help: 'Brand voice used when drafting replies to inbound messages. Empty = the sole brand, else "unassigned".' },
       { key: 'engagement_autodraft', label: 'Auto-draft inbound replies', type: 'bool', default: 'true',
         help: 'On: the worker polls Chatwoot and drafts on-brand replies for new inbound messages (you still send every reply).' },
+    ],
+  },
+  {
+    id: 'scout',
+    label: 'Scout & Discovery',
+    fields: [
+      { key: 'scout_ideas_per_niche', label: 'Ideas per niche', type: 'number', default: '5',
+        help: 'How many specific trend ideas the scout suggests per niche each run.' },
+      { key: 'scout_horizon_days', label: 'Freshness window (days)', type: 'number', default: '14',
+        help: 'Scout prefers things surfacing within this many days over evergreen topics.' },
+      { key: 'scout_timeout', label: 'Scout run timeout (seconds)', type: 'number', default: '300',
+        help: 'Max time the scout spends per niche before stopping. Falls back to the STUDIO_SCOUT_TIMEOUT env if unset.' },
+    ],
+  },
+  {
+    id: 'retention',
+    label: 'Trash & retention',
+    fields: [
+      { key: 'trash_ttl_days', label: 'Trash retention (days)', type: 'number', default: '30',
+        help: 'Rejected posts and deleted media are hard-deleted this many days after they hit the trash.' },
     ],
   },
   {

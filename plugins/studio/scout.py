@@ -15,9 +15,19 @@ import urllib.request
 import db  # same directory
 import llm  # same directory — Studio model seam (STUDIO_TEXT_MODEL)
 
+
+def _ints(key, default):
+    """Operator-tunable integer (the /settings Scout & Discovery tab); falls back to the default."""
+    try:
+        v = db.get_setting(key)
+        return int(v) if v not in (None, "") else default
+    except Exception:  # noqa: BLE001
+        return default
+
+
 LOCK = "/tmp/studio_scout.lock"
 LOCK_STALE_SECONDS = 1800
-RUN_TIMEOUT_SECONDS = int(os.environ.get("STUDIO_SCOUT_TIMEOUT", "300"))
+RUN_TIMEOUT_SECONDS = _ints("scout_timeout", int(os.environ.get("STUDIO_SCOUT_TIMEOUT", "300")))
 
 
 def _telegram_notify(text):
@@ -63,13 +73,15 @@ def _scout_prompt(niche):
         if pillars else ""
     )
     pillar_arg = "pillar=<the brand pillar it serves>, " if pillars else ""
+    _ideas = _ints("scout_ideas_per_niche", 5)   # /settings → Scout & Discovery
+    _hdays = _ints("scout_horizon_days", 14)
     return (
         f"You are the studio's trend scout. Brand: {niche['brand']!r}. Niche: {niche['query']!r}. "
         + pillar_block
         + "Scan WIDELY for what's genuinely CURRENT and gaining attention in this niche right now. "
         "USE YOUR REAL-TIME X (Twitter) ACCESS first — see what's actually being posted, discussed, and "
         "trending on X this week — then also check news, Reddit and forums, YouTube, blogs and the open "
-        "web. Prefer things surfacing in the LAST 1-2 WEEKS over evergreen. Choose 3-5 SPECIFIC ideas. "
+        f"web. Prefer things surfacing in the LAST {_hdays} DAYS over evergreen. Choose up to {_ideas} SPECIFIC ideas. "
         f"For EACH, call suggest_topic(brand={niche['brand']!r}, topic=<concrete idea>, "
         "rationale=<one line, grounded in what you actually read>, source_url=<real URL>, "
         "source=<WHERE you found it, e.g. 'Reddit r/beyondthebump', 'BBC News', 'X', 'YouTube'>, "

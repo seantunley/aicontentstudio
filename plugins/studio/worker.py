@@ -267,10 +267,11 @@ def _agent_prompt(job, with_image, with_video=False, with_carousel=False, social
     if _art:
         img_style += f"HOUSE ART-DIRECTION, apply to every image unless the brand's identity overrides: {_art} "
     if with_carousel:
+        _cdef = _int_setting("carousel_default_slides", 4)  # /settings → Generation & Media
         try:
-            n_slides = int((json.loads(job.get("meta") or "{}")).get("carousel_slides") or 4)
+            n_slides = int((json.loads(job.get("meta") or "{}")).get("carousel_slides") or _cdef)
         except Exception:  # noqa: BLE001
-            n_slides = 4
+            n_slides = _cdef
         n_slides = max(2, min(10, n_slides))
         p += (f"Step 3 — carousel: this is a multi-image swipe post. Call image_gen {n_slides} times for "
               f"{n_slides} DISTINCT slides that form a coherent set ({n_slides} tips/steps or a mini story). "
@@ -906,7 +907,7 @@ def main():
         _safety_pending()  # §6a brand-safety review on any preview draft not yet checked
         _validate_pending()  # platform capability registry: validate any preview draft not yet checked
         _alt_text_pending()  # generate accessibility alt text for draft images that lack it
-        db.purge_trash(30)  # hard-delete trashed jobs + media older than 30 days
+        db.purge_trash(_int_setting("trash_ttl_days", 30))  # /settings → Trash & retention
 
         jobs = db.get_queued_jobs()
         if not jobs:
