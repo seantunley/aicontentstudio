@@ -23,8 +23,9 @@ function currentValues() {
 export async function GET() {
   const session = await getSession();
   if (!session.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  // Everything the modal needs in one call: editable values + integration/system status.
-  return NextResponse.json({ values: currentValues(), ...settingsStatus() });
+  // Everything the modal needs in one call: editable values + integration/system status + the caller
+  // (so the panel can show the admin-only Users tab).
+  return NextResponse.json({ values: currentValues(), me: session.user || null, ...settingsStatus() });
 }
 
 // Coerce/validate a single field by its declared type. Returns the canonical string to store, or

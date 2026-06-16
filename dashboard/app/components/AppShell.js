@@ -99,7 +99,7 @@ function Wordmark({ name }) {
 }
 
 // Top-right operator menu: avatar → dropdown (name, Settings, Account, Log out). Sits beside the gear.
-function UserMenu({ user, onOpenSettings }) {
+function UserMenu({ user, onOpenSettings, onOpenTrash, trashCount }) {
   const [open, setOpen] = useState(false);
   const initial = (user || '?')[0].toUpperCase();
   return (
@@ -118,6 +118,7 @@ function UserMenu({ user, onOpenSettings }) {
           </div>
           <button className="um-item" onClick={() => { setOpen(false); onOpenSettings(); }}><Icon d={ICONS.settings} /> Settings</button>
           <button className="um-item" onClick={() => { setOpen(false); onOpenSettings('account'); }}><Icon d={ICONS.accounts} /> Account &amp; password</button>
+          <button className="um-item" onClick={() => { setOpen(false); onOpenTrash(); }}><Icon d={ICONS.trash} /> Trash{trashCount ? <span className="um-count">{trashCount}</span> : null}</button>
           <div className="um-sep" />
           <div className="um-item um-logout"><LogoutButton /></div>
         </div>
@@ -132,12 +133,7 @@ function TopBar({ user, onOpenSettings, onOpenTrash, trashCount }) {
     <div className="topbar">
       <Weather />
       <Clock />
-      <button className="iconbtn" onClick={onOpenTrash} title="Trash" aria-label="Trash">
-        <Icon d={ICONS.trash} />
-        {trashCount ? <span className="iconbtn-badge">{trashCount}</span> : null}
-      </button>
-      <button className="iconbtn" onClick={() => onOpenSettings()} title="Settings" aria-label="Settings"><Icon d={ICONS.settings} /></button>
-      <UserMenu user={user} onOpenSettings={onOpenSettings} />
+      <UserMenu user={user} onOpenSettings={onOpenSettings} onOpenTrash={onOpenTrash} trashCount={trashCount} />
     </div>
   );
 }

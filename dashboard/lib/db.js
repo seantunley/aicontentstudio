@@ -92,6 +92,41 @@ export function listBroadcasts(limit = 30) {
   return db().prepare('SELECT * FROM broadcasts ORDER BY id DESC LIMIT ?').all(limit);
 }
 
+// --- operators (multi-user, §7a). Login checks this table first, then falls back to the bootstrap
+// env operator so the studio can never lock itself out. Passwords are bcrypt-hashed by the API. ---
+function ensureUsers() {
+  db().exec("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password_hash TEXT, name TEXT, email TEXT, role TEXT DEFAULT 'operator', active INTEGER DEFAULT 1, created_at TEXT)");
+}
+export function listUsers() {
+  ensureUsers();
+  return db().prepare('SELECT id, username, name, email, role, active, created_at FROM users ORDER BY id').all();
+}
+export function userCount() { ensureUsers(); return db().prepare('SELECT COUNT(*) n FROM users').get().n; }
+export function getUserByUsername(username) {
+  ensureUsers();
+  return db().prepare('SELECT * FROM users WHERE username=?').get(String(username || '').trim().toLowerCase());
+}
+export function getUserById(id) {
+  ensureUsers();
+  return db().prepare('SELECT * FROM users WHERE id=?').get(id);
+}
+export function createUser({ username, passwordHash, name, email, role }) {
+  ensureUsers();
+  const r = db().prepare('INSERT INTO users (username,password_hash,name,email,role,active,created_at) VALUES (?,?,?,?,?,1,?)')
+    .run(String(username).trim().toLowerCase(), passwordHash, name || '', email || '', role || 'operator', new Date().toISOString());
+  return r.lastInsertRowid;
+}
+export function updateUser(id, fields) {
+  ensureUsers();
+  const allowed = ['name', 'email', 'role', 'active', 'password_hash'];
+  const sets = [], vals = [];
+  for (const k of allowed) if (k in fields && fields[k] !== undefined) { sets.push(`${k}=?`); vals.push(fields[k]); }
+  if (!sets.length) return;
+  vals.push(id);
+  db().prepare(`UPDATE users SET ${sets.join(',')} WHERE id=?`).run(...vals);
+}
+export function deleteUser(id) { ensureUsers(); db().prepare('DELETE FROM users WHERE id=?').run(id); }
+
 // All pipeline reads take an optional `brand` slug (§1b active-brand scope). null/undefined = all brands.
 export function pipelineCounts(brand) {
   const rows = brand

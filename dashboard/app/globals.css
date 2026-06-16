@@ -953,6 +953,8 @@ a.pulse-title:hover { color: var(--accent); text-decoration: underline; }
 .um-item:hover { background: var(--bg-2); color: var(--fg); }
 .um-item .ico { width: 16px; height: 16px; color: var(--muted); }
 .um-sep { height: 1px; background: var(--line); margin: 4px 0; }
+.um-count { margin-left: auto; font-family: var(--mono); font-size: 10px; font-weight: 700; background: var(--accent);
+  color: #14110d; border-radius: 999px; padding: 0 6px; min-width: 16px; text-align: center; line-height: 15px; }
 .um-logout { padding: 0; }
 .um-logout .btn { width: 100%; justify-content: flex-start; border: none; background: transparent; color: var(--fg-2);
   padding: 8px 10px; font-size: 13px; font-family: inherit; letter-spacing: 0; text-transform: none; }
@@ -1000,3 +1002,10 @@ a.pulse-title:hover { color: var(--accent); text-decoration: underline; }
 .reg-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 7px; vertical-align: middle;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18); }
 .reg-yes { color: var(--green); font-weight: 700; }
+
+/* settings select + multiselect */
+.set-select { appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23978c73' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; }
+.set-select option { background: var(--bg-1); color: var(--fg); }
+.set-checks { display: flex; flex-wrap: wrap; gap: 8px 18px; }

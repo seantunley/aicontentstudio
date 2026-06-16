@@ -1,8 +1,20 @@
 // Server-side status for the Settings panel: integration readiness (●/○) + system/worker info +
 // a read-only view of the platform-capability registry. Presence-only — secret VALUES are never
 // included, just whether each is set.
+import Holidays from 'date-holidays';
 import { getSetting } from './db';
 import { PLATFORM_META, PLATFORM_LIMITS, PLATFORM_IMAGE, PLATFORM_CAPS } from './platforms';
+
+// Country list for the region dropdown — from date-holidays (the same source the occasions feature
+// already uses), so it's a real, complete list rather than a typed free-text city.
+function regionOptions() {
+  try {
+    const c = new Holidays().getCountries('en');
+    return Object.values(c).sort((a, b) => a.localeCompare(b));
+  } catch {
+    return ['South Africa'];
+  }
+}
 
 const has = (k) => {
   const v = process.env[k];
@@ -82,5 +94,5 @@ export function settingsStatus() {
     workerEnv,
   };
 
-  return { integrations, system, registry: platformRegistry() };
+  return { integrations, system, registry: platformRegistry(), options: { regions: regionOptions() } };
 }

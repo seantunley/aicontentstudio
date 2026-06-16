@@ -65,34 +65,55 @@ function Toggle({ on, onChange, id }) {
   );
 }
 
-function Field({ field, value, onChange }) {
+// Resolve a select/multiselect's options: static field.options, or a dynamic list keyed by optionsKey
+// (e.g. the country list). Each option normalises to { value, label }.
+function optList(field, options) {
+  const raw = field.options || (options && options[field.optionsKey]) || [];
+  return raw.map((o) => (typeof o === 'string' ? { value: o, label: o } : o));
+}
+
+function Field({ field, value, onChange, options }) {
   const isBool = field.type === 'bool';
+  const lbl = <><label className="set-label" htmlFor={`f_${field.key}`}>{field.label}</label>{field.help ? <div className="set-help">{field.help}</div> : null}</>;
+
   if (field.type === 'textarea') {
     return (
       <div className="set-row set-row--stack">
-        <div className="set-row-main">
-          <label className="set-label" htmlFor={`f_${field.key}`}>{field.label}</label>
-          {field.help ? <div className="set-help">{field.help}</div> : null}
-        </div>
-        <textarea id={`f_${field.key}`} className="ta" rows={3}
-                  value={value ?? ''} onChange={(e) => onChange(field.key, e.target.value)} />
+        <div className="set-row-main">{lbl}</div>
+        <textarea id={`f_${field.key}`} className="ta" rows={3} value={value ?? ''} onChange={(e) => onChange(field.key, e.target.value)} />
       </div>
     );
   }
+
+  if (field.type === 'multiselect') {
+    const opts = optList(field, options);
+    const set = new Set(String(value || '').split(',').map((s) => s.trim()).filter(Boolean));
+    const toggle = (v) => { const n = new Set(set); if (n.has(v)) n.delete(v); else n.add(v); onChange(field.key, [...n].join(',')); };
+    return (
+      <div className="set-row set-row--stack">
+        <div className="set-row-main">{lbl}</div>
+        <div className="set-checks">
+          {opts.map((o) => (
+            <label key={o.value} className="check"><input type="checkbox" checked={set.has(o.value)} onChange={() => toggle(o.value)} /> {o.label}</label>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`set-row ${isBool ? 'set-row--bool' : ''}`}>
-      <div className="set-row-main">
-        <label className="set-label" htmlFor={`f_${field.key}`}>{field.label}</label>
-        {field.help ? <div className="set-help">{field.help}</div> : null}
-      </div>
+      <div className="set-row-main">{lbl}</div>
       <div className="set-row-ctrl">
         {isBool ? (
-          <Toggle id={`f_${field.key}`} on={value === 'true' || value === true}
-                  onChange={(v) => onChange(field.key, v ? 'true' : 'false')} />
+          <Toggle id={`f_${field.key}`} on={value === 'true' || value === true} onChange={(v) => onChange(field.key, v ? 'true' : 'false')} />
+        ) : field.type === 'select' ? (
+          <select id={`f_${field.key}`} className="input set-select" value={value ?? ''} onChange={(e) => onChange(field.key, e.target.value)}>
+            {!optList(field, options).some((o) => o.value === (value ?? '')) && <option value={value ?? ''}>{value || '— select —'}</option>}
+            {optList(field, options).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
         ) : (
-          <input id={`f_${field.key}`} className="input"
-                 type={field.type === 'number' ? 'number' : 'text'} step="any"
-                 value={value ?? ''} onChange={(e) => onChange(field.key, e.target.value)} />
+          <input id={`f_${field.key}`} className="input" type={field.type === 'number' ? 'number' : 'text'} step="any" value={value ?? ''} onChange={(e) => onChange(field.key, e.target.value)} />
         )}
       </div>
     </div>
@@ -196,9 +217,89 @@ function SystemTab({ system }) {
   );
 }
 
-export function SettingsPanel({ tabs, values, integrations, system, registry, initialTab }) {
+function UsersTab({ me }) {
   const ui = useUI();
-  const allTabs = useMemo(() => [...tabs.map((t) => ({ id: t.id, label: t.label, tier: t.tier })), ...SPECIAL], [tabs]);
+  const [users, setUsers] = useState(null);
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ username: '', name: '', email: '', password: '', role: 'operator' });
+  const [busy, setBusy] = useState(false);
+
+  const load = () => fetch('/api/users').then((r) => r.json()).then((d) => setUsers(d.users || [])).catch(() => setUsers([]));
+  useEffect(() => { load(); }, []);
+
+  async function add(e) {
+    e.preventDefault(); setBusy(true);
+    const r = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+    const d = await r.json(); setBusy(false);
+    if (r.ok) { ui.toast('Operator added'); setForm({ username: '', name: '', email: '', password: '', role: 'operator' }); setAdding(false); load(); }
+    else ui.toast(d.error || 'Failed', 'err');
+  }
+  async function patch(id, body, msg) {
+    const r = await fetch(`/api/users/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (r.ok) { ui.toast(msg || 'Updated'); load(); } else ui.toast((await r.json().catch(() => ({}))).error || 'Failed', 'err');
+  }
+  async function del(u) {
+    const ok = await ui.confirm({ title: `Remove ${u.username}?`, message: 'They lose access immediately.', danger: true, confirmLabel: 'Remove', tag: 'delete' });
+    if (!ok) return;
+    const r = await fetch(`/api/users/${u.id}`, { method: 'DELETE' });
+    if (r.ok) { ui.toast('Removed'); load(); }
+  }
+  function resetPw(u) {
+    const pw = typeof window !== 'undefined' ? window.prompt(`New password for ${u.username} (min 8 chars):`) : '';
+    if (!pw) return;
+    if (pw.length < 8) { ui.toast('Too short (min 8)', 'err'); return; }
+    patch(u.id, { password: pw }, 'Password reset');
+  }
+
+  return (
+    <div className="panel set-panel">
+      <div className="set-grouphead">Operators</div>
+      <p className="set-blurb">Everyone who can sign in. <strong>Admins</strong> manage users + worker/system settings; <strong>operators</strong> run the desk. Your bootstrap login always works as a fallback, so you can&rsquo;t lock yourself out.</p>
+      {users === null ? <div className="empty">Loading…</div> : (
+        <div className="set-status-list">
+          {users.length === 0 ? <div className="empty" style={{ marginBottom: 10 }}>No added operators yet — just your bootstrap login.</div> : users.map((u) => (
+            <div className="set-status" key={u.id}>
+              <span className="av" style={{ width: 26, height: 26 }}>{(u.name || u.username)[0].toUpperCase()}</span>
+              <div className="set-status-main">
+                <div className="set-status-name">{u.name || u.username} {me?.username === u.username ? <span className="dim">· you</span> : null} {!u.active ? <span className="badge badge--failed">disabled</span> : null}</div>
+                <div className="set-status-detail">@{u.username}{u.email ? ` · ${u.email}` : ''} · {u.role}</div>
+              </div>
+              <div className="actions" style={{ marginTop: 0 }}>
+                <button className="btn btn--sm" onClick={() => patch(u.id, { role: u.role === 'admin' ? 'operator' : 'admin' }, 'Role changed')}>{u.role === 'admin' ? '→ operator' : '→ admin'}</button>
+                <button className="btn btn--sm" onClick={() => resetPw(u)}>Reset pw</button>
+                <button className="btn btn--sm" onClick={() => patch(u.id, { active: u.active ? 0 : 1 }, u.active ? 'Disabled' : 'Enabled')}>{u.active ? 'Disable' : 'Enable'}</button>
+                <button className="btn btn--ghost btn--sm" onClick={() => del(u)}>Remove</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {adding ? (
+        <form onSubmit={add} className="field-stack" style={{ marginTop: 14, maxWidth: 440 }}>
+          <input className="input" placeholder="username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} autoComplete="off" autoFocus />
+          <div className="field-row">
+            <input className="input" style={{ flex: 1 }} placeholder="display name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <input className="input" style={{ flex: 1 }} placeholder="email (optional)" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          </div>
+          <input className="input" type="password" placeholder="password (min 8 chars)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="new-password" />
+          <label className="check"><input type="checkbox" checked={form.role === 'admin'} onChange={(e) => setForm({ ...form, role: e.target.checked ? 'admin' : 'operator' })} /> Admin (manage users + system settings)</label>
+          <div className="modal-acts">
+            <button type="button" className="btn btn--ghost" onClick={() => setAdding(false)}>Cancel</button>
+            <button type="submit" className="btn btn--primary" disabled={busy || !form.username || !form.password}>{busy ? 'Adding…' : 'Add operator'}</button>
+          </div>
+        </form>
+      ) : <div className="actions" style={{ marginTop: 12 }}><button className="btn btn--primary btn--sm" onClick={() => setAdding(true)}>+ Add operator</button></div>}
+    </div>
+  );
+}
+
+export function SettingsPanel({ tabs, values, integrations, system, registry, me, options, initialTab }) {
+  const ui = useUI();
+  const allTabs = useMemo(() => {
+    const special = [...SPECIAL];
+    if (me?.role === 'admin') special.splice(2, 0, { id: 'users', label: 'Users' }); // after Platforms
+    return [...tabs.map((t) => ({ id: t.id, label: t.label, tier: t.tier })), ...special];
+  }, [tabs, me]);
   const [active, setActive] = useState(initialTab || allTabs[0]?.id);
   const [vals, setVals] = useState(values);
   const [baseline, setBaseline] = useState(values);
@@ -245,13 +346,14 @@ export function SettingsPanel({ tabs, values, integrations, system, registry, in
             <div className="set-grouphead">{editableTab.label}</div>
             <div className="set-fields">
               {editableTab.fields.map((f) => (
-                <Field key={f.key} field={f} value={vals[f.key]} onChange={onChange} />
+                <Field key={f.key} field={f} value={vals[f.key]} onChange={onChange} options={options} />
               ))}
             </div>
           </div>
         )}
         {active === 'integrations' && <IntegrationsTab integrations={integrations} />}
         {active === 'platforms' && <PlatformsTab registry={registry} />}
+        {active === 'users' && <UsersTab me={me} />}
         {active === 'account' && <AccountTab />}
         {active === 'system' && <SystemTab system={system} />}
       </div>
@@ -293,7 +395,7 @@ export function SettingsModal({ open, onClose, initialTab }) {
         <div className="modal-body modal-body--scroll">
           {err ? <div className="empty" style={{ padding: 24 }}>{err}</div>
             : !data ? <div className="empty" style={{ padding: 48 }}>Loading settings…</div>
-            : <SettingsPanel tabs={EDITABLE_TABS} values={data.values} integrations={data.integrations} system={data.system} registry={data.registry} initialTab={initialTab} />}
+            : <SettingsPanel tabs={EDITABLE_TABS} values={data.values} integrations={data.integrations} system={data.system} registry={data.registry} me={data.me} options={data.options} initialTab={initialTab} />}
         </div>
       </div>
     </div>
