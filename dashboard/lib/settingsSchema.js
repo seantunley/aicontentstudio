@@ -45,6 +45,8 @@ export const EDITABLE_TABS = [
     id: 'pipeline',
     label: 'Content pipeline',
     fields: [
+      { key: 'claude_writes', label: 'Claude writes the posts', type: 'bool', default: 'true',
+        help: 'On: Claude (your subscription, via the brain seam) does the research + brief + drafts; images/video stay on Grok/fal. Off (or if the brain is unconfigured): the standard pipeline. Falls back automatically if Claude can’t ground a brief.' },
       { key: 'polish_enabled', label: 'Polish drafts before review', type: 'bool', default: 'true',
         help: 'Run the marketing-psychology + humanizer passes on each draft before it reaches the approval gate.' },
       { key: 'social_pulse_enabled', label: 'Ground research in current social discussion', type: 'bool', default: 'true',

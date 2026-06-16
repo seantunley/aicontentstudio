@@ -20,6 +20,7 @@ import urllib.request
 import db  # same directory
 import humanize  # same directory — the second-model humanizer pass (Principle 0)
 import registry  # same directory — platform capability registry + validation
+import claude  # same directory — the Claude brain seam (research/writing/fit-check, §intelligence)
 import llm  # same directory — Studio model seam (STUDIO_TEXT_MODEL); keeps Studio work off the chat model
 import socialpulse  # same directory — last30days runner + topic-relevance filter
 
@@ -355,6 +356,78 @@ def _requeue_or_fail(job, jid, qa, attempts, detail):
         db.log_system_event("error", "worker", f"Job failed: {job.get('topic')}", detail, jid)
 
 
+def _claude_write(job, social_text=""):
+    """§ intelligence (Path B) — Claude researches + writes the brief + per-platform drafts; the worker
+    saves them (db.save_brief still enforces §3c grounding, so weak grounding → fallback). Returns
+    {platform: image_brief} on success, else None (caller then runs the standard agent)."""
+    jid = job["id"]
+    targets = [p.strip() for p in (job.get("target_platforms") or "").split(",") if p.strip()]
+    if not targets:
+        return None
+    region = (db.get_setting("default_region") or "South Africa").strip() or "South Africa"
+    voice = ""
+    try:
+        b = db.get_brand(job.get("brand"))
+        if b:
+            voice = " ".join(x for x in [b.get("voice"), (f"audience: {b.get('audience')}" if b.get("audience") else ""),
+                                         (f"red lines: {b.get('safety')}" if b.get("safety") else "")] if x)
+    except Exception:  # noqa: BLE001
+        pass
+    direction = (job.get("direction") or "").strip()
+    social_block = (f"\nCURRENT SOCIAL DISCUSSION (ground the angle here where relevant):\n{social_text[:1500]}\n" if social_text else "")
+    prompt = (
+        f"You are {job.get('brand') or 'the studio'}'s creative director AND researcher. Produce a complete, "
+        "ready-to-review social post package.\n"
+        f"TOPIC: {job.get('topic')!r}\nTARGET PLATFORMS: {', '.join(targets)}\n"
+        + (f"BRAND VOICE: {voice}\n" if voice else "")
+        + (f"CREATIVE DIRECTION (follow it): {direction}\n" if direction else "")
+        + f"RULES: metric units ONLY (Celsius, km, kg, litres); audience region {region} (localise policy/context, "
+          "NOT the people depicted); write in the SAME language as the topic; ground EVERY fact in REAL, current, "
+          "citable sources (use web search) — never invent facts or URLs.\n"
+        + social_block
+        + "\nReply with ONLY strict JSON (no prose, no code fences):\n"
+          '{"brief":{"facts":[{"claim":"<specific claim>","source_url":"<real https URL>","snippet":"<short verbatim evidence from that source>"}],'
+          '"angles":[{"name":"<angle>","hook":"<one-line hook>"}],"recency":"<how current>"},'
+          '"drafts":[{"platform":"<a target platform>","body":"<full caption, on-brand, within the platform limit, hashtags where apt>",'
+          '"image_brief":"<rich art-direction tied to THIS post: subject, style, lighting, mood; no words baked into the image>"}]}\n'
+          "At least 3 grounded facts (each a real clickable source_url + snippet) and 2 distinct angles. One draft per target platform."
+    )
+    data = claude.draft(prompt, timeout=RUN_TIMEOUT_SECONDS)
+    if not isinstance(data, dict):
+        return None
+    brief = data.get("brief") or {}
+    facts, angles, drafts = brief.get("facts") or [], brief.get("angles") or [], data.get("drafts") or []
+    if not facts or len(angles) < 2 or not drafts:
+        return None
+    try:
+        db.save_brief(jid, facts, angles, recency=brief.get("recency"))  # raises if §3c not met → fallback
+        image_briefs = {}
+        for d in drafts:
+            plat = (d.get("platform") or "").strip()
+            body = (d.get("body") or "").strip()
+            if plat in targets and body:
+                db.create_draft(jid, plat, body)
+                image_briefs[plat] = (d.get("image_brief") or "").strip()
+        return image_briefs or None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _media_only_prompt(job, image_briefs, with_video, with_carousel):
+    """Agent prompt for when Claude already wrote + saved the drafts: visuals ONLY, no re-drafting."""
+    lines = "\n".join(f"- {p}: {image_briefs[p] or 'on-topic professional editorial photo'}" for p in image_briefs)
+    p = (f"The drafts for this job ('{job.get('topic')}') are ALREADY written and saved. Do NOT research, do NOT "
+         "call save_brief or create_draft, do NOT change any copy. Your ONLY task is the VISUALS.\n"
+         "For EACH platform draft, generate the image with image_gen using the art-direction below, then attach it "
+         "with set_draft_image" + (" (or set_carousel for a multi-image carousel)" if with_carousel else "") + ".\n")
+    if with_video:
+        p += "Then call make_video for the video draft(s).\n"
+    p += ("ART-DIRECTION per platform:\n" + lines + "\n"
+          "Image rules: rich, specific, photoreal editorial; real diverse people; localise context but never label "
+          "nationality on people; no text baked into the image; tasteful + brand-safe. Then stop.")
+    return p
+
+
 def _fit_check(jid, job):
     """§ intelligence — a Claude creative-director review of whether the generated media FITS the post's
     intent + treatment, BEFORE the human gate. Records a 'fit-check' build step and a warning event when
@@ -449,10 +522,27 @@ def process_one(job):
             pass
     social_text = social.get("text") if social else ""
 
+    # 1a) Claude writes the post (research + brief + drafts) on a FRESH pass when the brain is on.
+    #     Any failure (incl. §3c rejection) returns None → the standard agent runs. Generator never breaks.
+    claude_briefs = None
+    if not with_script and not resume_note and claude.configured() and db.get_setting_bool("claude_writes", True):
+        try:
+            claude_briefs = _claude_write(job, social_text)
+        except Exception as e:  # noqa: BLE001
+            db.record_event(jid, f"worker: Claude write errored → standard pipeline ({e})", actor="system")
+            claude_briefs = None
+
     try:
-        r = llm.run_z(_agent_prompt(job, with_image, with_video, with_carousel, social_text=social_text, resume_note=resume_note, with_script=with_script), timeout=RUN_TIMEOUT_SECONDS)
+        if claude_briefs is not None:
+            db.record_event(jid, f"worker: ✦ Claude wrote the brief + {len(claude_briefs)} draft(s) — generating visuals", actor="claude")
+            if with_image or with_video or with_carousel:
+                r = llm.run_z(_media_only_prompt(job, claude_briefs, with_video, with_carousel), timeout=RUN_TIMEOUT_SECONDS)
+            else:
+                r = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")  # text-only: no media run needed
+        else:
+            r = llm.run_z(_agent_prompt(job, with_image, with_video, with_carousel, social_text=social_text, resume_note=resume_note, with_script=with_script), timeout=RUN_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
-        _requeue_or_fail(job, jid, qa, attempts, f"timed out (research+draft exceeded {RUN_TIMEOUT_SECONDS}s)")
+        _requeue_or_fail(job, jid, qa, attempts, f"timed out (exceeded {RUN_TIMEOUT_SECONDS}s)")
         return
     except Exception as e:  # noqa: BLE001
         _requeue_or_fail(job, jid, qa, attempts, f"agent run error: {e}")

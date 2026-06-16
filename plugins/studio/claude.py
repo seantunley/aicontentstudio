@@ -100,6 +100,22 @@ def _via_api(prompt, timeout):
     return ("\n".join(parts).strip() or None)
 
 
+def draft(prompt, timeout=300):
+    """Ask Claude for a JSON object and return it parsed, or None. Used by the worker's Claude-writes
+    path — Claude researches + writes the brief + drafts, the worker saves them (§3c still enforced)."""
+    out = ask(prompt, timeout=timeout)
+    if not out:
+        return None
+    import re
+    m = re.search(r"\{.*\}", out, re.S)
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(0))
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def ask(prompt, timeout=180):
     """Return Claude's text answer, or None if the brain isn't configured/usable. Never raises."""
     if BRAIN == "off":
