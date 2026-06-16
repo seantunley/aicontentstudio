@@ -93,6 +93,11 @@ services:
       # § funnels — Mautic (runs from mautic/docker-compose.yml on :4010). Browser-reachable LAN URL
       # the /funnels page iframes (the real Mautic UI embedded in the desk).
       - MAUTIC_PUBLIC_URL=${MAUTIC_PUBLIC_URL:-http://172.18.18.101:4010}
+      # § flows — Typebot visual funnel builder (runs from typebot/docker-compose.yml). Builder is
+      # framed at /flows via its X-Frame-Options-stripping proxy (:4011); Mailpit (:4013) is the
+      # local login inbox where the magic-link sign-in arrives.
+      - TYPEBOT_PUBLIC_URL=${TYPEBOT_PUBLIC_URL:-http://172.18.18.101:4011}
+      - TYPEBOT_MAILPIT_URL=${TYPEBOT_MAILPIT_URL:-http://172.18.18.101:4013}
     extra_hosts:
       - "host.docker.internal:host-gateway"        # reach Postiz's host-published port from this bridge container
     volumes:

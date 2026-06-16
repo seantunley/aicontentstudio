@@ -22,3 +22,5 @@ chatwoot/.env
 chatwoot/data/
 mautic/.env
 mautic/data/
+typebot/.env
+typebot/data/

@@ -1,0 +1,109 @@
+# Typebot — visual conversational funnel builder (open-source, self-hosted).
+# The "flow builder" slot in the studio: drag-and-drop funnels the operator configures, deployed as
+# web/link-in-bio widgets (and WhatsApp later). Captured leads are POSTed (webhook block, configured
+# per-flow inside Typebot) into Mautic for nurture — that wiring lands in the Mautic-mirror phase.
+#
+# Engine behind the scenes; the builder UI is embedded in the studio at /flows (iframe, like Mautic).
+# Four containers: builder (:4011), viewer (:4012), Postgres, Redis. Lean — no MinIO/S3, no Caddy.
+#
+#   Bring up:  cd typebot && docker compose up -d
+#   Secrets:   copy .env.example -> .env (gitignored) and fill before bring-up.
+#   Login:     no SMTP — the magic link prints to `docker logs typebot-builder` (see docs).
+#
+# Images are :latest here only to stand up; pin to the deployed version tag after first run (studio
+# §12 — never run :latest in steady state).
+
+x-typebot-common: &typebot-common
+  restart: unless-stopped
+  depends_on:
+    typebot-redis:
+      condition: service_healthy
+    typebot-db:
+      condition: service_healthy
+  networks:
+    - typebot-network
+  env_file: .env
+  environment:
+    REDIS_URL: redis://typebot-redis:6379
+
+services:
+  typebot-db:
+    image: postgres:16-alpine
+    container_name: typebot-db
+    restart: unless-stopped
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-typebot}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - typebot-network
+
+  typebot-redis:
+    image: redis:7-alpine
+    container_name: typebot-redis
+    restart: unless-stopped
+    command: --save 60 1 --loglevel warning
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
+    volumes:
+      - redis-data:/data
+    networks:
+      - typebot-network
+
+  typebot-builder:
+    <<: *typebot-common
+    image: baptistearno/typebot-builder@sha256:3baf01dcaec6eab72026fbd6f575ff6fd64d4f76c14c6a19b7d5f48cad880c17  # latest @ 2026-06-16
+    container_name: typebot-builder
+    # No published port — reached only via the proxy below (which strips X-Frame-Options so the
+    # studio can embed it). NEXTAUTH_URL still points at :4011 (the proxy), so auth callbacks match.
+
+  # Reverse proxy that strips X-Frame-Options so the builder can be framed in the studio at /flows.
+  typebot-proxy:
+    image: nginx:alpine
+    container_name: typebot-proxy
+    restart: unless-stopped
+    depends_on:
+      - typebot-builder
+    volumes:
+      - ./proxy.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "4011:80"
+    networks:
+      - typebot-network
+
+  typebot-viewer:
+    <<: *typebot-common
+    image: baptistearno/typebot-viewer@sha256:ddc3cc82e0135bea18bc49110c18f6c6ea4931876bd0207ae0943490cf2f6799  # latest @ 2026-06-16
+    container_name: typebot-viewer
+    ports:
+      - "4012:3000"
+
+  # Local SMTP sink (no external mail). This build has NO auth provider unless SMTP is set, so Mailpit
+  # both ENABLES the magic-link login and captures the email — the operator reads the login link in
+  # Mailpit's web inbox at :4013. Doubles as a test inbox for funnel notification emails later. Tiny.
+  typebot-mailpit:
+    image: axllent/mailpit@sha256:3bd7c2f2696deb35a4780d152b404dceec99cb041b942c0877b3b22384714f85  # latest @ 2026-06-16
+    container_name: typebot-mailpit
+    restart: unless-stopped
+    networks:
+      - typebot-network
+    ports:
+      - "4013:8025"        # web inbox (read login links here); SMTP is 1025 internal-only
+
+networks:
+  typebot-network:
+    driver: bridge
+
+volumes:
+  db-data:
+  redis-data:
