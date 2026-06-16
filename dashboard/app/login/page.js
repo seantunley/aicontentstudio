@@ -7,6 +7,14 @@ export default function Login() {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
+  // Where to go after login. Honour ?next= ONLY for same-origin relative paths (e.g. the OIDC
+  // /api/oidc/authorize resume) — never a protocol-relative or absolute URL (open-redirect guard).
+  function nextTarget() {
+    if (typeof window === 'undefined') return '/';
+    const n = new URLSearchParams(window.location.search).get('next') || '/';
+    return n.startsWith('/') && !n.startsWith('//') ? n : '/';
+  }
+
   async function submit(e) {
     e.preventDefault();
     setErr(''); setBusy(true);
@@ -15,7 +23,7 @@ export default function Login() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
-      if (r.ok) { window.location.href = '/'; return; }
+      if (r.ok) { window.location.href = nextTarget(); return; }
       setErr('Invalid credentials');
     } catch { setErr('Network error'); }
     setBusy(false);

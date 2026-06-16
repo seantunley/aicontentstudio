@@ -45,6 +45,38 @@ export function allSettings() {
   return o;
 }
 
+// --- OIDC grant storage (the studio-as-SSO provider; see lib/oidc.js). Opaque one-time codes and
+// short-lived access tokens. Single-operator, low volume. Expired rows are swept opportunistically. ---
+function ensureOauth() {
+  db().exec('CREATE TABLE IF NOT EXISTS oauth_grants (token TEXT PRIMARY KEY, type TEXT, client_id TEXT, redirect_uri TEXT, sub TEXT, email TEXT, name TEXT, nonce TEXT, code_challenge TEXT, expires_at INTEGER)');
+}
+function oauthGc() { try { db().prepare('DELETE FROM oauth_grants WHERE expires_at < ?').run(Date.now()); } catch {} }
+
+export function oauthSaveCode(code, { clientId, redirectUri, sub, email, name, nonce, codeChallenge, ttlMs = 120000 }) {
+  ensureOauth(); oauthGc();
+  db().prepare('INSERT INTO oauth_grants (token,type,client_id,redirect_uri,sub,email,name,nonce,code_challenge,expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)')
+    .run(code, 'code', clientId, redirectUri, sub, email, name, nonce || null, codeChallenge || null, Date.now() + ttlMs);
+}
+// One-time: the code is deleted on read regardless of validity.
+export function oauthConsumeCode(code, clientId, redirectUri) {
+  ensureOauth(); oauthGc();
+  const r = db().prepare("SELECT * FROM oauth_grants WHERE token=? AND type='code'").get(code);
+  if (r) db().prepare('DELETE FROM oauth_grants WHERE token=?').run(code);
+  if (!r || r.expires_at < Date.now() || r.client_id !== clientId || r.redirect_uri !== redirectUri) return null;
+  return { sub: r.sub, email: r.email, name: r.name, nonce: r.nonce, codeChallenge: r.code_challenge };
+}
+export function oauthSaveToken(token, { sub, email, name, ttlMs = 300000 }) {
+  ensureOauth(); oauthGc();
+  db().prepare('INSERT INTO oauth_grants (token,type,sub,email,name,expires_at) VALUES (?,?,?,?,?,?)')
+    .run(token, 'access', sub, email, name, Date.now() + ttlMs);
+}
+export function oauthUserByToken(token) {
+  ensureOauth(); oauthGc();
+  const r = db().prepare("SELECT * FROM oauth_grants WHERE token=? AND type='access'").get(token);
+  if (!r || r.expires_at < Date.now()) return null;
+  return { sub: r.sub, email: r.email, name: r.name };
+}
+
 // All pipeline reads take an optional `brand` slug (§1b active-brand scope). null/undefined = all brands.
 export function pipelineCounts(brand) {
   const rows = brand

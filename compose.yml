@@ -98,6 +98,14 @@ services:
       # local login inbox where the magic-link sign-in arrives.
       - TYPEBOT_PUBLIC_URL=${TYPEBOT_PUBLIC_URL:-http://172.18.18.101:4011}
       - TYPEBOT_MAILPIT_URL=${TYPEBOT_MAILPIT_URL:-http://172.18.18.101:4013}
+      # §SSO — the studio is the single OIDC identity provider; embedded apps (Typebot now) delegate
+      # login here and auto-provision by email. Secrets/keys live in the gitignored root .env.
+      - STUDIO_OIDC_ISSUER=${STUDIO_OIDC_ISSUER:-http://172.18.18.101:4008/api/oidc}
+      - STUDIO_OIDC_CLIENT_ID=${STUDIO_OIDC_CLIENT_ID:-}
+      - STUDIO_OIDC_CLIENT_SECRET=${STUDIO_OIDC_CLIENT_SECRET:-}
+      - STUDIO_OIDC_REDIRECT_URIS=${STUDIO_OIDC_REDIRECT_URIS:-}
+      - STUDIO_OIDC_PRIVATE_KEY_B64=${STUDIO_OIDC_PRIVATE_KEY_B64:-}
+      - OPERATOR_EMAIL=${OPERATOR_EMAIL:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"        # reach Postiz's host-published port from this bridge container
     volumes:

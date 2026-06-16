@@ -2,6 +2,13 @@
 export default {
   // better-sqlite3 is a native module — keep it out of the bundle, load at runtime.
   serverExternalPackages: ['better-sqlite3'],
+  // OIDC discovery: clients fetch the SPEC path `${issuer}/.well-known/openid-configuration`, but
+  // Next's app router can't route a `.well-known` folder — so rewrite it to the real route handler.
+  async rewrites() {
+    return [
+      { source: '/api/oidc/.well-known/openid-configuration', destination: '/api/oidc/openid-configuration' },
+    ];
+  },
   // The image editor (Filerobot/konva) renders client-side only.
   reactStrictMode: false,
   webpack: (config) => {
