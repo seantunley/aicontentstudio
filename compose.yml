@@ -31,6 +31,12 @@ services:
       # Image/video models are configured separately (config.yaml image_gen.provider / video.provider).
       - STUDIO_TEXT_MODEL=${STUDIO_TEXT_MODEL:-}
       - STUDIO_TEXT_PROVIDER=${STUDIO_TEXT_PROVIDER:-}
+      # § Claude brain seam (creative-director fit-check QA; later the drafting brain). auto = use the
+      # `claude` CLI (your subscription, run `claude login` in the container) if present, else the
+      # Anthropic API if a key is set, else off (graceful). See plugins/studio/claude.py.
+      - STUDIO_BRAIN=${STUDIO_BRAIN:-auto}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - STUDIO_CLAUDE_MODEL=${STUDIO_CLAUDE_MODEL:-claude-sonnet-4-6}
       # Research enrichment keys (from gitignored .env). OpenRouter = reasoning/planner for the
       # last30days social-research skill; Tavily = the worker's web-search provider (upgrades the
       # keyless DuckDuckGo default). Empty if unset → falls back to prior behaviour.

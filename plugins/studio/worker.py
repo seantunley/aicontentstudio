@@ -355,6 +355,66 @@ def _requeue_or_fail(job, jid, qa, attempts, detail):
         db.log_system_event("error", "worker", f"Job failed: {job.get('topic')}", detail, jid)
 
 
+def _fit_check(jid, job):
+    """§ intelligence — a Claude creative-director review of whether the generated media FITS the post's
+    intent + treatment, BEFORE the human gate. Records a 'fit-check' build step and a warning event when
+    the fit is poor. Best-effort; skipped gracefully when the Claude brain isn't configured."""
+    try:
+        import claude  # studio brain seam (subscription CLI or Anthropic API)
+    except Exception:  # noqa: BLE001
+        return
+    if not claude.configured():
+        db.record_build_step(jid, "fit-check", model="(skipped)", provider="none",
+                             params={"reason": "Claude brain not configured — set STUDIO_BRAIN + `claude login`, or ANTHROPIC_API_KEY"})
+        return
+    try:
+        drafts = db.list_drafts(jid)
+    except Exception:  # noqa: BLE001
+        drafts = []
+    if not drafts:
+        return
+    d = drafts[-1]
+    caption = (d.get("body") or "")[:600]
+    facts = []
+    try:
+        with db._db() as conn:
+            for r in conn.execute("SELECT step, model, params FROM build_steps WHERE job_id=? AND step IN ('config','image','video')", (jid,)):
+                facts.append(f"{r['step']}={r['model']} {r['params']}")
+    except Exception:  # noqa: BLE001
+        pass
+    media_desc = "; ".join(facts) or "no media facts recorded"
+    prompt = (
+        "You are a senior creative director doing a final fit-check on a social post BEFORE it ships. "
+        f"POST INTENT/TOPIC: {job.get('topic')!r}.\n"
+        f"CAPTION: {caption!r}.\n"
+        f"HOW THE MEDIA WAS BUILT: {media_desc}.\n\n"
+        "Does the media FIT the intent — subject, energy and TREATMENT? Be strict and concrete: e.g. a "
+        "slow gentle image-to-video drift does NOT fit a 'high-speed' concept; an off-topic or generic "
+        "image does not fit. Reply with ONLY compact JSON: "
+        '{"fit": <0-5 integer>, "issue": "<one short line, empty if fine>", "fix": "<one short suggestion, empty if fine>"}.'
+    )
+    out = claude.ask(prompt)
+    if not out:
+        db.record_build_step(jid, "fit-check", model="(no response)", provider=claude.mode(), params={})
+        return
+    fit, issue, fix = None, "", ""
+    try:
+        m = re.search(r"\{.*\}", out, re.S)
+        j = json.loads(m.group(0)) if m else {}
+        fit = j.get("fit"); issue = (j.get("issue") or "").strip(); fix = (j.get("fix") or "").strip()
+    except Exception:  # noqa: BLE001
+        issue = out[:160]
+    db.record_build_step(jid, "fit-check", model="Claude", provider=claude.mode(),
+                         params={"fit": fit, "issue": issue or "(ok)", "fix": fix})
+    try:
+        if isinstance(fit, (int, float)) and fit < 3:
+            db.record_event(jid, f"fit-check: ⚠ media may not fit ({fit}/5) — {issue}" + (f" · fix: {fix}" if fix else ""), actor="claude")
+            db.log_system_event("warn", "fit-check", f"Low media fit ({fit}/5): {job.get('topic')}",
+                                (issue + (f" — suggested: {fix}" if fix else "")) or "", jid)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def process_one(job):
     jid = job["id"]
     qa = job.get("queued_action") or ""
@@ -439,6 +499,10 @@ def process_one(job):
             _validate_drafts(jid)  # platform capability registry validation
         except Exception as e:  # noqa: BLE001
             print(f"worker: validation error (non-fatal — sweep will retry): {e}")
+        try:
+            _fit_check(jid, job)  # § Claude creative-director QA: flag media that doesn't fit the post
+        except Exception as e:  # noqa: BLE001
+            print(f"worker: fit-check error (non-fatal): {e}")
     db.clear_queued(jid)  # drop the 'processing' marker so the cockpit shows it as a normal preview job
     try:
         flag = {"amber": " ⚠️ flagged for safety review", "red": " 🛑 SAFETY HOLD — read before approving"}.get(worst, "")
