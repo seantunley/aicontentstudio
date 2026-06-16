@@ -15,6 +15,8 @@ export default async function AppLayout({ children }) {
   let brands = [];
   let studioName = 'The Studio';
   try { studioName = getSetting('studio_name', 'The Studio') || 'The Studio'; } catch {}
+  let weatherLocation = 'Johannesburg';
+  try { weatherLocation = getSetting('weather_location', 'Johannesburg') || 'Johannesburg'; } catch {}
   try {
     counts = {
       queue: approvalQueue(brand).length,
@@ -28,5 +30,5 @@ export default async function AppLayout({ children }) {
     brands = listBrands();
   } catch {}
 
-  return <AppShell user={session.user.name} counts={counts} brands={brands} activeBrand={brand} studioName={studioName}>{children}</AppShell>;
+  return <AppShell user={session.user.name} counts={counts} brands={brands} activeBrand={brand} studioName={studioName} weatherLocation={weatherLocation}>{children}</AppShell>;
 }

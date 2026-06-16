@@ -3,18 +3,17 @@ import { useState, useEffect } from 'react';
 
 const TZ = 'Africa/Johannesburg';
 
-// Live clock in the studio timezone. Renders nothing on the server (avoids hydration mismatch),
-// then ticks client-side.
+// Live clock in the studio timezone. Renders nothing on the server (avoids hydration mismatch).
 export function Clock() {
   const [now, setNow] = useState(null);
   useEffect(() => {
     const tick = () => setNow(new Date());
     tick();
-    const id = setInterval(tick, 30000); // 30s — fine for HH:MM
+    const id = setInterval(tick, 30000);
     return () => clearInterval(id);
   }, []);
   if (!now) return null;
-  const date = now.toLocaleDateString('en-ZA', { timeZone: TZ, weekday: 'short', day: '2-digit', month: 'short' });
+  const date = now.toLocaleDateString('en-ZA', { timeZone: TZ, weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
   const time = now.toLocaleTimeString('en-ZA', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false });
   return (
     <div className="topclock" title={`${date} · ${TZ}`}>
@@ -24,42 +23,83 @@ export function Clock() {
   );
 }
 
-// WMO weather code → compact glyph + label.
+// WMO weather code → [emoji, label].
 function wx(code) {
-  if (code === 0) return ['☀', 'Clear'];
-  if (code <= 2) return ['🌤', 'Fair'];
-  if (code === 3) return ['☁', 'Cloudy'];
-  if (code <= 48) return ['🌫', 'Fog'];
-  if (code <= 57) return ['🌦', 'Drizzle'];
-  if (code <= 67) return ['🌧', 'Rain'];
-  if (code <= 77) return ['❄', 'Snow'];
-  if (code <= 82) return ['🌦', 'Showers'];
-  if (code <= 86) return ['🌨', 'Snow'];
-  if (code <= 99) return ['⛈', 'Storm'];
-  return ['🌡', ''];
+  if (code === 0) return ['☀️', 'Clear'];
+  if (code <= 2) return ['🌤️', 'Fair'];
+  if (code === 3) return ['☁️', 'Cloudy'];
+  if (code <= 48) return ['🌫️', 'Fog'];
+  if (code <= 57) return ['🌦️', 'Drizzle'];
+  if (code <= 67) return ['🌧️', 'Rain'];
+  if (code <= 77) return ['❄️', 'Snow'];
+  if (code <= 82) return ['🌦️', 'Showers'];
+  if (code <= 86) return ['🌨️', 'Snow'];
+  if (code <= 99) return ['⛈️', 'Storm'];
+  return ['🌡️', ''];
 }
 
-// Small weather widget for the studio's location (Johannesburg, metric). open-meteo: free, no key,
-// CORS-enabled — safe to fetch straight from the browser even on an HTTP LAN page.
-export function Weather() {
-  const [w, setW] = useState(null);
+// Colour-code the temperature — the splash of colour that lifts the grey.
+function tempColor(t) {
+  if (t <= 5) return '#5cc8ff';   // cold blue
+  if (t <= 14) return '#5cbfa9';  // cool teal
+  if (t <= 22) return '#93c96a';  // mild green
+  if (t <= 29) return '#e3a73f';  // warm brass
+  return '#ef6450';               // hot red
+}
+
+// Weather for the operator-set location (Settings → General → Weather location). Geocodes the city
+// then pulls current + a 7-day forecast (open-meteo: free, no key, CORS-ok). Click for the week.
+export function Weather({ location = 'Johannesburg' }) {
+  const [data, setData] = useState(null);
+  const [open, setOpen] = useState(false);
   useEffect(() => {
     let live = true;
-    const url = 'https://api.open-meteo.com/v1/forecast?latitude=-26.2041&longitude=28.0473&current=temperature_2m,weather_code&timezone=Africa%2FJohannesburg';
-    const pull = () => fetch(url)
-      .then((r) => r.json())
-      .then((d) => { if (live && d.current) setW({ t: Math.round(d.current.temperature_2m), code: d.current.weather_code }); })
-      .catch(() => {});
-    pull();
-    const id = setInterval(pull, 900000); // refresh every 15 min
+    async function load() {
+      try {
+        const g = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=en`).then((r) => r.json());
+        const loc = g.results && g.results[0];
+        if (!loc) return;
+        const w = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=7`).then((r) => r.json());
+        if (!live || !w.current) return;
+        const days = (w.daily?.time || []).map((d, i) => ({ date: d, code: w.daily.weather_code[i], hi: Math.round(w.daily.temperature_2m_max[i]), lo: Math.round(w.daily.temperature_2m_min[i]) }));
+        setData({ place: loc.name, country: loc.country_code || '', t: Math.round(w.current.temperature_2m), code: w.current.weather_code, days });
+      } catch { /* best effort */ }
+    }
+    load();
+    const id = setInterval(load, 900000);
     return () => { live = false; clearInterval(id); };
-  }, []);
-  if (!w) return null;
-  const [glyph, label] = wx(w.code);
+  }, [location]);
+
+  if (!data) return null;
+  const [glyph, label] = wx(data.code);
   return (
-    <div className="topweather" title={`Johannesburg · ${label}`}>
-      <span className="tw-ico">{glyph}</span>
-      <span className="tw-temp">{w.t}°C</span>
+    <div className="topweather-wrap">
+      <button className="topweather" onClick={() => setOpen((o) => !o)} title={`${data.place} · ${label} — tap for the week`}>
+        <span className="tw-ico">{glyph}</span>
+        <span className="tw-temp" style={{ color: tempColor(data.t) }}>{data.t}°</span>
+      </button>
+      {open && <div className="tw-back" onClick={() => setOpen(false)} />}
+      {open && (
+        <div className="tw-pop">
+          <div className="tw-pop-head">
+            <span className="tw-ico">{glyph}</span> {data.place}{data.country ? `, ${data.country}` : ''}
+            <span className="tw-now" style={{ color: tempColor(data.t) }}>{data.t}°C now · {label}</span>
+          </div>
+          <div className="tw-days">
+            {data.days.map((d, i) => {
+              const [g] = wx(d.code);
+              return (
+                <div className="tw-day" key={d.date}>
+                  <span className="tw-dow">{i === 0 ? 'Today' : new Date(d.date).toLocaleDateString('en-ZA', { weekday: 'short' })}</span>
+                  <span className="tw-dico">{g}</span>
+                  <span className="tw-hi" style={{ color: tempColor(d.hi) }}>{d.hi}°</span>
+                  <span className="tw-lo">{d.lo}°</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

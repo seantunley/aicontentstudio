@@ -128,10 +128,10 @@ function UserMenu({ user, onOpenSettings, onOpenTrash, trashCount }) {
 }
 
 // The top bar (desktop): trash + settings gear (both open modals) + the operator menu, top-right.
-function TopBar({ user, onOpenSettings, onOpenTrash, trashCount }) {
+function TopBar({ user, onOpenSettings, onOpenTrash, trashCount, weatherLocation }) {
   return (
     <div className="topbar">
-      <Weather />
+      <Weather location={weatherLocation} />
       <Clock />
       <UserMenu user={user} onOpenSettings={onOpenSettings} onOpenTrash={onOpenTrash} trashCount={trashCount} />
     </div>
@@ -157,7 +157,7 @@ function BrandSwitcher({ brands, activeBrand }) {
   );
 }
 
-export function AppShell({ user, counts, brands, activeBrand, studioName, children }) {
+export function AppShell({ user, counts, brands, activeBrand, studioName, weatherLocation, children }) {
   const path = usePathname();
   const [more, setMore] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -227,7 +227,7 @@ export function AppShell({ user, counts, brands, activeBrand, studioName, childr
         </aside>
 
         <div style={{ minWidth: 0 }}>
-          <TopBar user={user} onOpenSettings={openSettings} onOpenTrash={() => setTrashOpen(true)} trashCount={counts.trash} />
+          <TopBar user={user} onOpenSettings={openSettings} onOpenTrash={() => setTrashOpen(true)} trashCount={counts.trash} weatherLocation={weatherLocation} />
           <div className="mobile-top">
             <Wordmark name={studioName} />
             <BrandSwitcher brands={brands} activeBrand={activeBrand} />
