@@ -888,8 +888,24 @@ def _process_reply_drafts():
             print(f"worker: reply-draft error: {e}")
 
 
+def _publish_registry():
+    """Publish the LIVE platform-capability registry to the DB so the cockpit can show it read-only.
+    Source of truth = registry.PLATFORM_RULES + db.PLATFORM_IMAGE/VIDEO — this avoids the dashboard's
+    static mirror drifting silently (the operator can eyeball the real values in /settings → Platforms)."""
+    try:
+        out = {}
+        for plat, r in registry.PLATFORM_RULES.items():
+            img = db.PLATFORM_IMAGE.get(plat)
+            vid = db.PLATFORM_VIDEO.get(plat)
+            out[plat] = {**r, "image": list(img) if img else None, "video_dims": list(vid) if vid else None}
+        db.set_setting("_registry_json", json.dumps(out))
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def main():
     db.init_db()
+    _publish_registry()
     _heartbeat()
     if _locked():
         print("worker: another run is in progress, skipping")

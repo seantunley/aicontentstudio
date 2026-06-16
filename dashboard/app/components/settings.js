@@ -6,9 +6,55 @@ import { EDITABLE_TABS } from '@/lib/settingsSchema';
 // The full tab list: the editable groups (from the schema) plus three special, mostly read-only tabs.
 const SPECIAL = [
   { id: 'integrations', label: 'Integrations & Keys' },
+  { id: 'platforms', label: 'Platforms' },
   { id: 'account', label: 'Account' },
   { id: 'system', label: 'System' },
 ];
+
+const yn = (b) => (b ? <span className="reg-yes">✓</span> : <span className="dim">·</span>);
+
+function PlatformsTab({ registry }) {
+  const rows = registry?.rows || [];
+  return (
+    <div className="panel set-panel">
+      <div className="set-grouphead">Platform capability registry</div>
+      <p className="set-blurb">
+        Read-only — the per-platform rules the studio validates every draft against.{' '}
+        {registry?.live
+          ? 'These are the live values the worker published (source of truth).'
+          : 'Showing the dashboard mirror — run the worker once to display the live values.'}{' '}
+        To change them, edit <span className="kbd">registry.py</span> / <span className="kbd">db.py</span>: they mirror real platform limits, so a wrong value here would break posting.
+      </p>
+      {rows.length === 0 ? <div className="empty">No registry data.</div> : (
+        <div style={{ overflowX: 'auto' }}>
+          <table className="table">
+            <thead><tr>
+              <th>Platform</th>
+              <th style={{ textAlign: 'right' }}>Caption max</th>
+              <th style={{ textAlign: 'right' }}>Album max</th>
+              <th>Carousel</th><th>Video</th><th>Alt-text</th>
+              <th className="hide-sm">Image</th><th className="hide-sm">Video size</th>
+            </tr></thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.key}>
+                  <td><span className="reg-dot" style={{ background: r.color }} />{r.label}</td>
+                  <td className="num" style={{ textAlign: 'right' }}>{typeof r.captionMax === 'number' ? r.captionMax.toLocaleString() : (r.captionMax ?? '—')}</td>
+                  <td className="num" style={{ textAlign: 'right' }}>{r.mediaMax ?? '—'}</td>
+                  <td>{yn(r.carousel)}</td>
+                  <td>{yn(r.video)}</td>
+                  <td>{r.altText == null ? <span className="dim">?</span> : yn(r.altText)}</td>
+                  <td className="hide-sm id">{r.image}</td>
+                  <td className="hide-sm id">{r.videoDims}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Toggle({ on, onChange, id }) {
   return (
@@ -150,7 +196,7 @@ function SystemTab({ system }) {
   );
 }
 
-export function SettingsPanel({ tabs, values, integrations, system, initialTab }) {
+export function SettingsPanel({ tabs, values, integrations, system, registry, initialTab }) {
   const ui = useUI();
   const allTabs = useMemo(() => [...tabs.map((t) => ({ id: t.id, label: t.label, tier: t.tier })), ...SPECIAL], [tabs]);
   const [active, setActive] = useState(initialTab || allTabs[0]?.id);
@@ -205,6 +251,7 @@ export function SettingsPanel({ tabs, values, integrations, system, initialTab }
           </div>
         )}
         {active === 'integrations' && <IntegrationsTab integrations={integrations} />}
+        {active === 'platforms' && <PlatformsTab registry={registry} />}
         {active === 'account' && <AccountTab />}
         {active === 'system' && <SystemTab system={system} />}
       </div>
@@ -246,7 +293,7 @@ export function SettingsModal({ open, onClose, initialTab }) {
         <div className="modal-body modal-body--scroll">
           {err ? <div className="empty" style={{ padding: 24 }}>{err}</div>
             : !data ? <div className="empty" style={{ padding: 48 }}>Loading settings…</div>
-            : <SettingsPanel tabs={EDITABLE_TABS} values={data.values} integrations={data.integrations} system={data.system} initialTab={initialTab} />}
+            : <SettingsPanel tabs={EDITABLE_TABS} values={data.values} integrations={data.integrations} system={data.system} registry={data.registry} initialTab={initialTab} />}
         </div>
       </div>
     </div>

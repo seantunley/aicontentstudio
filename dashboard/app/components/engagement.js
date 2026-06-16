@@ -63,6 +63,8 @@ export function EngagementInbox() {
   const ui = useUI();
   const [status, setStatus] = useState('open');
   const [tab, setTab] = useState('all');           // active platform tab
+  const [counts, setCounts] = useState({});        // per-platform OPEN unread (stable tab order/badges)
+  const [openTotal, setOpenTotal] = useState(0);
   const [data, setData] = useState(undefined);     // {configured, ui, conversations}
   const [sel, setSel] = useState(null);
   const [thread, setThread] = useState(undefined);
@@ -80,6 +82,19 @@ export function EngagementInbox() {
   }, [status]);
 
   useEffect(() => () => clearInterval(pollRef.current), []);
+
+  // Tab order + badges reflect the OPEN backlog (the actionable unread), NOT the current status
+  // filter — so clicking Resolved/Pending no longer reshuffles the tabs or makes everything look done.
+  useEffect(() => {
+    let live = true;
+    fetch('/api/engagement?status=open').then((r) => r.json()).then((d) => {
+      if (!live) return;
+      const by = {}; let total = 0;
+      for (const c of (d.conversations || [])) { const k = channelToPlatform(c.channel); by[k] = (by[k] || 0) + (c.unread || 0); total += (c.unread || 0); }
+      setCounts(by); setOpenTotal(total);
+    }).catch(() => {});
+    return () => { live = false; };
+  }, [status]);
 
   async function openConversation(c) {
     setSel(c); setThread(undefined); setText(''); setDrafting(false); clearInterval(pollRef.current);
@@ -132,10 +147,8 @@ export function EngagementInbox() {
   }
 
   const conversations = data?.conversations || [];
-  // unread message tally per platform (for tab order + badges)
-  const unreadBy = {}; let allUnread = 0;
-  for (const c of conversations) { const k = channelToPlatform(c.channel); unreadBy[k] = (unreadBy[k] || 0) + (c.unread || 0); allUnread += (c.unread || 0); }
-  const orderedPlatforms = [...PLATFORMS].sort((a, b) => (unreadBy[b.key] || 0) - (unreadBy[a.key] || 0));
+  // Tab order + badges come from `counts` (the OPEN backlog) — stable regardless of the status filter.
+  const orderedPlatforms = [...PLATFORMS].sort((a, b) => (counts[b.key] || 0) - (counts[a.key] || 0));
   const shown = tab === 'all' ? conversations : conversations.filter((c) => channelToPlatform(c.channel) === tab);
 
   return (
@@ -144,12 +157,12 @@ export function EngagementInbox() {
       <div className="eng-tabs">
         <button className={`eng-tab ${tab === 'all' ? 'active' : ''}`} onClick={() => setTab('all')}>
           <span className="eng-ico eng-ico--all" title="All platforms"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M4 12h16M4 18h16" /></svg></span>
-          All{allUnread ? <span className="eng-tab-badge">{allUnread}</span> : null}
+          All{openTotal ? <span className="eng-tab-badge">{openTotal}</span> : null}
         </button>
         {orderedPlatforms.map((p) => (
           <button key={p.key} className={`eng-tab ${tab === p.key ? 'active' : ''}`} onClick={() => setTab(p.key)}>
             <PlatChip k={p.key} size={20} />
-            {p.label}{unreadBy[p.key] ? <span className="eng-tab-badge">{unreadBy[p.key]}</span> : null}
+            {p.label}{counts[p.key] ? <span className="eng-tab-badge">{counts[p.key]}</span> : null}
           </button>
         ))}
       </div>

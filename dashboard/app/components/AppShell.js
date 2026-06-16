@@ -6,6 +6,7 @@ import { UIProvider } from './ui';
 import { NewJobButton, LogoutButton } from './actions';
 import { SettingsModal } from './settings';
 import { TrashModal } from './trash';
+import { Clock, Weather } from './topwidgets';
 
 function Icon({ d, className = 'ico' }) {
   return (
@@ -129,6 +130,8 @@ function UserMenu({ user, onOpenSettings }) {
 function TopBar({ user, onOpenSettings, onOpenTrash, trashCount }) {
   return (
     <div className="topbar">
+      <Weather />
+      <Clock />
       <button className="iconbtn" onClick={onOpenTrash} title="Trash" aria-label="Trash">
         <Icon d={ICONS.trash} />
         {trashCount ? <span className="iconbtn-badge">{trashCount}</span> : null}
@@ -205,7 +208,6 @@ export function AppShell({ user, counts, brands, activeBrand, studioName, childr
             <Wordmark name={studioName} />
             <div className="strap"><span className="pulse" /> operator&rsquo;s desk</div>
           </div>
-          <BrandSwitcher brands={brands} activeBrand={activeBrand} />
           <NewJobButton block defaultBrand={activeBrand} brands={brands} />
           <nav className="nav">
             {GROUPS.map((g) => (
@@ -220,8 +222,11 @@ export function AppShell({ user, counts, brands, activeBrand, studioName, childr
               </div>
             ))}
           </nav>
-          <div className="side-foot">
-            <div className="colophon">est. 2026 · vol. II</div>
+          <div className="side-bottom">
+            <BrandSwitcher brands={brands} activeBrand={activeBrand} />
+            <div className="side-foot">
+              <div className="colophon">est. 2026 · vol. II</div>
+            </div>
           </div>
         </aside>
 

@@ -14,7 +14,7 @@ export default function Settings() {
   for (const t of EDITABLE_TABS) {
     for (const f of t.fields) values[f.key] = stored[f.key] != null ? stored[f.key] : f.default;
   }
-  const { integrations, system } = settingsStatus();
+  const { integrations, system, registry } = settingsStatus();
 
   return (
     <>
@@ -25,7 +25,7 @@ export default function Settings() {
         </div>
         <div className="crumbs">operator control</div>
       </div>
-      <SettingsPanel tabs={EDITABLE_TABS} values={values} integrations={integrations} system={system} />
+      <SettingsPanel tabs={EDITABLE_TABS} values={values} integrations={integrations} system={system} registry={registry} />
     </>
   );
 }

@@ -1,9 +1,38 @@
-// Server-side status for the Settings panel: integration readiness (●/○) + system/worker info.
-// Presence-only — secret VALUES are never included, just whether each is set.
+// Server-side status for the Settings panel: integration readiness (●/○) + system/worker info +
+// a read-only view of the platform-capability registry. Presence-only — secret VALUES are never
+// included, just whether each is set.
+import { getSetting } from './db';
+import { PLATFORM_META, PLATFORM_LIMITS, PLATFORM_IMAGE, PLATFORM_CAPS } from './platforms';
+
 const has = (k) => {
   const v = process.env[k];
   return !!(v && String(v).trim());
 };
+
+const dims = (a) => (Array.isArray(a) && a.length === 2 ? `${a[0]}×${a[1]}` : '—');
+
+// The LIVE platform registry the worker publishes to the DB (_registry_json = source of truth from
+// registry.py + db.PLATFORM_IMAGE/VIDEO). Falls back to the dashboard's static mirror if the worker
+// hasn't run yet. Read-only — shown so the operator can verify the rules without reading code.
+function platformRegistry() {
+  let reg = null;
+  try { const raw = getSetting('_registry_json'); if (raw) reg = JSON.parse(raw); } catch {}
+  const keys = reg ? Object.keys(reg) : Object.keys(PLATFORM_LIMITS);
+  const rows = keys.map((k) => {
+    const meta = PLATFORM_META[k] || { label: k, color: '#888' };
+    const r = reg && reg[k];
+    if (r) {
+      return { key: k, label: meta.label, color: meta.color, captionMax: r.caption_max, mediaMax: r.media_max,
+        carousel: !!r.carousel, video: !!r.video, altText: !!r.alt_text, hashtags: !!r.hashtags,
+        image: dims(r.image), videoDims: dims(r.video_dims) };
+    }
+    const caps = PLATFORM_CAPS[k] || {};
+    return { key: k, label: meta.label, color: meta.color, captionMax: PLATFORM_LIMITS[k], mediaMax: caps.mediaMax,
+      carousel: !!caps.carousel, video: !!caps.video, altText: null, hashtags: null,
+      image: dims(PLATFORM_IMAGE[k]), videoDims: '—' };
+  });
+  return { live: !!reg, rows };
+}
 
 export function settingsStatus() {
   const integrations = [
@@ -53,5 +82,5 @@ export function settingsStatus() {
     workerEnv,
   };
 
-  return { integrations, system };
+  return { integrations, system, registry: platformRegistry() };
 }
