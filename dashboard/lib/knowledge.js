@@ -73,6 +73,21 @@ export function readNote(rel) {
   return { rel: safe, fm, body, title: fm.title || safe };
 }
 
+// Curated principle / "playbook" notes (frontmatter tag 'playbook') — surfaced as a Learnings tab so
+// the operator can read the studio's hard-won guidance, not just the auto-captured edit/reject feedback.
+export function playbookNotes() {
+  const out = [];
+  for (const n of listNotes()) {
+    try {
+      const note = readNote(n.rel);
+      const t = note.fm && note.fm.tags;
+      const tags = Array.isArray(t) ? t.join(',') : String(t || '');
+      if (/\bplaybook\b/i.test(tags)) out.push({ rel: note.rel, title: note.title, body: note.body, updated: n.updated });
+    } catch {}
+  }
+  return out;
+}
+
 export function searchNotes(q, limit = 40) {
   const needle = (q || '').toLowerCase().trim();
   if (!needle) return [];
