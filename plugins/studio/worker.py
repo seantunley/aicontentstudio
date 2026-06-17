@@ -1198,36 +1198,37 @@ def _validate_pending(limit=12):
 
 
 def _alt_text_pending(limit=6):
-    """Sweep: generate accessibility alt text (vision, studio model) for preview-draft images that
-    lack it, on platforms that support alt text, then re-validate so the 'no alt text' nudge clears."""
+    """Sweep: generate accessibility alt text for preview-draft images that lack it, on platforms that
+    support it, then re-validate so the 'no alt text' nudge clears. Alt text MUST come from a model that
+    actually SEES the image (Claude vision) — handing a URL to a TEXT model makes it hallucinate (e.g.
+    describing a cart as a 'KTM motorcycle') or fail on an internal URL, so we fetch the pixels + use vision."""
+    try:
+        import claude
+    except Exception:  # noqa: BLE001
+        return
+    if not claude.vision_available():
+        return  # no eyes available — leave the nudge; NEVER fabricate alt text from a blind model
     for d in db.preview_drafts_unalttexted(limit):
         rules = registry.PLATFORM_RULES.get((d.get("platform") or "").lower())
         if not rules or not rules.get("alt_text"):
             continue  # platform doesn't carry alt text — nothing to do
-        url = None
         try:
-            imgs = json.loads(d.get("images_json") or "null") or []
-            if imgs:
-                url = imgs[0].get("path")
+            media = _media_for_fitcheck(d)  # fetches the real image bytes (handles the internal-IP URL)
         except Exception:  # noqa: BLE001
-            pass
-        url = url or d.get("image_path")
-        if not url:
-            continue
-        prompt = ("Write concise, factual alt text for this image, for accessibility: describe what is "
-                  "actually visible in ONE sentence, max ~120 characters, no 'image of'/'photo of' prefix "
-                  f"and no commentary. Reply with the alt text only. Image: {url}")
+            media = None
+        if not media:
+            continue  # couldn't fetch the image → a later sweep retries; never guess
         try:
-            r = llm.run_z(prompt, timeout=90)
-            alt = (r.stdout or "").strip().strip('"').replace("\n", " ").strip()
+            out = claude.ask_image(
+                "Write concise, factual alt text for this image, for accessibility: describe what is "
+                "ACTUALLY visible in ONE sentence, max ~120 characters, no 'image of'/'photo of' prefix and "
+                "no commentary. Reply with the alt text only.", [media], timeout=120)
+            alt = (out or "").strip().strip('"').replace("\n", " ").strip()
         except Exception:  # noqa: BLE001
             continue
         low = alt.lower()
-        # Skip non-answers (image unreachable / model refusal) so we never store junk alt text;
-        # the 'missing' nudge stays, and a later sweep can retry.
         if (not alt or len(alt) > 300 or any(p in low for p in (
-                "inaccessible", "cannot generate", "can't generate", "cannot see", "can't see",
-                "unable to", "not able to", "no image", "couldn't", "i'm sorry", "as an ai"))):
+                "inaccessible", "cannot", "can't", "unable to", "no image", "i'm sorry", "as an ai"))):
             continue
         db.set_draft_alt_text(d["id"], alt)
         # refresh the capability-registry validation so the alt_text_missing nudge clears
