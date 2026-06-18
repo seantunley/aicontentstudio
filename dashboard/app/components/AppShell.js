@@ -51,7 +51,8 @@ const GROUPS = [
     { href: '/upcoming', key: 'upcoming', label: 'Upcoming', countKey: 'upcoming', calm: true },
     { href: '/calendar', key: 'calendar', label: 'Calendar' },
     { href: '/engagement', key: 'engagement', label: 'Engagement' },
-    { href: '/funnels', key: 'funnels', label: 'Funnels' },
+    // Funnels hidden while Mautic is disabled (stack stopped 2026-06). Re-add this line to restore.
+    // { href: '/funnels', key: 'funnels', label: 'Funnels' },
     { href: '/flows', key: 'flows', label: 'Flows' },
     { href: '/broadcasts', key: 'broadcasts', label: 'Broadcasts' },
     { href: '/performance', key: 'performance', label: 'Performance' },

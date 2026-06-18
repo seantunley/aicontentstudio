@@ -98,7 +98,9 @@ nano ~/.hermes/.env             <span class="c"># set TELEGRAM_ALLOWED_USERS to 
 (cd postiz   &amp;&amp; docker compose up -d)
 (cd chatwoot &amp;&amp; docker compose up -d)
 (cd typebot  &amp;&amp; docker compose up -d)
-(cd mautic   &amp;&amp; docker compose up -d)</pre>
+<span class="c"># Mautic is OPTIONAL and currently DISABLED — skip it. The content engine has zero</span>
+<span class="c"># dependency on it (plugins/ = 0 refs); the dashboard Funnels area just no-ops. Re-enable</span>
+<span class="c"># later with: (cd mautic &amp;&amp; docker compose up -d) and un-hide the Funnels nav item.</span></pre>
     The first worker tick runs <code>db.init_db()</code> → fresh <code>studio.db</code> with the full schema and a re-seeded occasions calendar.</li>
   <li><b>Install the cron block</b> (§6) with <code>crontab -e</code>. This drives the worker/scout/heartbeat and starts the two host bots on boot. <b>Adjust the paths</b> if the repo or home dir differ.</li>
   <li><b>Set the VM to survive reboots</b> (if it's a VM): on the hypervisor, <code>qm set &lt;vmid&gt; --onboot 1</code> and install <code>qemu-guest-agent</code> in the guest, so a host power event auto-restarts everything.</li>
@@ -115,7 +117,7 @@ nano ~/.hermes/.env             <span class="c"># set TELEGRAM_ALLOWED_USERS to 
   <tr><td>Postiz (<code>postiz/</code>)</td><td>postiz, postgres, redis, temporal (+ es, pg, ui), admin-tools</td><td>Publishing + scheduling</td></tr>
   <tr><td>Chatwoot (<code>chatwoot/</code>)</td><td>rails, sidekiq, postgres, redis</td><td>§3d engagement inbox</td></tr>
   <tr><td>Typebot (<code>typebot/</code>)</td><td>builder, viewer, db, redis, mailpit, proxy</td><td>Funnel flows (/flows)</td></tr>
-  <tr><td>Mautic (<code>mautic/</code>)</td><td>mautic, mautic-cron, db</td><td>Nurture / broadcast</td></tr>
+  <tr><td>Mautic (<code>mautic/</code>) <span class="tag d">optional / off</span></td><td>mautic, mautic-cron, db</td><td>Nurture / broadcast — heavy; currently disabled, Funnels nav hidden. Skip unless needed.</td></tr>
   <tr><td colspan="3">Host processes (cron <code>@reboot</code>): <code>claude-bridge.py</code> on <code>127.0.0.1:4014</code> · <code>nancy_bot.py</code> (Telegram).</td></tr>
 </table>
 
