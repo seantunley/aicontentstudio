@@ -11,5 +11,14 @@ export async function POST(req) {
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'bad request' }, { status: 400 }); }
   if (body.dismiss) setSetting('onboarding_dismissed', '1');
   if (body.welcomed) setSetting('onboarding_welcomed', '1');
+  // Per-brand reference product photos (consumed by the worker at brand_ref_images:<slug>). Not in the
+  // settings whitelist (dynamic key), so saved here. Only public http(s) URLs the worker can fetch.
+  if (body.refImages && body.refImages.slug) {
+    const slug = String(body.refImages.slug).trim().toLowerCase();
+    const urls = Array.isArray(body.refImages.urls)
+      ? body.refImages.urls.filter((u) => typeof u === 'string' && /^https?:\/\//.test(u.trim())).map((u) => u.trim())
+      : [];
+    if (slug) setSetting('brand_ref_images:' + slug, JSON.stringify(urls));
+  }
   return NextResponse.json({ ok: true });
 }

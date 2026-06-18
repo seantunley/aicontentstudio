@@ -77,7 +77,13 @@ export default function OnboardingPanel({ state }) {
           })}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 11 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+          <Link
+            href="/onboarding"
+            style={{ fontFamily: 'var(--mono)', fontSize: 11, color: brass, border: '1px solid var(--line-2)', background: 'var(--accent-bg)', padding: '5px 12px', borderRadius: 6 }}
+          >
+            Start guided setup →
+          </Link>
           <button
             onClick={dismiss}
             style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--faint)', background: 'none', border: 'none', cursor: 'pointer' }}

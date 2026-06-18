@@ -34,13 +34,13 @@ export function onboardingState(activeBrandSlug = null) {
 
   // weight = how much this input moves output quality (voice / reference photos / Telegram weigh most)
   const steps = [
-    { key: 'telegram',  label: 'Connect Telegram',                 done: hasEnv('TELEGRAM_BOT_TOKEN') && hasEnv('TELEGRAM_ALLOWED_USERS'), weight: 3, href: '/settings', hint: 'Your control surface — chat to Constance & Nancy.' },
+    { key: 'telegram',  label: 'Connect Telegram',                 done: hasEnv('TELEGRAM_BOT_TOKEN') && hasEnv('TELEGRAM_ALLOWED_USERS'), weight: 3, href: '/onboarding', hint: 'Your control surface — chat to Constance & Nancy.' },
     { key: 'basics',    label: 'Studio basics & region',           done: has(setting('studio_name')) && has(setting('default_region')),    weight: 1, href: '/settings', hint: 'Name, region, timezone, currency.' },
     { key: 'brand',     label: 'Create your first brand',          done: brands.length > 0,                                               weight: 2, href: '/brands',   hint: 'The profile that shapes every draft.' },
     { key: 'voice',     label: 'Define the brand voice',           done: has(brand?.voice),                                               weight: 3, href: '/brands',   hint: 'Tone & do’s/don’ts — the biggest quality lever.' },
     { key: 'pillars',   label: 'Add content pillars',              done: has(brand?.pillars),                                             weight: 1, href: '/brands',   hint: 'Recurring themes to draw from.' },
     { key: 'channels',  label: 'Connect a publishing channel',     done: has(brand?.channels),                                            weight: 1, href: '/brands',   hint: 'Which platforms this brand may post to.' },
-    { key: 'refimages', label: 'Add reference product photos',     done: refImages,                                                       weight: 3, href: '/brands',   hint: 'Real photos so AI media looks like your product.' },
+    { key: 'refimages', label: 'Add reference product photos',     done: refImages,                                                       weight: 3, href: '/onboarding', hint: 'Real photos so AI media looks like your product.' },
     { key: 'knowledge', label: 'Add brand knowledge',             done: knowledge,                                                       weight: 1, href: '/knowledge', hint: 'Docs that ground content in facts.' },
     { key: 'first',     label: 'Create & approve your first piece', done: firstPiece,                                                     weight: 1, href: '/jobs',     hint: 'Prove the pipeline end-to-end.' },
   ];
