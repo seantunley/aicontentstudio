@@ -231,9 +231,9 @@ CREATE TABLE IF NOT EXISTS build_steps (             -- per-post build trace: wh
     params   TEXT,                                   -- JSON of the key params (animate, duration, dims, ...)
     at       TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS delegations (             -- §org: CEO (Zingo) -> Head of Content (Nancy) hand-off, tracked end to end (Phase B)
+CREATE TABLE IF NOT EXISTS delegations (             -- §org: CEO (Constance) -> Head of Content (Nancy) hand-off, tracked end to end (Phase B)
     id          TEXT PRIMARY KEY,
-    from_agent  TEXT NOT NULL,                        -- 'zingo'
+    from_agent  TEXT NOT NULL,                        -- 'constance'
     to_agent    TEXT NOT NULL,                        -- 'nancy'
     task        TEXT NOT NULL,                        -- the content brief (a line)
     brand       TEXT,
@@ -621,9 +621,9 @@ def clear_queued(job_id):
 
 
 # --- §org: CEO -> Head-of-Content delegations (Phase B), tracked end to end -------------------
-def create_delegation(task, brand=None, from_agent="zingo", to_agent="nancy",
+def create_delegation(task, brand=None, from_agent="constance", to_agent="nancy",
                       platforms=None, media=None, direction=None, note=None):
-    """Zingo (CEO) hands a content task to Nancy. Returns the delegation row."""
+    """Constance (CEO) hands a content task to Nancy. Returns the delegation row."""
     did = str(uuid.uuid4())
     now = _utcnow()
     plats = (",".join([p.strip() for p in platforms if p and p.strip()])

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Nancy — Head of Content. A Claude-powered Telegram bot (your Claude SUBSCRIPTION, via the host
-`claude` CLI), parallel to Zingo (the Hermes/Grok CEO bot). Nancy is the content specialist: she runs
+`claude` CLI), parallel to Constance (the Hermes/Grok CEO bot). Nancy is the content specialist: she runs
 on the same model that researches, writes and checks every post in the Studio, so the chat voice and
-the published voice are one. She reports to Zingo and they share ONE studio (this same studio.db).
+the published voice are one. She reports to Constance and they share ONE studio (this same studio.db).
 
 Design (deliberately dependency-light — stdlib only, so it runs anywhere the subscription `claude` does):
   • transport  — the Telegram Bot API by hand (long-poll getUpdates + sendMessage/sendPhoto + buttons).
@@ -160,7 +160,7 @@ def studio_state():
     except Exception:  # noqa: BLE001
         opens = []
     if opens:
-        lines.append("OPEN DELEGATIONS FROM ZINGO (CEO) — pick each up: queue it and include its delegation_id so the loop closes:")
+        lines.append("OPEN DELEGATIONS FROM CONSTANCE (CEO) — pick each up: queue it and include its delegation_id so the loop closes:")
         for d in opens:
             meta = ", ".join(b for b in [
                 (f"brand={d['brand']}" if d.get("brand") else "NO BRAND — ask the operator which"),
@@ -299,7 +299,7 @@ def _act_queue(cid, a):
     if did:
         try:
             db.link_delegation(_resolve_deleg(did) or did, job["id"])
-            linked = " (closing Zingo's loop on it)"
+            linked = " (closing Constance's loop on it)"
         except Exception:  # noqa: BLE001
             pass
     plats = ", ".join(platforms) or "no platform set"
@@ -363,7 +363,7 @@ def handle_message(msg):
     if text in ("/start", "/help"):
         return send(cid, "I'm Nancy, Head of Content. Tell me what you want to make — a topic, a platform, "
                          "a vibe — and I'll shape it and put it through the Studio. Ask me what's waiting to "
-                         "review, too. (Zingo runs the ops side.)")
+                         "review, too. (Constance runs the ops side.)")
     typing(cid)
     _remember(cid, "operator", text)
     reply, action = think(cid, text)
@@ -425,7 +425,7 @@ def _decide(cid, jid, decision):
 
 
 def _poll_delegations():
-    """Proactive pickup — Nancy notices new delegations from Zingo, tells the operator, and (when the
+    """Proactive pickup — Nancy notices new delegations from Constance, tells the operator, and (when the
     brief has a brand) queues them straight away + links them so the loop auto-closes. Runs each poll."""
     try:
         db.sync_delegations()
@@ -446,15 +446,15 @@ def _poll_delegations():
             try:
                 plats = [p for p in (d.get("platforms") or "").split(",") if p]
                 job = db.create_and_queue(task, brand=brand, source="nancy",
-                                          created_by="Nancy (delegated by Zingo)", platforms=plats,
+                                          created_by="Nancy (delegated by Constance)", platforms=plats,
                                           media=(d.get("media") or "none"), direction=d.get("direction"))
                 db.link_delegation(d["id"], job["id"])
-                send(HOME, f"📥 Zingo's handed me: \"{task}\" for {brand}. On it — queued to the Studio "
+                send(HOME, f"📥 Constance's handed me: \"{task}\" for {brand}. On it — queued to the Studio "
                            f"[{job['id'][:8]}]. I'll bring it back to review when it's built. Shout if you want a different angle or format.")
             except Exception as e:  # noqa: BLE001
-                send(HOME, f"📥 Zingo handed me \"{task}\" for {brand}, but I hit a snag queuing it: {e}")
+                send(HOME, f"📥 Constance handed me \"{task}\" for {brand}, but I hit a snag queuing it: {e}")
         else:
-            send(HOME, f"📥 Zingo's handed me: \"{task}\" — no brand pinned. Which brand should it be?")
+            send(HOME, f"📥 Constance's handed me: \"{task}\" — no brand pinned. Which brand should it be?")
     if changed:
         SESS["_deleg_seen"] = seen[-300:]
         _save(SESS)

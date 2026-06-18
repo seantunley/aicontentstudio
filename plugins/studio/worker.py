@@ -154,7 +154,7 @@ def _run_social_pulse(topic, sources=None):
 
 
 def _direction_block(job):
-    """The creative direction the studio manager (Zingo) agreed with the operator — the worker honours it."""
+    """The creative direction the studio manager (Constance) agreed with the operator — the worker honours it."""
     d = (job.get("direction") or "").strip()
     if not d:
         return ""

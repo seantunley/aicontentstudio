@@ -5,7 +5,7 @@ How to run and operate the studio day-to-day. (Architecture/intent live in
 
 ## What it is (one breath)
 
-Send a topic (Telegram **or** the cockpit) → **Zingo** researches it (grounded, cited),
+Send a topic (Telegram **or** the cockpit) → **Constance** researches it (grounded, cited),
 writes a platform draft, optionally generates an image → it lands in your **approval
 queue** → you review/edit/approve → you **publish** (live to Bluesky via Postiz). The
 agent never publishes; publishing is always your hand.
@@ -14,7 +14,7 @@ agent never publishes; publishing is always your hand.
 
 | Surface | Where | What you do there |
 |---|---|---|
-| **Telegram (Zingo)** | your bot | Start jobs, ask status, **review the queue** (Approve/Reject/Defer buttons). Get pinged when a draft's ready and when a post goes live. |
+| **Telegram (Constance)** | your bot | Start jobs, ask status, **review the queue** (Approve/Reject/Defer buttons). Get pinged when a draft's ready and when a post goes live. |
 | **Cockpit** | `http://172.18.18.101:4008` (login `sean`) | Originate jobs, see the pipeline, edit drafts, **Approve / Publish live**, accounts. |
 | **Postiz** | `http://172.18.18.101:4007` | Connected channels, the calendar, scheduling. |
 
@@ -30,7 +30,7 @@ agent never publishes; publishing is always your hand.
 ## Day-to-day
 
 - **Start a job:** Telegram — *"draft a post about X (with an image)"*; or cockpit — **+ New job** (topic, brand, image toggle). Cockpit jobs are processed by the worker (cron, ~2 min) and ping you when ready.
-- **Review:** Telegram — *"what's in my approval queue?"* → Zingo lists drafts and shows Approve/Reject/Defer buttons. Cockpit — **Approval queue** tab.
+- **Review:** Telegram — *"what's in my approval queue?"* → Constance lists drafts and shows Approve/Reject/Defer buttons. Cockpit — **Approval queue** tab.
 - **Publish:** cockpit **Ready to publish** → **Publish live** (confirms, posts, DMs you the link).
 
 ## Running the stack

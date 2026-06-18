@@ -1,4 +1,4 @@
-"""Tool schemas — what the model (Zingo) sees for each studio tool."""
+"""Tool schemas — what the model (Constance) sees for each studio tool."""
 
 LOG_JOB = {
     "name": "log_job",

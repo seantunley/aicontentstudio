@@ -74,7 +74,7 @@ services:
       - ${HOME}/.hermes:/opt/data        # Hermes: config.yaml, memories/, skills/, auth.json, .env, logs/
       - ./studio-data:/opt/studio        # studio job store (SQLite) — separate from Hermes's own memory
       - ./plugins:/opt/data/plugins      # studio plugin source (version-controlled in repo)
-      - ./config/SOUL.md:/opt/data/SOUL.md  # Zingo's persona — version-controlled here, not just ~/.hermes
+      - ./config/SOUL.md:/opt/data/SOUL.md  # Constance's persona — version-controlled here, not just ~/.hermes
     # Phase 0 deliberately omits: HERMES_DASHBOARD (that is Hermes's own dash, not our §7a cockpit),
     # the gateway API server (loopback-only is fine), and resource limits. Added later only when needed.
 

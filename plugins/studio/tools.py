@@ -639,14 +639,14 @@ def suggest_topic(args, **kwargs):
 
 def delegate(args, **kwargs):
     """§org (Phase B) — the CEO hands a CONTENT task to Nancy (Head of Content). Records a tracked
-    delegation; Nancy's bot picks it up automatically. Zingo does NOT produce content himself — this
+    delegation; Nancy's bot picks it up automatically. Constance does NOT produce content himself — this
     is the hand-off, and he follows up via the delegations tool to close the loop."""
     task = (args.get("task") or "").strip()
     if not task:
         return _err("task is required — what should Nancy make?")
     brand = (args.get("brand") or "").strip() or None
     try:
-        d = db.create_delegation(task, brand=brand, from_agent="zingo", to_agent="nancy",
+        d = db.create_delegation(task, brand=brand, from_agent="constance", to_agent="nancy",
                                  platforms=args.get("platforms") or None,
                                  media=(args.get("media") or "").strip().lower() or None,
                                  direction=(args.get("direction") or "").strip() or None,
@@ -663,7 +663,7 @@ def delegations(args, **kwargs):
     Auto-closes any delegation whose content has reached the gate. Use it to close the loop."""
     status = (args.get("status") or "").strip() or None
     try:
-        rows = db.list_delegations(from_agent="zingo", status=status, limit=30)
+        rows = db.list_delegations(from_agent="constance", status=status, limit=30)
     except Exception as e:  # noqa: BLE001
         return _err(str(e))
     items = [{"id": r["id"][:8], "task": r["task"], "brand": r.get("brand"), "status": r["status"],
