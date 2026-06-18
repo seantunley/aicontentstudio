@@ -4,6 +4,8 @@ import { zar } from '@/lib/money';
 import { za } from '@/lib/time';
 import { getActiveBrand } from '@/lib/brand';
 import { PLATFORM_META, PLATFORM_ICON } from '@/lib/platforms';
+import { onboardingState } from '@/lib/onboarding';
+import OnboardingPanel from '@/app/components/onboarding';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,6 +51,7 @@ function DeskCard({ href, n, lab, tone }) {
 
 export default async function Overview() {
   const brand = await getActiveBrand();
+  const ob = onboardingState(brand);
   let pipe = [], work = [], jobs = [], cost = { entries: 0, totalUsd: 0 }, qn = 0, rn = 0, sn = 0, hb = null, err = null;
   try {
     pipe = pipelineCounts(brand);
@@ -73,6 +76,8 @@ export default async function Overview() {
         <div><h1>The desk</h1><div className="lede">Everything moving through the studio, and what&rsquo;s waiting on your call.</div></div>
         <div className="crumbs">{dateline}</div>
       </div>
+
+      <OnboardingPanel state={ob} />
 
       {failed.length > 0 && (
         <div className="alert-strip reveal">
