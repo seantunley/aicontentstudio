@@ -1,6 +1,6 @@
 'use client';
 import { useState, useMemo, useEffect } from 'react';
-import { useUI } from './ui';
+import { useUI, Tooltip, InfoDot } from './ui';
 import { EDITABLE_TABS } from '@/lib/settingsSchema';
 
 // The full tab list: the editable groups (from the schema) plus three special, mostly read-only tabs.
@@ -30,9 +30,11 @@ function PlatformsTab({ registry }) {
           <table className="table">
             <thead><tr>
               <th>Platform</th>
-              <th style={{ textAlign: 'right' }}>Caption max</th>
-              <th style={{ textAlign: 'right' }}>Album max</th>
-              <th>Carousel</th><th>Video</th><th>Alt-text</th>
+              <th style={{ textAlign: 'right' }}>Caption max<InfoDot tip="Longest caption this platform allows. Drafts over it get flagged." placement="bottom" /></th>
+              <th style={{ textAlign: 'right' }}>Album max<InfoDot tip="Most images allowed in one multi-image post (carousel)." placement="bottom" /></th>
+              <th>Carousel<InfoDot tip="Whether this platform supports a multi-image swipe post." placement="bottom" /></th>
+              <th>Video<InfoDot tip="Whether this platform accepts a native video post." placement="bottom" /></th>
+              <th>Alt-text<InfoDot tip="Whether image alt-text (for screen readers) is supported." placement="bottom" /></th>
               <th className="hide-sm">Image</th><th className="hide-sm">Video size</th>
             </tr></thead>
             <tbody>
@@ -58,10 +60,12 @@ function PlatformsTab({ registry }) {
 
 function Toggle({ on, onChange, id }) {
   return (
-    <button type="button" role="switch" aria-checked={on} id={id}
-            className={`tgl ${on ? 'on' : ''}`} onClick={() => onChange(!on)}>
-      <span className="tgl-knob" />
-    </button>
+    <Tooltip text={on ? 'On — click to turn off.' : 'Off — click to turn on.'} focusable={false}>
+      <button type="button" role="switch" aria-checked={on} id={id}
+              className={`tgl ${on ? 'on' : ''}`} onClick={() => onChange(!on)}>
+        <span className="tgl-knob" />
+      </button>
+    </Tooltip>
   );
 }
 
@@ -121,7 +125,7 @@ function Field({ field, value, onChange, options }) {
 }
 
 function StatusDot({ ok }) {
-  return <span className={`sdot ${ok ? 'on' : 'off'}`} title={ok ? 'configured' : 'not set'} />;
+  return <Tooltip text={ok ? 'Configured and connected.' : 'Not configured — set its key/credentials in the environment.'} className={`sdot ${ok ? 'on' : 'off'}`} />;
 }
 
 function AccountTab() {
@@ -177,7 +181,7 @@ function IntegrationsTab({ integrations }) {
                 {it.detail}{it.extra ? <span className="dim"> · {it.extra}</span> : null}
               </div>
             </div>
-            <span className={`badge ${it.ok ? 'badge--approved' : 'badge--failed'}`}>{it.ok ? 'connected' : 'not set'}</span>
+            <Tooltip text={it.ok ? 'This engine is wired up and reachable.' : 'Not wired up — add its credentials to the .env and restart its container.'} className={`badge ${it.ok ? 'badge--approved' : 'badge--failed'}`}>{it.ok ? 'connected' : 'not set'}</Tooltip>
           </div>
         ))}
       </div>

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { PLATFORM_META, PLATFORM_ICON } from '@/lib/platforms';
-import { useUI } from './ui';
+import { useUI, Tooltip } from './ui';
 import { PlatformChip } from './actions';
 
 const POSTIZ_UI = 'http://172.18.18.101:4007';
@@ -81,7 +81,7 @@ export function Calendar() {
           <span className="cal-title">{MONTHS[cursor.getMonth()]} {cursor.getFullYear()}</span>
         </div>
         <div className="cal-meta">
-          <span className={`cal-status cal-status--${status}`}>{status === 'down' ? 'Postiz unreachable' : status === 'loading' ? 'loading…' : 'live · drag to reschedule · refreshes each minute'}</span>
+          <Tooltip className={`cal-status cal-status--${status}`} text={status === 'down' ? 'Can’t reach Postiz — the calendar may be stale until it’s back.' : status === 'loading' ? 'Fetching the schedule from Postiz…' : 'Mirrored live from Postiz — drag a post to a new day to reschedule it.'}>{status === 'down' ? 'Postiz unreachable' : status === 'loading' ? 'loading…' : 'live · drag to reschedule · refreshes each minute'}</Tooltip>
           <a className="deeplink" href={POSTIZ_UI} target="_blank" rel="noreferrer">open Postiz ↗</a>
         </div>
       </div>
@@ -116,9 +116,9 @@ export function Calendar() {
         })}
       </div>
       <div className="cal-legend">
-        <span><i className="st-dot st-queue" /> scheduled (drag to move)</span>
-        <span><i className="st-dot st-published" /> published (locked)</span>
-        <span><i className="st-dot st-error" /> error</span>
+        <Tooltip text="Queued to post — not out yet. Drag it to a different day to reschedule."><i className="st-dot st-queue" /> scheduled (drag to move)</Tooltip>
+        <Tooltip text="Already gone out. Locked — you can’t move a post that’s been published."><i className="st-dot st-published" /> published (locked)</Tooltip>
+        <Tooltip text="Postiz failed to publish this one — open it in Postiz to see why."><i className="st-dot st-error" /> error</Tooltip>
         <span className="dim">changes sync to Postiz; moves made in Postiz appear here within a minute.</span>
       </div>
 

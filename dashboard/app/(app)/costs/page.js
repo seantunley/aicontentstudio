@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { costSummary, costThisMonth, costByBrand, costByOperation, recentCosts } from '@/lib/db';
 import { zar, zarRate } from '@/lib/money';
 import { za } from '@/lib/time';
+import { Tooltip } from '@/app/components/ui';
 
 export const dynamic = 'force-dynamic';
 const when = (s) => za(s);
@@ -23,15 +24,18 @@ export default function Costs() {
     <>
       <div className="phead">
         <div><h1>Cost ledger</h1><div className="lede">Every API call, attributed per job and per brand, so you can see what each published piece cost.</div></div>
-        <div className="crumbs">{total.entries} entries · R{zarRate().toFixed(2)}/$</div>
+        <Tooltip className="crumbs" text="Total logged API calls, and the USD→ZAR rate used to show Rands (set in Settings → General).">{total.entries} entries · R{zarRate().toFixed(2)}/$</Tooltip>
       </div>
 
       <section className="section reveal r1">
         <div className="section-head"><span className="idx">01</span><h2>Spend</h2><span className="rule" /></div>
         <div className="statgrid">
-          <div className="stat"><div className="big tnum">{zar(total.totalUsd)}</div><div className="lab">All time</div></div>
-          <div className="stat"><div className="big tnum">{zar(month.totalUsd)}</div><div className="lab">This month</div></div>
-          <div className="stat"><div className="big tnum">{total.entries}</div><div className="lab">API calls logged</div></div>
+          <Tooltip as="div" className="stat" text="Total spend across every API call the studio has ever made (research, writing, images, video).">
+            <div className="big tnum">{zar(total.totalUsd)}</div><div className="lab">All time</div></Tooltip>
+          <Tooltip as="div" className="stat" text="Spend since the start of the current calendar month.">
+            <div className="big tnum">{zar(month.totalUsd)}</div><div className="lab">This month</div></Tooltip>
+          <Tooltip as="div" className="stat" text="How many individual API calls have been costed and recorded.">
+            <div className="big tnum">{total.entries}</div><div className="lab">API calls logged</div></Tooltip>
         </div>
       </section>
 

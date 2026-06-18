@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useUI } from './ui';
+import { useUI, Tooltip, InfoDot } from './ui';
 
 const BLANK = { slug: '', name: '', region: '', audience: '', voice: '', safety: '', pillars: '', sensitive: '', channels: '' };
 
@@ -22,10 +22,10 @@ function PillarCoverage({ pillars, cov }) {
     <div className="card-foot pillar-cov" style={{ margin: '2px 0 0' }}>
       pillars
       {rows.map(({ p, n, extra }) => (
-        <span key={p} className={`pillar-chip ${n === 0 ? 'pillar-chip--gap' : ''} ${extra ? 'pillar-chip--extra' : ''}`}
-              title={extra ? 'made, but not in this brand’s pillar list' : n === 0 ? 'defined but nothing made yet' : `${n} live ${n === 1 ? 'piece' : 'pieces'}`}>
+        <Tooltip key={p} className={`pillar-chip ${n === 0 ? 'pillar-chip--gap' : ''} ${extra ? 'pillar-chip--extra' : ''}`}
+              text={extra ? 'Made, but no longer in this brand’s pillar list.' : n === 0 ? 'A defined pillar with nothing made yet — a coverage gap.' : `${n} live ${n === 1 ? 'piece' : 'pieces'} serve this pillar.`}>
           {p} · {n}
-        </span>
+        </Tooltip>
       ))}
     </div>
   );
@@ -113,13 +113,17 @@ export function BrandManager({ brands, coverage = {} }) {
                   <input className="input" style={{ flex: 1 }} placeholder="region / audience country (e.g. South Africa)" value={editing.region} onChange={set('region')} />
                   <input className="input" style={{ flex: 1 }} placeholder="audience (who they are)" value={editing.audience} onChange={set('audience')} />
                 </div>
+                <label className="card-foot" style={{ margin: '2px 0 4px', display: 'block' }}>Voice<InfoDot tip="How this brand sounds — tone, do's & don'ts, sign-off. Steers every draft's wording." /></label>
                 <textarea className="ta" rows={3} placeholder="voice rules — tone, do's & don'ts, sign-off" value={editing.voice} onChange={set('voice')} />
+                <label className="card-foot" style={{ margin: '6px 0 4px', display: 'block' }}>Safety<InfoDot tip="Red lines the studio must never cross for this brand — flags or holds anything that breaks them." /></label>
                 <textarea className="ta" rows={3} placeholder="brand-safety notes — red lines, tone rules, anything to never do" value={editing.safety} onChange={set('safety')} />
+                <label className="card-foot" style={{ margin: '6px 0 4px', display: 'block' }}>Pillars<InfoDot tip="Recurring themes this brand posts about, one per line. Drive coverage tracking and the scout." /></label>
                 <textarea className="ta" rows={2} placeholder="content pillars — recurring themes, one per line" value={editing.pillars} onChange={set('pillars')} />
+                <label className="card-foot" style={{ margin: '6px 0 4px', display: 'block' }}>Sensitive topics<InfoDot tip="Dates/topics that should notify you first rather than auto-draft (e.g. tragedies, anniversaries)." /></label>
                 <input className="input" placeholder="sensitive topics/occasions (notify-first) — optional" value={editing.sensitive} onChange={set('sensitive')} />
                 <div>
                   <div className="card-foot" style={{ margin: '2px 0 6px' }}>
-                    ACCOUNTS THIS BRAND MAY POST TO (§1b){selectedChannels.length ? <span className="dim"> · {selectedChannels.length} selected</span> : null}
+                    ACCOUNTS THIS BRAND MAY POST TO (§1b)<InfoDot tip="Restrict this brand to specific connected accounts. Leave all unticked = any connected account." />{selectedChannels.length ? <span className="dim"> · {selectedChannels.length} selected</span> : null}
                   </div>
                   {accounts === null ? <span className="empty">loading channels…</span>
                     : accounts.length === 0 ? <span className="empty">No channels connected in Postiz.</span>

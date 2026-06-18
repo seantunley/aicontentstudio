@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { PlatformChip } from './actions';
+import { Tooltip } from './ui';
 
 const RANGES = [7, 30, 90];
 
@@ -30,7 +31,7 @@ export function PerformancePanel() {
   return (
     <>
       <div className="perf-bar">
-        <div className="kb-views">{RANGES.map((r) => <button key={r} className={`kb-view ${days === r ? 'on' : ''}`} onClick={() => setDays(r)}>{r}d</button>)}</div>
+        <div className="kb-views">{RANGES.map((r) => <Tooltip key={r} text={`Show metrics over the last ${r} days.`} focusable={false}><button className={`kb-view ${days === r ? 'on' : ''}`} onClick={() => setDays(r)}>{r}d</button></Tooltip>)}</div>
         <span className="card-foot" style={{ margin: 0 }}>
           Postiz reports analytics for Instagram, Facebook, YouTube, LinkedIn, TikTok, Threads &amp; Pinterest. <b>Bluesky isn&rsquo;t supported by Postiz</b>, so it shows no metrics. As data accrues it feeds the voice flywheel, recycling &amp; posting-time tuning.
         </span>

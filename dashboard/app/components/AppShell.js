@@ -7,6 +7,31 @@ import { NewJobButton, LogoutButton } from './actions';
 import { SettingsModal } from './settings';
 import { TrashModal } from './trash';
 import { Clock, Weather } from './topwidgets';
+import { Tooltip } from './ui';
+
+// One-line, operator-facing description of what each section is for (keyed by nav `key`).
+const NAV_TIPS = {
+  overview: 'The desk at a glance — what needs you, the pipeline, recent spend.',
+  queue: 'Drafts waiting for your call — read, edit, then approve or reject.',
+  ready: 'Approved posts cleared to go — publish now or schedule them.',
+  upcoming: 'Posts already scheduled, in the order they go out.',
+  calendar: 'Month view of everything scheduled, mirrored from Postiz — drag to reschedule.',
+  engagement: 'Replies and DMs across your connected inboxes (Chatwoot).',
+  flows: 'Build visual chatbot/lead flows (Typebot) that feed the funnel.',
+  broadcasts: 'Send a one-off message out to a channel or list.',
+  performance: 'Reach and engagement per channel once analytics accrue.',
+  scout: 'Auto-found content ideas — promote the good ones into jobs.',
+  occasions: 'Holidays and recurring dates the studio can draft ahead for.',
+  campaigns: 'One theme expanded into several coordinated posts, reviewed as a set.',
+  jobs: 'Every content job and exactly where it sits in the pipeline.',
+  brands: 'Per-brand voice, safety rules, pillars and allowed accounts.',
+  vault: 'Your library of generated and uploaded media, ready to reuse.',
+  knowledge: 'Notes and reference docs the studio draws on when writing.',
+  activity: 'Errors, warnings and notices the studio would otherwise swallow.',
+  learnings: 'What the studio learned from your edits and rejections, per brand.',
+  accounts: 'Social accounts connected through Postiz, and their status.',
+  costs: 'Every API call costed and attributed per job and per brand.',
+};
 
 function Icon({ d, className = 'ico' }) {
   return (
@@ -186,15 +211,17 @@ export function AppShell({ user, counts, brands, activeBrand, studioName, weathe
   });
 
   const navItem = (n) => (
-    <Link key={n.href} href={n.href} className={`nav-item ${active(n.href) ? 'active' : ''}`} onClick={() => setMore(false)}>
-      <Icon d={ICONS[n.key]} />
-      {n.label}
-      {n.alertKey != null && counts[n.alertKey] ? (
-        <span className="nc nc--alert">{counts[n.alertKey]}</span>
-      ) : n.countKey != null ? (
-        <span className={`nc ${n.calm ? 'calm' : ''} ${counts[n.countKey] ? '' : 'zero'}`}>{counts[n.countKey] || 0}</span>
-      ) : null}
-    </Link>
+    <Tooltip key={n.href} text={NAV_TIPS[n.key]} placement="bottom" focusable={false} style={{ display: 'block' }}>
+      <Link href={n.href} className={`nav-item ${active(n.href) ? 'active' : ''}`} onClick={() => setMore(false)}>
+        <Icon d={ICONS[n.key]} />
+        {n.label}
+        {n.alertKey != null && counts[n.alertKey] ? (
+          <span className="nc nc--alert">{counts[n.alertKey]}</span>
+        ) : n.countKey != null ? (
+          <span className={`nc ${n.calm ? 'calm' : ''} ${counts[n.countKey] ? '' : 'zero'}`}>{counts[n.countKey] || 0}</span>
+        ) : null}
+      </Link>
+    </Tooltip>
   );
 
   return (

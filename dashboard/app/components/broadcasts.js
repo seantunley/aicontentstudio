@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { useUI } from './ui';
+import { useUI, Tooltip } from './ui';
 
 export function BroadcastComposer() {
   const ui = useUI();
@@ -33,8 +33,8 @@ export function BroadcastComposer() {
   return (
     <div className="panel set-panel">
       <div className="field-row" style={{ marginBottom: 10 }}>
-        <span className="badge badge--approved">Telegram</span>
-        <span className="badge" title="needs a Meta WhatsApp Business account" style={{ opacity: 0.6 }}>WhatsApp · soon</span>
+        <Tooltip className="badge badge--approved" text="Broadcasts go out over Telegram — the connected channel.">Telegram</Tooltip>
+        <Tooltip className="badge" text="Not yet available — needs a connected Meta WhatsApp Business account." style={{ opacity: 0.6 }}>WhatsApp · soon</Tooltip>
       </div>
 
       <div className="card-foot" style={{ margin: '0 0 6px' }}>AUDIENCE</div>

@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { useUI } from './ui';
+import { useUI, Tooltip } from './ui';
 import { za } from '@/lib/time';
 
 const STATUSES = [['open', 'Open'], ['pending', 'Pending'], ['resolved', 'Resolved']];
@@ -35,9 +35,9 @@ function channelToPlatform(ch) {
 function PlatChip({ k, size = 22 }) {
   const p = PLAT[k] || PLAT.web;
   return (
-    <span className="eng-ico" style={{ background: p.color, width: size, height: size }} title={p.label}>
+    <Tooltip className="eng-ico" focusable={false} style={{ background: p.color, width: size, height: size }} text={`Conversations from ${p.label}.`}>
       <svg viewBox="0 0 24 24" width={size * 0.62} height={size * 0.62}>{p.mark}</svg>
-    </span>
+    </Tooltip>
   );
 }
 
@@ -168,7 +168,7 @@ export function EngagementInbox() {
       </div>
 
       <div className="perf-bar">
-        <div className="kb-views">{STATUSES.map(([v, l]) => <button key={v} className={`kb-view ${status === v ? 'on' : ''}`} onClick={() => setStatus(v)}>{l}</button>)}</div>
+        <div className="kb-views">{STATUSES.map(([v, l]) => <Tooltip key={v} focusable={false} text={v === 'open' ? 'Conversations still needing a reply.' : v === 'pending' ? 'Conversations waiting on the other person.' : 'Conversations you’ve closed out.'}><button className={`kb-view ${status === v ? 'on' : ''}`} onClick={() => setStatus(v)}>{l}</button></Tooltip>)}</div>
         <a className="btn btn--sm" href={cwUrl} target="_blank" rel="noreferrer" style={{ marginLeft: 'auto' }}>Open Chatwoot ↗</a>
       </div>
 

@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { createPortal } from 'react-dom';
-import { useUI } from './ui';
+import { useUI, Tooltip } from './ui';
 import { SUPPORTED, PLATFORM_META, PLATFORM_LIMITS, PLATFORM_ICON, capsFor } from '@/lib/platforms';
 import { za } from '@/lib/time';
 
@@ -142,15 +142,15 @@ export function NewJobButton({ block, defaultBrand, brands }) {
               <PlatformPicker selected={selected} onToggle={toggle} />
             </div>
             <div className="field-row">
-              <label className="check"><input type="checkbox" checked={withImage || withVideo} disabled={withVideo || withCarousel} onChange={(e) => { setWithImage(e.target.checked); if (e.target.checked) setWithCarousel(false); }} /> + image</label>
+              <Tooltip text="Generate a single on-brand image to go with the post." focusable={false}><label className="check"><input type="checkbox" checked={withImage || withVideo} disabled={withVideo || withCarousel} onChange={(e) => { setWithImage(e.target.checked); if (e.target.checked) setWithCarousel(false); }} /> + image</label></Tooltip>
               {caps.video ? (
-                <label className="check"><input type="checkbox" checked={withVideo} disabled={withCarousel} onChange={(e) => { setWithVideo(e.target.checked); if (e.target.checked) setWithCarousel(false); }} /> + video <span className="empty" style={{ marginLeft: 4 }}>(branded clip)</span></label>
+                <Tooltip text="Generate a short branded video clip (slower — voiceover + motion)." focusable={false}><label className="check"><input type="checkbox" checked={withVideo} disabled={withCarousel} onChange={(e) => { setWithVideo(e.target.checked); if (e.target.checked) setWithCarousel(false); }} /> + video <span className="empty" style={{ marginLeft: 4 }}>(branded clip)</span></label></Tooltip>
               ) : (
                 <label className="check check--off" title={`Video not supported by ${platLabels(caps.noVideo)}`}><input type="checkbox" disabled checked={false} readOnly /> + video <span className="empty" style={{ marginLeft: 4 }}>(not on {platLabels(caps.noVideo)})</span></label>
               )}
               {caps.carousel ? (
-                <label className="check"><input type="checkbox" checked={withCarousel} onChange={(e) => { setWithCarousel(e.target.checked); if (e.target.checked) { setWithImage(false); setWithVideo(false); } }} /> + carousel <span className="empty" style={{ marginLeft: 4 }}>(multi-image swipe)</span>
-                  {withCarousel ? <span style={{ marginLeft: 8 }}><input type="number" className="input" min="2" max={caps.mediaMax} value={slides} onChange={(e) => setSlides(Math.min(caps.mediaMax, Math.max(2, Number(e.target.value) || 2)))} style={{ width: 56, padding: '4px 8px', display: 'inline-block' }} /> slides <span className="empty">(max {caps.mediaMax})</span></span> : null}</label>
+                <Tooltip text="Generate a multi-image swipe (a set of slides the viewer scrolls)." focusable={false}><label className="check"><input type="checkbox" checked={withCarousel} onChange={(e) => { setWithCarousel(e.target.checked); if (e.target.checked) { setWithImage(false); setWithVideo(false); } }} /> + carousel <span className="empty" style={{ marginLeft: 4 }}>(multi-image swipe)</span>
+                  {withCarousel ? <span style={{ marginLeft: 8 }}><input type="number" className="input" min="2" max={caps.mediaMax} value={slides} onChange={(e) => setSlides(Math.min(caps.mediaMax, Math.max(2, Number(e.target.value) || 2)))} style={{ width: 56, padding: '4px 8px', display: 'inline-block' }} /> slides <span className="empty">(max {caps.mediaMax})</span></span> : null}</label></Tooltip>
               ) : (
                 <label className="check check--off" title={`Carousels not supported by ${platLabels(caps.noCarousel)}`}><input type="checkbox" disabled checked={false} readOnly /> + carousel <span className="empty" style={{ marginLeft: 4 }}>(not on {platLabels(caps.noCarousel)})</span></label>
               )}
@@ -187,11 +187,17 @@ export function ApprovalActions({ jobId, flagged }) {
   }
   return (
     <div className="actions">
-      <button className="btn btn--approve" disabled={busy} onClick={() => act('approve')}>Approve</button>
-      <button className={`btn btn--review ${flagged ? 'on' : ''}`} disabled={busy} onClick={review}>
-        {flagged ? 'Reviewing later ✓' : 'Review later'}
-      </button>
-      <button className="btn btn--reject" disabled={busy} onClick={() => act('reject')}>Reject</button>
+      <Tooltip text="Approve this draft — it moves to Ready to publish." focusable={false}>
+        <button className="btn btn--approve" disabled={busy} onClick={() => act('approve')}>Approve</button>
+      </Tooltip>
+      <Tooltip text="Park it for a second look without deciding now — stays in the queue, flagged." focusable={false}>
+        <button className={`btn btn--review ${flagged ? 'on' : ''}`} disabled={busy} onClick={review}>
+          {flagged ? 'Reviewing later ✓' : 'Review later'}
+        </button>
+      </Tooltip>
+      <Tooltip text="Send to Trash. Restorable for 30 days; nothing is posted." focusable={false}>
+        <button className="btn btn--reject" disabled={busy} onClick={() => act('reject')}>Reject</button>
+      </Tooltip>
     </div>
   );
 }
@@ -211,7 +217,7 @@ export function PublishButton({ jobId, channel, brand }) {
     if (done) { ui.toast(`Published to ${data.channel || 'channel'}${data.with_image ? ' (with image)' : ''}`); window.location.reload(); return; }
     ui.toast(data.error || 'Publish failed', 'err'); setBusy(false);
   }
-  return <div className="actions"><button className="btn btn--primary" disabled={busy} onClick={go}>{busy ? 'Publishing…' : 'Publish live'}</button></div>;
+  return <div className="actions"><Tooltip text="Post this now, live, via Postiz. Check the brand and destination first." focusable={false}><button className="btn btn--primary" disabled={busy} onClick={go}>{busy ? 'Publishing…' : 'Publish live'}</button></Tooltip></div>;
 }
 
 const _pad = (n) => String(n).padStart(2, '0');
@@ -250,7 +256,7 @@ export function ScheduleButton({ jobId, channel }) {
 
   return (
     <>
-      <button className="btn btn--ghost" onClick={openPicker}>Schedule</button>
+      <Tooltip text="Hand to Postiz's queue to post automatically at a time you pick." focusable={false}><button className="btn btn--ghost" onClick={openPicker}>Schedule</button></Tooltip>
       {open && (
         <Modal bar="schedule" onClose={() => setOpen(false)}>
           <h3>Schedule this post</h3>
@@ -362,7 +368,7 @@ export function RunScoutButton() {
     else ui.toast(data.error || 'Failed', 'err');
     setBusy(false);
   }
-  return <button className="btn btn--ghost btn--sm" disabled={busy} onClick={go}>{busy ? 'Queuing…' : '⟳ Run scout now'}</button>;
+  return <Tooltip text="Hunt for fresh content ideas now — new suggestions land within ~2 min." focusable={false}><button className="btn btn--ghost btn--sm" disabled={busy} onClick={go}>{busy ? 'Queuing…' : '⟳ Run scout now'}</button></Tooltip>;
 }
 
 export function SuggestionActions({ id }) {
@@ -393,8 +399,8 @@ export function SuggestionActions({ id }) {
   return (
     <>
       <div className="actions">
-        <button className="btn btn--approve" onClick={() => setOpen(true)}>Promote to job</button>
-        <button className="btn btn--ghost" onClick={dismiss}>Dismiss</button>
+        <Tooltip text="Turn this idea into a real job — research + draft it for the platforms you pick." focusable={false}><button className="btn btn--approve" onClick={() => setOpen(true)}>Promote to job</button></Tooltip>
+        <Tooltip text="Remove this idea from your list. It won’t be drafted." focusable={false}><button className="btn btn--ghost" onClick={dismiss}>Dismiss</button></Tooltip>
       </div>
       {open && (
         <Modal bar="promote" onClose={() => setOpen(false)}>
@@ -526,7 +532,7 @@ export function RestoreButton({ jobId }) {
     if (ok) { ui.toast('Restored to the approval queue'); window.location.reload(); return; }
     ui.toast(data.error || 'Failed', 'err'); setBusy(false);
   }
-  return <button className="btn btn--approve btn--sm" disabled={busy} onClick={go}>↩ Restore</button>;
+  return <Tooltip text="Put this rejected job back into the approval queue." focusable={false}><button className="btn btn--approve btn--sm" disabled={busy} onClick={go}>↩ Restore</button></Tooltip>;
 }
 
 // Restore a deleted Vault asset from Trash.
@@ -539,7 +545,7 @@ export function MediaRestoreButton({ id }) {
     if (ok) { ui.toast('Restored to the Vault'); window.location.reload(); return; }
     ui.toast(data.error || 'Failed', 'err'); setBusy(false);
   }
-  return <button className="btn btn--approve btn--sm" disabled={busy} onClick={go}>↩ Restore</button>;
+  return <Tooltip text="Put this deleted asset back into the Vault." focusable={false}><button className="btn btn--approve btn--sm" disabled={busy} onClick={go}>↩ Restore</button></Tooltip>;
 }
 
 // Collapsible approval-queue row. Collapsed: topic, platforms, the post's first line, job id.
@@ -688,7 +694,7 @@ export function PostPreview({ draft, handle }) {
 
   return (
     <>
-      <button className="btn btn--sm" onClick={() => { setSlide(0); setOpen(true); }}>👁 Preview</button>
+      <Tooltip text="See the post mocked up exactly as it’ll look in the platform’s feed." focusable={false}><button className="btn btn--sm" onClick={() => { setSlide(0); setOpen(true); }}>👁 Preview</button></Tooltip>
       {open && createPortal(
         <div className="modal-back" onClick={() => setOpen(false)}>
           <div className="pp-wrap" onClick={(e) => e.stopPropagation()}>
@@ -750,11 +756,11 @@ export function QueueItem({ job }) {
           <div className="qcard-topic">{job.topic}</div>
         </div>
         <div className="qcard-meta">
-          {flagged ? <span className="badge badge--review">review later</span> : null}
-          {job.pillar ? <span className="pillar-chip" title="Content pillar this piece serves">{job.pillar}</span> : null}
-          {job.has_pulse ? <span className="qchip-social" title="Grounded in current social discussion (last ~30 days)">📰 social</span> : null}
-          {platforms.map((p) => <PlatformChip key={p} platform={p} />)}
-          <span className="qcard-id">{job.id.slice(0, 8)}</span>
+          {flagged ? <Tooltip focusable={false} text="You parked this for a second look — it's still awaiting your decision." className="badge badge--review">review later</Tooltip> : null}
+          {job.pillar ? <Tooltip focusable={false} text="The content pillar (recurring theme) this piece serves." className="pillar-chip">{job.pillar}</Tooltip> : null}
+          {job.has_pulse ? <Tooltip focusable={false} text="Grounded in current social discussion (last ~30 days), not just evergreen facts." className="qchip-social">📰 social</Tooltip> : null}
+          {platforms.map((p) => <Tooltip key={p} text={`Drafted for ${PLATFORM_META[p]?.label || p} — tailored to its format and limits.`} focusable={false}><PlatformChip platform={p} /></Tooltip>)}
+          <Tooltip focusable={false} text="Short job ID — open the full job for sources, all drafts and the timeline." className="qcard-id">{job.id.slice(0, 8)}</Tooltip>
         </div>
       </button>
       {open && (

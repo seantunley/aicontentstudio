@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { useUI } from './ui';
+import { useUI, Tooltip } from './ui';
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']; // 0=Mon..6=Sun
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -144,12 +144,16 @@ export function OccasionsManager({ occasions, brand, countries = [] }) {
                 <div className="occ-rule">{ruleText(o.rule)} · {o.auto_draft ? `auto-drafts ${o.lead_days}d ahead` : 'calendar only'}</div>
               </div>
               <div className="occ-acts">
-                <button className={`occ-toggle ${o.auto_draft ? 'is-on' : ''}`} onClick={() => patch(o, { auto_draft: o.auto_draft ? 0 : 1 })} title="Auto-draft ahead of this date">
-                  {o.auto_draft ? '◉ auto-draft' : '○ auto-draft'}
-                </button>
-                <button className={`occ-toggle ${o.sensitive ? 'is-warn' : ''}`} onClick={() => patch(o, { sensitive: o.sensitive ? 0 : 1 })} title="Notify first instead of auto-drafting">
-                  {o.sensitive ? '◉ sensitive' : '○ sensitive'}
-                </button>
+                <Tooltip text={o.auto_draft ? 'On — the studio will draft a post for this date automatically, in advance.' : 'Off — this date only shows on the calendar; nothing is drafted.'} focusable={false}>
+                  <button className={`occ-toggle ${o.auto_draft ? 'is-on' : ''}`} onClick={() => patch(o, { auto_draft: o.auto_draft ? 0 : 1 })}>
+                    {o.auto_draft ? '◉ auto-draft' : '○ auto-draft'}
+                  </button>
+                </Tooltip>
+                <Tooltip text={o.sensitive ? 'On — the studio notifies you first instead of auto-drafting (for delicate dates).' : 'Off — treated as a normal occasion.'} focusable={false}>
+                  <button className={`occ-toggle ${o.sensitive ? 'is-warn' : ''}`} onClick={() => patch(o, { sensitive: o.sensitive ? 0 : 1 })}>
+                    {o.sensitive ? '◉ sensitive' : '○ sensitive'}
+                  </button>
+                </Tooltip>
                 <button className="btn btn--sm" onClick={() => openEdit(o)}>Edit</button>
                 <button className="btn btn--ghost btn--sm" onClick={() => del(o)}>✕</button>
               </div>
