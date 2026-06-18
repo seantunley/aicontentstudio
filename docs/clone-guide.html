@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AI Content Studio — Clone &amp; Fresh-Instance Guide</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 20mm 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #1c1d22; font-size: 10.5pt; line-height: 1.5; margin: 0;
+  }
+  h1 { font-size: 23pt; margin: 0 0 2pt; letter-spacing: -0.4pt; }
+  h2 {
+    font-size: 14pt; margin: 22pt 0 7pt; padding-bottom: 4pt;
+    border-bottom: 2px solid #c8a84b; color: #14151a; page-break-after: avoid;
+  }
+  h3 { font-size: 11.5pt; margin: 14pt 0 4pt; color: #2a2c33; page-break-after: avoid; }
+  p { margin: 5pt 0; }
+  .sub { color: #6b6e76; font-size: 10pt; margin: 2pt 0 0; }
+  .meta { color: #8a8d95; font-size: 8.5pt; margin-top: 6pt; }
+  code, pre, .mono { font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; }
+  code { background: #f1f1f3; padding: 1px 4px; border-radius: 3px; font-size: 9pt; }
+  pre {
+    background: #15171c; color: #e6e7ea; padding: 9pt 11pt; border-radius: 6px;
+    font-size: 8.4pt; line-height: 1.45; overflow-x: auto; white-space: pre-wrap;
+    word-break: break-word; page-break-inside: avoid;
+  }
+  pre .c { color: #7f8895; }   /* comment */
+  table { border-collapse: collapse; width: 100%; margin: 7pt 0; font-size: 9pt; page-break-inside: avoid; }
+  th, td { border: 1px solid #d9dade; padding: 5pt 7pt; text-align: left; vertical-align: top; }
+  th { background: #f4f1e8; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafafb; }
+  .keep { color: #1f7a3d; font-weight: 600; }
+  .drop { color: #b3261e; font-weight: 600; }
+  .regen { color: #b3640e; font-weight: 600; }
+  .callout {
+    border-left: 4px solid #c8a84b; background: #faf6ea; padding: 8pt 12pt;
+    margin: 10pt 0; border-radius: 0 5px 5px 0; page-break-inside: avoid;
+  }
+  .callout.warn { border-left-color: #b3261e; background: #fbecea; }
+  .callout b { display: block; margin-bottom: 2pt; }
+  ol, ul { margin: 5pt 0 5pt 0; padding-left: 18pt; }
+  li { margin: 3pt 0; }
+  .tag { font-size: 7.5pt; padding: 1px 6px; border-radius: 10px; font-weight: 600; vertical-align: middle; }
+  .tag.k { background: #e3f3e8; color: #1f7a3d; }
+  .tag.d { background: #fbe3e1; color: #b3261e; }
+  .tag.r { background: #f7ead4; color: #b3640e; }
+  hr { border: none; border-top: 1px solid #e3e4e8; margin: 16pt 0; }
+  .foot { color: #8a8d95; font-size: 8pt; text-align: center; margin-top: 14pt; }
+  .pb { page-break-before: always; }
+</style>
+</head>
+<body>
+
+<h1>AI&nbsp;Content&nbsp;Studio</h1>
+<p class="sub">Clone &amp; Fresh-Instance Guide — stand up a new copy with a new user and separate brands, carrying <b>zero</b> prior data.</p>
+<p class="meta">Generated from <code>docs/clone-guide.html</code> · re-render with <code>docs/render-pdf.sh</code>.</p>
+
+<h2>1 · What this platform is made of</h2>
+<p>The whole studio is four layers. Cloning cleanly means knowing which layer to copy, which to drop, and which to regenerate.</p>
+<table>
+  <tr><th>Layer</th><th>What lives there</th><th>On a new box</th></tr>
+  <tr><td><b>Git repo</b><br><code>aicontentstudio/</code></td><td>All code: <code>compose.yml</code>, <code>plugins/studio</code>, <code>dashboard/</code>, <code>renderer/</code>, <code>scripts/</code>, the four sub-app stacks, the seeded occasions calendar.</td><td class="keep">CLONE — this <i>is</i> the platform.</td></tr>
+  <tr><td><b>SQLite store</b><br><code>studio-data/</code></td><td><code>studio.db</code> (jobs, drafts, brands, learnings, campaigns, media, settings) + <code>knowledge/</code> &amp; <code>bm-config/</code> (Basic-Memory index) + logs.</td><td class="drop">DON'T COPY — <code>db.init_db()</code> rebuilds the schema on first run; occasions re-seed; brands start empty by design.</td></tr>
+  <tr><td><b>Docker volumes</b></td><td>Each sub-app's own DB: <code>postiz_*</code> (connected socials, schedule, analytics), <code>chatwoot_*</code> (inbox, contacts), <code>typebot_*</code> (flows), <code>mautic_*</code> (contacts, campaigns), <code>basic-memory-config</code>.</td><td class="drop">DON'T COPY — fresh stacks = empty apps; the new user re-onboards their own accounts.</td></tr>
+  <tr><td><b>Env files</b><br><code>.env</code> ×2</td><td>Root <code>.env</code> + <code>~/.hermes/.env</code>. All secrets <b>and</b> the operator's identity (bot tokens, admin login, Telegram allow-list, OIDC keys).</td><td class="regen">TEMPLATE + REGENERATE — copy the shape, replace identity/secrets (§5).</td></tr>
+</table>
+
+<div class="callout">
+  <b>The mental model</b>
+  Carry the <span class="keep">code</span>. Drop the <span class="drop">data</span> (SQLite + volumes). Regenerate the <span class="regen">identity</span> (.env). That is the entire trick — everything below is detail.
+</div>
+
+<h2>2 · Prerequisites on the new box</h2>
+<table>
+  <tr><th>Requirement</th><th>Notes</th></tr>
+  <tr><td>Docker + Docker Compose v2</td><td><code>docker compose</code> (not the old <code>docker-compose</code>).</td></tr>
+  <tr><td><b>The <code>claude</code> CLI, logged in</b></td><td>The Studio "brain" (research, writing, image prompts, the vision fit-check) runs through the <b>host's <code>claude</code> subscription</b> via a bridge — <b>not</b> an API key. Install it and run an interactive login once so the session is valid. See §7 (this is the easiest thing to forget).</td></tr>
+  <tr><td>git</td><td>To clone the repo.</td></tr>
+  <tr><td>~4 vCPU / 16 GB RAM / 80 GB disk</td><td>The 1-vCPU/8 GB original was too small (video render pegged the box). 4 vCPU / 16 GB is comfortable. Video/worker still run one job at a time by design (§8).</td></tr>
+  <tr><td>A Linux user (e.g. <code>hermes</code>)</td><td>Match <code>HERMES_UID</code>/<code>HERMES_GID</code> in <code>.env</code> to this user so bind-mounted files are owned correctly. Add the user to the <code>docker</code> group.</td></tr>
+</table>
+
+<h2>3 · Step-by-step clone</h2>
+<ol>
+  <li><b>Clone the repo</b> to the new box (push this repo to a git remote first if it isn't on one):
+    <pre>git clone &lt;your-remote&gt; aicontentstudio
+cd aicontentstudio</pre></li>
+  <li><b>Create the two <code>.env</code> files</b> from the templates and regenerate identity/secrets — see the §5 checklist:
+    <pre><span class="c"># root env (studio + sub-apps)</span>
+cp .env.example .env            <span class="c"># if no example exists, copy your old .env and blank the §5 rows</span>
+<span class="c"># Hermes's own env (Telegram allow-list lives here, NOT in root .env)</span>
+nano ~/.hermes/.env             <span class="c"># set TELEGRAM_ALLOWED_USERS to the NEW operator</span></pre></li>
+  <li><b>Do NOT copy</b> <code>studio-data/</code> or any <code>*_*</code> Docker volume from the old box. Starting without them is what guarantees a clean slate.</li>
+  <li><b>Bring up the studio</b>, then each sub-app stack:
+    <pre>docker compose up -d                       <span class="c"># hermes, dashboard, renderer, basic-memory</span>
+(cd postiz   &amp;&amp; docker compose up -d)
+(cd chatwoot &amp;&amp; docker compose up -d)
+(cd typebot  &amp;&amp; docker compose up -d)
+(cd mautic   &amp;&amp; docker compose up -d)</pre>
+    The first worker tick runs <code>db.init_db()</code> → fresh <code>studio.db</code> with the full schema and a re-seeded occasions calendar.</li>
+  <li><b>Install the cron block</b> (§6) with <code>crontab -e</code>. This drives the worker/scout/heartbeat and starts the two host bots on boot. <b>Adjust the paths</b> if the repo or home dir differ.</li>
+  <li><b>Set the VM to survive reboots</b> (if it's a VM): on the hypervisor, <code>qm set &lt;vmid&gt; --onboot 1</code> and install <code>qemu-guest-agent</code> in the guest, so a host power event auto-restarts everything.</li>
+  <li><b>Log in &amp; configure</b>: open the dashboard (<code>http://&lt;box-ip&gt;:4008</code>), log in with the new <code>DASH_USER</code>, then under <b>Settings</b> re-enter the ~17 preferences (studio name, region, ZAR rate, model seams, etc.) and add your brands fresh.</li>
+  <li><b>Re-onboard the sub-apps</b>: connect the new social accounts in Postiz, create the Chatwoot inbox, build Typebot flows. Copy the resulting IDs/tokens back into <code>.env</code> (the §5 "re-created on onboarding" rows) and <code>docker compose up -d</code> to pick them up.</li>
+  <li><b>Smoke-test</b> with §9 before handing it over.</li>
+</ol>
+
+<div class="pb"></div>
+<h2>4 · Service map (what comes up)</h2>
+<table>
+  <tr><th>Stack</th><th>Services</th><th>Reach</th></tr>
+  <tr><td>Studio (<code>compose.yml</code>)</td><td>hermes (host-net), dashboard, renderer, basic-memory</td><td>Dashboard <code>:4008</code> · MCP <code>127.0.0.1:8808</code></td></tr>
+  <tr><td>Postiz (<code>postiz/</code>)</td><td>postiz, postgres, redis, temporal (+ es, pg, ui), admin-tools</td><td>Publishing + scheduling</td></tr>
+  <tr><td>Chatwoot (<code>chatwoot/</code>)</td><td>rails, sidekiq, postgres, redis</td><td>§3d engagement inbox</td></tr>
+  <tr><td>Typebot (<code>typebot/</code>)</td><td>builder, viewer, db, redis, mailpit, proxy</td><td>Funnel flows (/flows)</td></tr>
+  <tr><td>Mautic (<code>mautic/</code>)</td><td>mautic, mautic-cron, db</td><td>Nurture / broadcast</td></tr>
+  <tr><td colspan="3">Host processes (cron <code>@reboot</code>): <code>claude-bridge.py</code> on <code>127.0.0.1:4014</code> · <code>nancy_bot.py</code> (Telegram).</td></tr>
+</table>
+
+<h2>5 · The <code>.env</code> regeneration checklist</h2>
+<p>When the new instance is for a <b>different operator</b>, do not reuse the identity fields. Three buckets:</p>
+
+<h3><span class="tag r">REGENERATE</span> — new identity &amp; secrets, per instance</h3>
+<table>
+  <tr><th>Key</th><th>How to get a fresh value</th></tr>
+  <tr><td><code>TELEGRAM_BOT_TOKEN</code>, <code>NANCY_BOT_TOKEN</code></td><td>New bots via @BotFather.</td></tr>
+  <tr><td><code>TELEGRAM_ALLOWED_USERS</code> <span class="meta">(in ~/.hermes/.env)</span>, <code>TELEGRAM_CHAT_ID</code></td><td>The new operator's Telegram user/chat id.</td></tr>
+  <tr><td><code>DASH_USER</code> (+ password)</td><td>New admin login (password is set/changed in Settings; stored hashed in the DB).</td></tr>
+  <tr><td><code>OPERATOR_EMAIL</code></td><td>New operator's email.</td></tr>
+  <tr><td><code>SESSION_SECRET</code>, <code>CLAUDE_BRIDGE_TOKEN</code>, <code>POSTIZ_JWT_SECRET</code>, <code>CHATWOOT_WEBHOOK_TOKEN</code>, <code>FUNNEL_CAPTURE_TOKEN</code></td><td>Fresh random strings: <code>openssl rand -hex 32</code>.</td></tr>
+  <tr><td><code>STUDIO_OIDC_CLIENT_ID</code>, <code>STUDIO_OIDC_CLIENT_SECRET</code>, <code>STUDIO_OIDC_ISSUER</code>, <code>STUDIO_OIDC_REDIRECT_URIS</code></td><td>New issuer = the new box URL; new client id/secret; redirect URIs point at the new host.</td></tr>
+  <tr><td><code>STUDIO_COCKPIT_URL</code>, <code>HEALTHCHECK_URL</code></td><td>New box's LAN/host URL; a new healthcheck ping URL.</td></tr>
+</table>
+
+<h3><span class="tag d">RE-CREATED ON ONBOARDING</span> — fill after the new user sets up each sub-app</h3>
+<table>
+  <tr><th>Key</th><th>Source</th></tr>
+  <tr><td><code>POSTIZ_API_KEY</code>, <code>POSTIZ_API_URL</code>, <code>POSTIZ_USER_ID</code></td><td>From the new Postiz account.</td></tr>
+  <tr><td><code>CHATWOOT_API_TOKEN</code>, <code>CHATWOOT_ACCOUNT_ID</code></td><td>From the new Chatwoot account.</td></tr>
+  <tr><td><code>MAUTIC_API_USER</code>, <code>MAUTIC_API_PASSWORD</code>, <code>MAUTIC_API_URL</code></td><td>From the new Mautic install.</td></tr>
+</table>
+
+<h3><span class="tag k">REUSE OR SWAP</span> — shared AI / infra keys (not identity)</h3>
+<table>
+  <tr><th>Key</th><th>Note</th></tr>
+  <tr><td><code>FAL_KEY</code>, <code>FAL_VIDEO_MODEL</code></td><td>Image/video generation (fal). Reuse or give the new user their own.</td></tr>
+  <tr><td><code>OPENROUTER_API_KEY</code>, <code>TAVILY_API_KEY</code></td><td>Social-pulse reasoning &amp; worker web search.</td></tr>
+  <tr><td><code>ELEVENLABS_API_KEY</code>, <code>ELEVENLABS_VOICE_ID</code>, <code>ELEVENLABS_VOICE_ID_RU</code></td><td>Video voiceover.</td></tr>
+  <tr><td><code>STUDIO_TEXT_MODEL</code>, <code>STUDIO_TEXT_PROVIDER</code></td><td>Studio text-gen model seam.</td></tr>
+  <tr><td><code>ZAR_PER_USD</code>, <code>CHATWOOT_DEFAULT_BRAND</code></td><td>Locale / default routing.</td></tr>
+  <tr><td><code>HERMES_UID</code>, <code>HERMES_GID</code>, <code>HERMES_IMAGE_TAG</code></td><td>Match the new box's user; pin the image version.</td></tr>
+</table>
+
+<div class="pb"></div>
+<h2>6 · Cron block (copy-paste, then fix paths)</h2>
+<p>The scheduled jobs drive the pipeline; the two <code>@reboot</code> lines start the host bots. The token values are read out of <code>.env</code> at boot.</p>
+<pre><span class="c"># --- scheduled work ---</span>
+*/5  * * * * /home/hermes/aicontentstudio/scripts/heartbeat.sh  &gt;&gt; /home/hermes/aicontentstudio/studio-data/heartbeat.log 2&gt;&amp;1
+*/2  * * * * /home/hermes/aicontentstudio/scripts/run-worker.sh &gt;&gt; /home/hermes/aicontentstudio/studio-data/worker.log 2&gt;&amp;1
+*/15 * * * * /home/hermes/aicontentstudio/scripts/run-scout.sh  &gt;&gt; /home/hermes/aicontentstudio/studio-data/scout.log 2&gt;&amp;1
+30   * * * * /home/hermes/aicontentstudio/scripts/disk-watch.sh &gt;&gt; /home/hermes/aicontentstudio/studio-data/disk-watch.log 2&gt;&amp;1
+
+<span class="c"># --- host bots on boot ---</span>
+<span class="c"># NOTE: CLAUDE_BIN is REQUIRED. cron's PATH is minimal, so the bridge cannot find</span>
+<span class="c"># the `claude` binary without it -> the whole Claude brain silently falls back.</span>
+@reboot CLAUDE_BRIDGE_TOKEN=$(grep '^CLAUDE_BRIDGE_TOKEN=' /home/hermes/aicontentstudio/.env | cut -d= -f2-) CLAUDE_BIN=/home/hermes/.local/bin/claude /usr/bin/python3 /home/hermes/aicontentstudio/scripts/claude-bridge.py &gt;&gt; /home/hermes/aicontentstudio/studio-data/claude-bridge.log 2&gt;&amp;1
+@reboot NANCY_BOT_TOKEN=$(grep '^NANCY_BOT_TOKEN=' /home/hermes/aicontentstudio/.env | cut -d= -f2-) TELEGRAM_ALLOWED_USERS=$(grep '^TELEGRAM_ALLOWED_USERS=' /home/hermes/.hermes/.env | cut -d= -f2-) STUDIO_REPO=/home/hermes/aicontentstudio CLAUDE_BIN=/home/hermes/.local/bin/claude /usr/bin/python3 /home/hermes/aicontentstudio/scripts/nancy_bot.py &gt;&gt; /home/hermes/aicontentstudio/studio-data/nancy.log 2&gt;&amp;1</pre>
+<p>Find the binary path on the new box with <code>which claude</code> and substitute it for <code>/home/hermes/.local/bin/claude</code>.</p>
+
+<h2>7 · The Claude brain (don't skip this)</h2>
+<p>Research, copywriting, image prompts, and the "does the rendered image actually match the brief" <b>vision fit-check</b> all go through <code>scripts/claude-bridge.py</code> on <code>127.0.0.1:4014</code>, which shells out to the host's <code>claude</code> CLI under a <b>subscription login</b> — there is no Anthropic API key in <code>.env</code>.</p>
+<p>On a new box you must: (1) install the <code>claude</code> CLI, (2) run it once interactively to log in, (3) ensure the cron line passes <code>CLAUDE_BIN</code> (§6). Verify with the end-to-end ping in §9 — if it returns an <code>Errno 2 'claude'</code> error, the binary isn't on the bridge's PATH; if it returns an auth error, the subscription needs re-login. Either way the studio keeps running with a graceful non-Claude fallback, but quality drops, so confirm it before handoff.</p>
+
+<h2>8 · How the worker runs (so testers aren't surprised)</h2>
+<p>Cron fires <code>run-worker.sh</code> every 2 minutes → <code>worker.py --once</code>. It takes a single lockfile and processes <b>exactly one job per tick</b>; concurrent ticks log <code>"another run is in progress, skipping"</code> — that is <b>normal</b>, not an error. One-at-a-time is a deliberate race-safety choice (a long run must not outlive the stale-lock window), not just an old single-CPU limit. The queue drains one job per free tick; a thorough research+draft+media run can take several minutes. Raising true parallelism is a real change (per-slot locks) best done <i>after</i> the test round.</p>
+
+<div class="pb"></div>
+<h2>9 · Pre-handoff smoke test</h2>
+<p>Run these on the new box; all should be green before you give it to a tester.</p>
+<pre><span class="c"># 1. all studio containers up</span>
+docker compose ps
+
+<span class="c"># 2. each sub-app stack up</span>
+for d in postiz chatwoot typebot mautic; do (cd $d &amp;&amp; docker compose ps); done
+
+<span class="c"># 3. host bots running (exactly one python each, no duplicates)</span>
+pgrep -af '[p]ython.*nancy_bot.py'
+pgrep -af '[p]ython.*claude-bridge.py'
+
+<span class="c"># 4. DB integrity + queue health (no stuck 'processing' jobs)</span>
+docker compose exec -T hermes python3 -c "import sqlite3;c=sqlite3.connect('/opt/studio/studio.db');\
+print('integrity:',c.execute('PRAGMA integrity_check').fetchone()[0]);\
+print('stuck:',c.execute(\"SELECT COUNT(*) FROM jobs WHERE queued_action='processing'\").fetchone()[0])"
+
+<span class="c"># 5. dashboard responds</span>
+curl -s -o /dev/null -w 'dashboard %{http_code}\n' http://127.0.0.1:9119/
+
+<span class="c"># 6. Claude bridge is alive AND reaches Claude (THE key check)</span>
+curl -s http://127.0.0.1:4014/health           <span class="c"># -> {"ok": true}</span>
+TOK=$(grep '^CLAUDE_BRIDGE_TOKEN=' .env | cut -d= -f2-)
+curl -s -X POST http://127.0.0.1:4014/ask -H 'Content-Type: application/json' \
+  -H "X-Bridge-Token: $TOK" \
+  -d '{"prompt":"Reply with exactly the three words: bridge check ok","timeout":90}'
+<span class="c"># expect: {"text": "bridge check ok"}</span>
+
+<span class="c"># 7. disk headroom</span>
+df -h /</pre>
+
+<h2>10 · Optional: factory-reset a clone in place</h2>
+<div class="callout warn">
+  <b>Destructive — wipes all studio data and sub-app databases.</b>
+  Only run on a clone you intend to blank, never on a live instance. Back up first.
+</div>
+<pre><span class="c"># stop everything</span>
+docker compose down
+for d in postiz chatwoot typebot mautic; do (cd $d &amp;&amp; docker compose down -v); done  <span class="c"># -v wipes sub-app volumes</span>
+
+<span class="c"># drop the studio data (schema rebuilds on next start)</span>
+rm -f  studio-data/studio.db studio-data/studio.db-* studio-data/*.log
+rm -rf studio-data/knowledge studio-data/bm-config
+
+<span class="c"># blank the identity rows in .env (§5 REGENERATE), then bring it back up</span>
+docker compose up -d</pre>
+<p>For a brand-new operator on a brand-new box, prefer the §3 fresh-clone path over reset-in-place — it leaves nothing behind to clean up.</p>
+
+<hr>
+<p class="foot">AI Content Studio · internal handoff document · keep with the repo at <code>docs/clone-guide.pdf</code></p>
+
+</body>
+</html>
