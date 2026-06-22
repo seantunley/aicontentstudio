@@ -21,6 +21,7 @@ import re
 import sys
 import json
 import time
+import datetime
 import uuid
 import mimetypes
 import urllib.request
@@ -38,7 +39,7 @@ PERSONA = os.environ.get("NANCY_PERSONA", os.path.join(REPO, "config", "NANCY.md
 DB_PATH = os.environ.get("STUDIO_DB_PATH", os.path.join(REPO, "studio-data", "studio.db"))
 SESS_FILE = os.path.join(REPO, "studio-data", "nancy-sessions.json")
 POSTIZ_FALLBACK = "127.0.0.1:4007"
-HISTORY_TURNS = 16
+HISTORY_TURNS = 8  # ~4 exchanges of working memory — short on purpose so old topics/pastes age out fast
 # Nancy talks; she doesn't touch the filesystem/shell — disable the coding-agent tools entirely.
 DISALLOWED = ["Bash", "Edit", "Write", "Read", "NotebookEdit", "WebFetch", "WebSearch",
               "Glob", "Grep", "Task", "TodoWrite"]
@@ -132,10 +133,15 @@ def _remember(cid, role, text):
 
 
 # ----------------------------------------------------------------------------- studio state (the truth)
+# Only CURRENT, actionable work is surfaced to the brain each turn. Cancelled/failed/rejected jobs are
+# NEVER shown — re-surfacing them is exactly what made Nancy drag up "posts that never happened".
+DEAD_STATES = {"cancelled", "failed", "rejected"}
+
+
 def studio_state():
-    jobs = db.list_jobs(limit=200)
+    jobs = [j for j in db.list_jobs(limit=80) if j.get("state") not in DEAD_STATES]
     counts = Counter(j["state"] for j in jobs)
-    lines = ["QUEUE BY STATE: " + (", ".join(f"{k}={v}" for k, v in counts.items()) or "empty")]
+    lines = ["QUEUE BY STATE (live only): " + (", ".join(f"{k}={v}" for k, v in counts.items()) or "empty")]
     preview = [j for j in jobs if j["state"] == "preview"]
     if preview:
         lines.append("AWAITING REVIEW (preview) — use a review action with the id to show one:")
@@ -144,17 +150,16 @@ def studio_state():
     ready = [j for j in jobs if j["state"] == "approved"]
     if ready:
         lines.append(f"READY TO PUBLISH (approved, operator publishes in cockpit): {len(ready)}")
+    inflight = [j for j in jobs if j["state"] not in ("preview", "approved", "published")]
+    if inflight:
+        lines.append("IN PROGRESS (being built right now — do NOT re-queue or re-pitch these):")
+        for j in inflight[:6]:
+            lines.append(f"  • [{j['id'][:8]}] {j['topic']} — {j['state']} ({j['brand']})")
     try:
         brands = [b.get("name") or b.get("slug") for b in db.list_brands()]
     except Exception:  # noqa: BLE001
         brands = []
-    seen = sorted({j.get("brand") for j in jobs if j.get("brand") and j.get("brand") != "unassigned"})
-    lines.append("BRANDS (registered): " + (", ".join(b for b in brands if b) or "none registered"))
-    if seen:
-        lines.append("BRANDS SEEN ON RECENT JOBS (use as clarify options when asking which brand): " + ", ".join(seen))
-    lines.append("RECENT JOBS:")
-    for j in jobs[:6]:
-        lines.append(f"  • [{j['id'][:8]}] {j['topic']} — {j['state']} ({j['brand']})")
+    lines.append("BRANDS (registered — the only valid brands): " + (", ".join(b for b in brands if b) or "none registered"))
     try:
         opens = db.open_delegations("nancy")
     except Exception:  # noqa: BLE001
@@ -352,6 +357,25 @@ def _act_suggest(cid, a):
 
 
 # ----------------------------------------------------------------------------- dispatch
+RESET_TRIGGERS = {"new post", "newpost", "new", "start over", "startover", "start fresh", "fresh start",
+                  "fresh", "reset", "clear", "clear context", "new brief", "start again", "scratch that",
+                  "/new", "/clear", "/reset"}
+
+
+def _is_reset(text):
+    """A short, standalone 'let's start fresh' message — NOT one that already carries a topic
+    (e.g. 'new post about winter savings' is a real brief and goes to the brain, not a reset)."""
+    return (text or "").strip().lower().rstrip(" .!?") in RESET_TRIGGERS
+
+
+def _reset_chat(cid):
+    """Wipe this chat's working context so a fresh request can't blend with an earlier topic or paste.
+    Studio jobs/drafts are untouched — this only clears Nancy's short-term conversational memory."""
+    SESS[str(cid)] = {"history": [], "clarify": [], "review": None, "deleg_brand": None}
+    _save(SESS)
+    send(cid, "Clean slate. 🧹 What's the new post — give me the topic or angle, and the brand if you know it.")
+
+
 def handle_message(msg):
     frm = str((msg.get("from") or {}).get("id") or "")
     cid = (msg.get("chat") or {}).get("id")
@@ -363,7 +387,9 @@ def handle_message(msg):
     if text in ("/start", "/help"):
         return send(cid, "I'm Nancy, Head of Content. Tell me what you want to make — a topic, a platform, "
                          "a vibe — and I'll shape it and put it through the Studio. Ask me what's waiting to "
-                         "review, too. (Constance runs the ops side.)")
+                         "review, too. (Constance runs the ops side.) Say \"new post\" any time to start clean.")
+    if _is_reset(text):
+        return _reset_chat(cid)
     typing(cid)
     _remember(cid, "operator", text)
     reply, action = think(cid, text)
@@ -402,6 +428,29 @@ def handle_callback(cb):
         if not jid:
             return send(cid, "Lost track of which job — ask me to show it again.")
         _decide(cid, jid, decision)
+    elif data.startswith("dbr|"):
+        # Brand picked (or dropped) for a no-brand delegation — deterministic, no model call.
+        c = _chat(cid)
+        pend = c.get("deleg_brand") or {}
+        sel = data.split("|", 1)[1]
+        if sel == "drop":
+            try:
+                db.drop_delegation(pend.get("did"))
+            except Exception:  # noqa: BLE001
+                pass
+            c["deleg_brand"] = None; _save(SESS)
+            return send(cid, f"Dropped it — \"{pend.get('task', 'that one')}\" is off the list. Ask again if you change your mind.")
+        try:
+            slug = pend["brands"][int(sel)]
+        except Exception:  # noqa: BLE001
+            return send(cid, "That brand choice expired — ask me to show it again.")
+        try:
+            job = _queue_delegation(cid, pend.get("did"), pend["task"], slug,
+                                    pend.get("media"), pend.get("platforms"), pend.get("direction"))
+            send(cid, f"On it — \"{pend['task']}\" queued for {slug} [{job['id'][:8]}]. I'll bring it back to review once it's built.")
+        except Exception as e:  # noqa: BLE001
+            send(cid, f"Hit a snag queuing that: {e}")
+        c["deleg_brand"] = None; _save(SESS)
 
 
 def _decide(cid, jid, decision):
@@ -424,9 +473,73 @@ def _decide(cid, jid, decision):
         send(cid, f"Couldn't apply that: {e}")
 
 
+def _setting_int(key, default):
+    """Operator-tunable integer (read per poll); falls back to the default on any bad/empty value."""
+    try:
+        v = db.get_setting(key)
+        return int(v) if v not in (None, "") else default
+    except Exception:  # noqa: BLE001
+        return default
+
+
+def _age_hours(iso, now):
+    """Hours since an ISO8601 timestamp, or None if it can't be parsed."""
+    try:
+        dt = datetime.datetime.fromisoformat(iso)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        return (now - dt).total_seconds() / 3600.0
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _queue_delegation(cid, did, task, brand, media="none", platforms="", direction=None):
+    """Queue a delegated brief into the Studio and link it so Constance's loop auto-closes."""
+    plats = [p for p in (platforms or "").split(",") if p]
+    job = db.create_and_queue(task, brand=brand, source="nancy",
+                              created_by="Nancy (delegated by Constance)", platforms=plats,
+                              media=(media or "none"), direction=direction)
+    if did:
+        try:
+            db.link_delegation(did, job["id"])
+        except Exception:  # noqa: BLE001
+            pass
+    return job
+
+
+def _stage_deleg(cid, d, brand_slugs):
+    """Stash a delegation against the chat so a later dbr| button tap can act on it deterministically."""
+    c = _chat(cid)
+    c["deleg_brand"] = {"did": d["id"], "task": d["task"], "media": d.get("media") or "none",
+                        "platforms": d.get("platforms") or "", "direction": d.get("direction"),
+                        "brands": brand_slugs}
+    _save(SESS)
+
+
+def _ask_brand(cid, d, lead=None):
+    """No brand pinned — ask which, with one button per brand (like Constance), plus a drop option.
+    `lead` overrides the prompt line (e.g. an about-to-expire framing). RULE: options → buttons."""
+    try:
+        brands = [(b.get("slug") or b.get("name"), b.get("name") or b.get("slug"))
+                  for b in (db.list_brands() or [])][:8]
+    except Exception:  # noqa: BLE001
+        brands = []
+    task = d["task"]
+    if not brands:
+        return send(cid, lead or (f"📥 Constance's handed me: \"{task}\" — but there are no brands set up yet. "
+                                  f"Add a brand in the studio (or just tell me the brand here) and I'll queue it."))
+    _stage_deleg(cid, d, [s for (s, n) in brands])
+    rows = [[(n, f"dbr|{i}")] for i, (s, n) in enumerate(brands)]
+    rows.append([("✕ Not now — drop it", "dbr|drop")])
+    send(cid, lead or f"📥 Constance's handed me: \"{task}\" — which brand is it for?", buttons=rows)
+
+
 def _poll_delegations():
-    """Proactive pickup — Nancy notices new delegations from Constance, tells the operator, and (when the
-    brief has a brand) queues them straight away + links them so the loop auto-closes. Runs each poll."""
+    """Proactive pickup — Nancy notices delegations from Constance: queues them when a brand is set (and
+    links them so the loop auto-closes) or asks which brand with buttons. Also warns the operator before a
+    stranded delegation auto-expires, then drops it — so an un-actioned one can't nag forever. Each poll."""
+    warn_h = _setting_int("delegation_warn_hours", 36)
+    exp_h = _setting_int("delegation_expiry_hours", 48)
     try:
         db.sync_delegations()
         opens = db.open_delegations("nancy")
@@ -434,8 +547,25 @@ def _poll_delegations():
         print(f"nancy: delegation poll error: {e}", flush=True)
         return
     seen = SESS.setdefault("_deleg_seen", [])
+    warned = SESS.setdefault("_deleg_warned", [])
     changed = False
+    now = datetime.datetime.now(datetime.timezone.utc)
     for d in opens:
+        # Heads-up before we auto-drop it — give the operator a chance to act.
+        if HOME and warn_h and exp_h and warn_h < exp_h and d["id"] not in warned:
+            age = _age_hours(d.get("created_at"), now)
+            if age is not None and warn_h <= age < exp_h:
+                left = max(1, round(exp_h - age))
+                if not d.get("brand"):
+                    # options → buttons: re-offer the brand picker (+ drop), now with an expiry framing.
+                    _ask_brand(HOME, d, lead=f"⏳ Constance's delegation \"{d['task']}\" has waited ~{round(age)}h "
+                                              f"with no brand — I'll auto-drop it in ~{left}h. Pick a brand, or drop it:")
+                else:
+                    # branded but stuck (rare) — the only real action is to drop it; give it a button.
+                    _stage_deleg(HOME, d, [])
+                    send(HOME, f"⏳ Constance's delegation \"{d['task']}\" has waited ~{round(age)}h unqueued. "
+                               f"I'll auto-drop it in ~{left}h.", buttons=[[("✕ Drop it now", "dbr|drop")]])
+                warned.append(d["id"]); changed = True
         if d["id"] in seen:
             continue
         seen.append(d["id"]); changed = True
@@ -444,19 +574,25 @@ def _poll_delegations():
         task, brand = d["task"], d.get("brand")
         if brand:
             try:
-                plats = [p for p in (d.get("platforms") or "").split(",") if p]
-                job = db.create_and_queue(task, brand=brand, source="nancy",
-                                          created_by="Nancy (delegated by Constance)", platforms=plats,
-                                          media=(d.get("media") or "none"), direction=d.get("direction"))
-                db.link_delegation(d["id"], job["id"])
+                job = _queue_delegation(HOME, d["id"], task, brand, d.get("media"), d.get("platforms"), d.get("direction"))
                 send(HOME, f"📥 Constance's handed me: \"{task}\" for {brand}. On it — queued to the Studio "
                            f"[{job['id'][:8]}]. I'll bring it back to review when it's built. Shout if you want a different angle or format.")
             except Exception as e:  # noqa: BLE001
                 send(HOME, f"📥 Constance handed me \"{task}\" for {brand}, but I hit a snag queuing it: {e}")
         else:
-            send(HOME, f"📥 Constance's handed me: \"{task}\" — no brand pinned. Which brand should it be?")
-    if changed:
+            _ask_brand(HOME, d)
+    # Auto-expire the truly stale ones and let the operator know they were dropped.
+    try:
+        expired = db.expire_stale_delegations(exp_h)
+    except Exception as e:  # noqa: BLE001
+        expired = []
+        print(f"nancy: delegation expire error: {e}", flush=True)
+    for ex in expired:
+        if HOME:
+            send(HOME, f"🗑️ Dropped Constance's stale delegation \"{ex['task']}\" — no action in {exp_h}h. Just ask again if you still want it.")
+    if changed or expired:
         SESS["_deleg_seen"] = seen[-300:]
+        SESS["_deleg_warned"] = warned[-300:]
         _save(SESS)
 
 

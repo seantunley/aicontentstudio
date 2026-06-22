@@ -674,6 +674,38 @@ def sync_delegations():
     return closed
 
 
+def expire_stale_delegations(hours=48, to_agent="nancy"):
+    """Auto-close 'open' (un-actioned) delegations older than `hours`. An un-actioned delegation is
+    re-injected into the assignee's per-turn context on every message, so a stranded/no-brand one
+    would otherwise nag forever. Returns the rows it expired (id, task, brand) for an operator notice."""
+    if not hours or hours <= 0:
+        return []
+    cutoff = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=hours)).isoformat()
+    now = _utcnow()
+    expired = []
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT id, task, brand FROM delegations WHERE to_agent=? AND status='open' AND created_at < ?",
+            (to_agent, cutoff)).fetchall()
+        for r in rows:
+            conn.execute(
+                "UPDATE delegations SET status='expired', closed_at=?, updated_at=?, "
+                "note = COALESCE(note,'') || ? WHERE id=? AND status='open'",
+                (now, now, f" [auto-expired: un-actioned > {hours}h]", r["id"]))
+            expired.append(dict(r))
+    return expired
+
+
+def drop_delegation(did, status="dropped"):
+    """Operator declined an open delegation (or cleared it) — close it without delivering. Only acts on
+    a still-'open' row, so it can't clobber one already accepted/delivered. Returns the updated row."""
+    now = _utcnow()
+    with _db() as conn:
+        conn.execute("UPDATE delegations SET status=?, closed_at=?, updated_at=? WHERE id=? AND status='open'",
+                     (status, now, now, did))
+    return get_delegation(did)
+
+
 def list_delegations(from_agent=None, status=None, limit=20):
     """For the CEO's follow-up view. Auto-syncs (closes delivered) before returning."""
     sync_delegations()
