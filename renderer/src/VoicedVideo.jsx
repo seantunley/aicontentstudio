@@ -5,7 +5,9 @@ import { AbsoluteFill, Img, OffthreadVideo, Audio, useCurrentFrame, useVideoConf
 // travels in inputProps with no asset server.
 const FONT = "'Liberation Sans', 'DejaVu Sans', 'Noto Color Emoji', sans-serif";
 
-export const VoicedVideo = ({ imageUrl, videoUrl, audioData, captions = [], accent = '#c8f24e', kicker = '' }) => {
+export const VoicedVideo = ({ imageUrl, videoUrl, audioData, captions = [], accent: accentProp = '#c8f24e', kicker = '', palette = {} }) => {
+  const accent = palette.accent || accentProp; // brand accent overrides the studio lime; kicker + progress use `accent`
+  const bg = palette.bg || '#0c0e10';          // brand background (letterbox + gradient fallback)
   const frame = useCurrentFrame();
   const { fps, durationInFrames, width, height } = useVideoConfig();
   const t = frame / fps;
@@ -19,7 +21,7 @@ export const VoicedVideo = ({ imageUrl, videoUrl, audioData, captions = [], acce
   const capIn = cap ? spring({ frame: frame - Math.round(cap.start * fps), fps, config: { damping: 200 } }) : 0;
 
   return (
-    <AbsoluteFill style={{ backgroundColor: '#0c0e10', fontFamily: FONT }}>
+    <AbsoluteFill style={{ backgroundColor: bg, fontFamily: FONT }}>
       {videoUrl ? (
         // Grok Imagine motion clip as the moving background — its own motion, so no Ken-Burns
         // transform; loop + mute (our voiceover carries the audio; the clip has none).
@@ -30,7 +32,7 @@ export const VoicedVideo = ({ imageUrl, videoUrl, audioData, captions = [], acce
         <AbsoluteFill style={{ transform: `scale(${scale}) translateY(${drift}px)` }}>
           {imageUrl
             ? <Img src={imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <AbsoluteFill style={{ background: 'radial-gradient(circle at 50% 30%, #1b2024, #0c0e10)' }} />}
+            : <AbsoluteFill style={{ background: `radial-gradient(circle at 50% 30%, #1b2024, ${bg})` }} />}
         </AbsoluteFill>
       )}
 

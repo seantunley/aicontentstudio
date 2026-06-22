@@ -46,6 +46,8 @@ export function layout(props) {
 export const PostMock = (props) => {
   const L = layout(props);
   const meta = META[L.platform] || { label: L.platform, color: '#555' };
+  const palette = props.palette || {};
+  const avatarColor = palette.primary || palette.accent || meta.color; // brand avatar tint; falls back to platform colour
   const name = props.handle && props.handle !== 'unassigned' ? props.handle : meta.label;
   const textFirst = TEXT_FIRST.includes(L.platform);
   const n = L.images.length;
@@ -53,7 +55,7 @@ export const PostMock = (props) => {
 
   const header = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '22px 24px' }}>
-      <div style={{ width: 64, height: 64, borderRadius: '50%', background: meta.color, color: '#fff',
+      <div style={{ width: 64, height: 64, borderRadius: '50%', background: avatarColor, color: '#fff',
         display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 28, flexShrink: 0 }}>{initial}</div>
       <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2, minWidth: 0 }}>
         <span style={{ fontWeight: 600, fontSize: 27, color: '#111' }}>{name}</span>

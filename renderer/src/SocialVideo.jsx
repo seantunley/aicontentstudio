@@ -2,7 +2,9 @@ import { AbsoluteFill, Img, useCurrentFrame, useVideoConfig, interpolate, spring
 
 // Branded social video: Ken-Burns image, legibility scrim, animated kicker +
 // caption with a lime accent bar, and a thin progress bar. No audio/TTS (deferred).
-export const SocialVideo = ({ imageUrl, caption, kicker, accent }) => {
+export const SocialVideo = ({ imageUrl, caption, kicker, accent: accentProp = '#c8f24e', palette = {} }) => {
+  const accent = palette.accent || accentProp; // brand accent overrides the studio lime; rest of comp uses `accent`
+  const bg = palette.bg || '#0c0e10';          // brand background (letterbox + gradient fallback)
   const frame = useCurrentFrame();
   const { fps, durationInFrames, width, height } = useVideoConfig();
   const pad = Math.round(width * 0.06);
@@ -18,12 +20,12 @@ export const SocialVideo = ({ imageUrl, caption, kicker, accent }) => {
   const progress = interpolate(frame, [0, durationInFrames], [0, 1]);
 
   return (
-    <AbsoluteFill style={{ backgroundColor: '#0c0e10', fontFamily: 'sans-serif' }}>
+    <AbsoluteFill style={{ backgroundColor: bg, fontFamily: 'sans-serif' }}>
       <AbsoluteFill style={{ transform: `scale(${scale}) translateY(${drift}px)` }}>
         {imageUrl ? (
           <Img src={imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <AbsoluteFill style={{ background: 'radial-gradient(circle at 50% 30%, #1b2024, #0c0e10)' }} />
+          <AbsoluteFill style={{ background: `radial-gradient(circle at 50% 30%, #1b2024, ${bg})` }} />
         )}
       </AbsoluteFill>
 

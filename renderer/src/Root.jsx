@@ -19,6 +19,7 @@ export const Root = () => (
         caption: 'Your caption here',
         kicker: '',
         accent: '#c8f24e',
+        palette: {},
         width: 1080,
         height: 1920,
         durationSec: 6,
@@ -37,7 +38,7 @@ export const Root = () => (
       fps={24}
       width={1080}
       height={1920}
-      defaultProps={{ imageUrl: '', audioData: '', captions: [], accent: '#c8f24e', kicker: '', width: 1080, height: 1920, durationSec: 10 }}
+      defaultProps={{ imageUrl: '', audioData: '', captions: [], accent: '#c8f24e', palette: {}, kicker: '', width: 1080, height: 1920, durationSec: 10 }}
       calculateMetadata={({ props }) => ({
         width: props.width || 1080,
         height: props.height || 1920,
@@ -52,7 +53,7 @@ export const Root = () => (
       fps={1}
       width={1080}
       height={1350}
-      defaultProps={{ platform: 'instagram', handle: '', body: 'Your caption here', images: [], video: false }}
+      defaultProps={{ platform: 'instagram', handle: '', body: 'Your caption here', images: [], video: false, palette: {} }}
       calculateMetadata={({ props }) => { const L = layout(props); return { width: L.width, height: L.frameH, durationInFrames: 1, fps: 1 }; }}
     />
   </>

@@ -96,6 +96,7 @@ app.post('/render', async (req, res) => {
     caption = '',
     kicker = '',
     accent = '#c8f24e',
+    palette = {},
     width = 1080,
     height = 1920,
     durationSec = 6,
@@ -106,7 +107,7 @@ app.post('/render', async (req, res) => {
   try {
     await ensureBrowser();
     const serveUrl = await getBundle();
-    const inputProps = { imageUrl, caption, kicker, accent, width, height, durationSec };
+    const inputProps = { imageUrl, caption, kicker, accent, palette, width, height, durationSec };
     const composition = await selectComposition({ serveUrl, id: 'SocialVideo', inputProps });
     await renderMedia({
       composition,
@@ -130,12 +131,12 @@ app.post('/render', async (req, res) => {
 
 // POST /preview -> renders the PostMock platform-mockup still, streams back a PNG
 app.post('/preview', async (req, res) => {
-  const { platform = 'instagram', handle = '', body = '', images = [], video = false } = req.body || {};
+  const { platform = 'instagram', handle = '', body = '', images = [], video = false, palette = {} } = req.body || {};
   const out = path.join(os.tmpdir(), `preview_${process.pid}_${Math.round(Math.random() * 1e9)}.png`);
   try {
     await ensureBrowser();
     const serveUrl = await getBundle();
-    const inputProps = { platform, handle, body, images, video };
+    const inputProps = { platform, handle, body, images, video, palette };
     const composition = await selectComposition({ serveUrl, id: 'PostMock', inputProps });
     await renderStill({
       composition,
@@ -160,7 +161,7 @@ app.post('/preview', async (req, res) => {
 // POST /video -> script + image => Piper voiceover + time-synced captions => 9:16 mp4 (§7b Phase 3)
 app.post('/video', async (req, res) => {
   const { script = '', imageUrl = '', videoUrl = '', accent = '#c8f24e', kicker = '', width = 1080, height = 1920,
-    captions: wantCaps = false } = req.body || {}; // videoUrl = a moving background (Grok Imagine clip); captions overlay off by default
+    palette = {}, captions: wantCaps = false } = req.body || {}; // videoUrl = a moving background (Grok Imagine clip); captions overlay off by default
   if (!script.trim()) return res.status(400).json({ error: 'script required' });
   const stamp = `${process.pid}_${Math.round(Math.random() * 1e9)}`;
   const mp3 = path.join(os.tmpdir(), `vo_${stamp}.mp3`);
@@ -175,7 +176,7 @@ app.post('/video', async (req, res) => {
 
     await ensureBrowser();
     const serveUrl = await getBundle();
-    const inputProps = { imageUrl, videoUrl, audioData, captions, accent, kicker, width, height, durationSec: durSec };
+    const inputProps = { imageUrl, videoUrl, audioData, captions, accent, palette, kicker, width, height, durationSec: durSec };
     const composition = await selectComposition({ serveUrl, id: 'VoicedVideo', inputProps });
     // NOTE: this container has 1 core, so concurrency stays at the default (1); 24fps keeps frames down.
     await renderMedia({ composition, serveUrl, codec: 'h264', outputLocation: out, inputProps,

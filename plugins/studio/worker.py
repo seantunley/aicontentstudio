@@ -98,6 +98,13 @@ def _brand_block(job):
     return f"BRAND PROFILE for {b.get('name') or job.get('brand')} — write in this brand's voice. " + " ".join(bits) + " "
 
 
+def _brand_visual_block(job):
+    """Brand VISUAL identity (palette/archetype/mood/art-direction) for media generation — woven into
+    image prompts so artwork looks like the brand, not generic. Delegates to the shared db helper so the
+    worker and the agent tools format it identically. Empty when unset (never blocks)."""
+    return db.brand_visual_text(job.get("brand"))
+
+
 def _campaign_block(job):
     """If the job is part of a campaign arc (§7e), tell the agent the shared theme so the piece is
     coherent with the series and distinct from its siblings. Empty otherwise."""
@@ -267,6 +274,9 @@ def _agent_prompt(job, with_image, with_video=False, with_carousel=False, social
     _art = (db.get_setting("image_art_direction") or "").strip()
     if _art:
         img_style += f"HOUSE ART-DIRECTION, apply to every image unless the brand's identity overrides: {_art} "
+    _bvis = _brand_visual_block(job)
+    if _bvis:
+        img_style += _bvis  # brand palette/archetype/mood/art-direction — overrides the house look
     if with_carousel:
         _cdef = _int_setting("carousel_default_slides", 4)  # /settings → Generation & Media
         try:
@@ -374,12 +384,14 @@ def _claude_write(job, social_text=""):
     except Exception:  # noqa: BLE001
         pass
     direction = (job.get("direction") or "").strip()
+    _bvis = _brand_visual_block(job)
     social_block = (f"\nCURRENT SOCIAL DISCUSSION (ground the angle here where relevant):\n{social_text[:1500]}\n" if social_text else "")
     prompt = (
         f"You are {job.get('brand') or 'the studio'}'s creative director AND researcher. Produce a complete, "
         "ready-to-review social post package.\n"
         f"TOPIC: {job.get('topic')!r}\nTARGET PLATFORMS: {', '.join(targets)}\n"
         + (f"BRAND VOICE: {voice}\n" if voice else "")
+        + (f"{_bvis}(reflect this palette/mood/art-direction in every image_brief.)\n" if _bvis else "")
         + (f"CREATIVE DIRECTION (follow it): {direction}\n" if direction else "")
         + f"RULES: metric units ONLY (Celsius, km, kg, litres); audience region {region} (localise policy/context, "
           "NOT the people depicted); write in the SAME language as the topic; ground EVERY fact in REAL, current, "
@@ -561,11 +573,13 @@ def _fit_check(jid, job):
     except Exception:  # noqa: BLE001
         pass
     media_desc = "; ".join(facts) or "no media facts recorded"
+    _bvis = db.brand_visual_text(job.get("brand"))  # palette/mood/art-direction to judge the visual against
     base = (
         "You are a senior creative director doing a final fit-check on a social post BEFORE it ships. "
         f"POST INTENT/TOPIC: {job.get('topic')!r}.\n"
         f"CAPTION: {caption!r}.\n"
         f"HOW THE MEDIA WAS BUILT: {media_desc}.\n"
+        + (f"{_bvis}\n" if _bvis else "")
     )
     json_instr = ('\nReply with ONLY compact JSON: {"fit": <0-5 integer>, '
                   '"issue": "<one short line, empty if fine>", "fix": "<one short suggestion, empty if fine>"}.')
@@ -580,8 +594,10 @@ def _fit_check(jid, job):
         vprompt = (base +
                    "The ACTUAL rendered media is attached. Judge STRICTLY on what you SEE — subject, composition, "
                    "quality, any garbled text/artefacts, on-topic-ness, AND whether the visual matches the caption's "
-                   "promise and the local context (right place/season, no foreign or stock-photo mismatch). For a "
-                   "video the frame shows the look — use the build facts for the motion treatment." + json_instr)
+                   "promise and the local context (right place/season, no foreign or stock-photo mismatch). "
+                   + ("ALSO judge it against the BRAND VISUAL IDENTITY above — mark it down if the palette/mood/"
+                      "art-direction is off-brand, not just off-product. " if _bvis else "")
+                   + "For a video the frame shows the look — use the build facts for the motion treatment." + json_instr)
         out = claude.ask_image(vprompt, [media], timeout=240)
         if out:
             model = "Claude (vision)"
@@ -632,10 +648,12 @@ def _validate_launch_image(job, master_path, reference_urls):
             mb = f.read()
         if not ref or not mb or not claude.vision_available():
             return True, ""
+        _bvis = db.brand_visual_text(job.get("brand"))
         prompt = ("Image 1 = the REAL product reference. Image 2 = a generated launch image. Judge Image 2 strictly: "
                   "is it the SAME product faithfully (no wrong size/parts/colour), are any people realistic (NOT "
-                  "distorted), and does it read as an exciting launch? Reply ONLY JSON: "
-                  '{"ok": true|false, "issue": "<one short line, empty if fine>"}.')
+                  "distorted), and does it read as an exciting launch? "
+                  + (f"{_bvis}Also flag it if the look is clearly off this brand's palette/mood/art-direction. " if _bvis else "")
+                  + 'Reply ONLY JSON: {"ok": true|false, "issue": "<one short line, empty if fine>"}.')
         out = claude.ask_image(prompt, [(ref, "image/jpeg"), (mb, "image/png")], timeout=180)
         if not out:
             return True, ""
@@ -684,6 +702,9 @@ def _fal_launch_media(job, image_briefs, with_video):
     if not drafts:
         return False
     art = next((image_briefs[p] for p in image_briefs if image_briefs.get(p)), "") if image_briefs else ""
+    _bvis = _brand_visual_block(job)
+    if _bvis:
+        art = (art + " " + _bvis).strip()  # carry brand palette/mood/art-direction into the fal reference-edit
     # 1) launch IMAGE (with people) — validate + re-roll once
     master, issue = None, ""
     for attempt in (1, 2):

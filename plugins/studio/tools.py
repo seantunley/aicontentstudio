@@ -397,6 +397,7 @@ def _render_mockup(platform, handle, body, imgs, video):
             "body": body or "",
             "images": [m.get("path") for m in (imgs or []) if m.get("path")][:10],
             "video": bool(video),
+            "palette": db.brand_palette(handle),  # brand-theme the preview card; {} = studio default look
         }
         r = requests.post(f"{RENDER_URL}/preview", json=payload, timeout=120)
         if r.status_code == 200 and r.content:
@@ -755,6 +756,8 @@ def make_video(args, **kwargs):
         dur = max(4.0, min(_maxv, float(args.get("duration_sec") or db.get_setting("video_default_seconds") or 6)))
     except (TypeError, ValueError):
         dur = 6.0
+    _bvis = db.brand_visual_text(job.get("brand"))   # brand mood → woven into the motion prompt (§visual identity)
+    _palette = db.brand_palette(job.get("brand"))     # brand palette → renderer theming (caption pills / kicker / accent)
     done, failed = [], []
     for d in drafts:
         w, h = db.PLATFORM_VIDEO.get(d["platform"], (1080, 1920))
@@ -778,6 +781,8 @@ def make_video(args, **kwargs):
                     secs = max(3, min(15, round(len(script.split()) / 2.6)))  # ~clip length ≈ voiceover
                     motion = ("Gentle, slow cinematic camera push-in with soft natural light and subtle, "
                               "lifelike motion; calm and premium." + (f" Theme: {kicker}." if kicker else ""))
+                    if _bvis:
+                        motion += " " + _bvis  # honour the brand's mood/art-direction in the motion treatment
                     video_url = _grok_animate(imgtmp, motion, w, h, secs)
                     try:
                         os.unlink(imgtmp)
@@ -785,6 +790,8 @@ def make_video(args, **kwargs):
                         pass
             payload = {"script": script, "imageUrl": img_url, "kicker": kicker, "width": w, "height": h,
                        "captions": captions}  # captions toggle from /settings (default on)
+            if _palette:
+                payload["palette"] = _palette  # brand-theme the caption pills + kicker (falls back to studio look)
             if video_url:
                 payload["videoUrl"] = video_url  # renderer loops it under the voiceover + captions
             endpoint, vtimeout = "/video", 1200  # voiced render is frame-by-frame; allow slow CPU renders
@@ -792,6 +799,8 @@ def make_video(args, **kwargs):
             caption = (args.get("caption") or _video_caption(d["body"])).strip()
             payload = {"imageUrl": d.get("image_path") or "", "caption": caption,
                        "kicker": kicker, "width": w, "height": h, "durationSec": dur, "id": d["id"]}
+            if _palette:
+                payload["palette"] = _palette  # brand-theme the accent bar + kicker (falls back to studio look)
             endpoint, vtimeout = "/render", 300
         try:
             r = requests.post(f"{RENDER_URL}{endpoint}", json=payload, timeout=vtimeout)

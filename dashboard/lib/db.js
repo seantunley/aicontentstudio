@@ -669,11 +669,13 @@ export function upsertBrand(b) {
   if (!slug) throw new Error('could not derive a slug');
   const now = new Date().toISOString();
   const channels = Array.isArray(b.channels) ? b.channels.filter(Boolean).join(',') : (b.channels || null);
-  const vals = [name, b.region || null, b.audience || null, b.voice || null, b.safety || null, b.pillars || null, b.sensitive || null, channels || null, b.enabled === false ? 0 : 1, now];
+  const vals = [name, b.region || null, b.audience || null, b.voice || null, b.safety || null, b.pillars || null, b.sensitive || null, channels || null,
+    b.palette || null, b.archetype || null, b.visual_mood || null, b.art_direction || null,
+    b.enabled === false ? 0 : 1, now];
   if (d.prepare('SELECT slug FROM brands WHERE slug=?').get(slug)) {
-    d.prepare('UPDATE brands SET name=?,region=?,audience=?,voice=?,safety=?,pillars=?,sensitive=?,channels=?,enabled=?,updated_at=? WHERE slug=?').run(...vals, slug);
+    d.prepare('UPDATE brands SET name=?,region=?,audience=?,voice=?,safety=?,pillars=?,sensitive=?,channels=?,palette=?,archetype=?,visual_mood=?,art_direction=?,enabled=?,updated_at=? WHERE slug=?').run(...vals, slug);
   } else {
-    d.prepare('INSERT INTO brands (name,region,audience,voice,safety,pillars,sensitive,channels,enabled,updated_at,created_at,slug) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(...vals, now, slug);
+    d.prepare('INSERT INTO brands (name,region,audience,voice,safety,pillars,sensitive,channels,palette,archetype,visual_mood,art_direction,enabled,updated_at,created_at,slug) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(...vals, now, slug);
   }
   return { ok: true, slug };
 }

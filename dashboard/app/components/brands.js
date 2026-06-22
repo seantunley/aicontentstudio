@@ -2,7 +2,10 @@
 import { useState, useEffect } from 'react';
 import { useUI, Tooltip, InfoDot } from './ui';
 
-const BLANK = { slug: '', name: '', region: '', audience: '', voice: '', safety: '', pillars: '', sensitive: '', channels: '' };
+const BLANK = { slug: '', name: '', region: '', audience: '', voice: '', safety: '', pillars: '', sensitive: '', channels: '', palette: '', archetype: '', visual_mood: '', art_direction: '' };
+
+// 12 brand archetypes — drive visual mood + voice. None fits? Leave blank and use the text fields.
+const ARCHETYPES = ['The Innocent', 'The Sage', 'The Explorer', 'The Rebel', 'The Magician', 'The Hero', 'The Lover', 'The Jester', 'The Everyman', 'The Caregiver', 'The Ruler', 'The Creator'];
 
 async function post(body) {
   const r = await fetch('/api/brands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -66,6 +69,13 @@ export function BrandManager({ brands, coverage = {} }) {
     ui.toast(data.error || 'Failed', 'err');
   }
   const set = (k) => (e) => setEditing((b) => ({ ...b, [k]: e.target.value }));
+  // palette stored as a JSON string {primary,secondary,accent,bg}; edit one swatch at a time.
+  let palette = {}; try { palette = JSON.parse(editing?.palette || '{}') || {}; } catch { palette = {}; }
+  const setPalette = (key) => (e) => setEditing((b) => {
+    let p = {}; try { p = JSON.parse(b.palette || '{}') || {}; } catch { p = {}; }
+    p[key] = e.target.value;
+    return { ...b, palette: JSON.stringify(p) };
+  });
 
   return (
     <>
@@ -121,6 +131,23 @@ export function BrandManager({ brands, coverage = {} }) {
                 <textarea className="ta" rows={2} placeholder="content pillars — recurring themes, one per line" value={editing.pillars} onChange={set('pillars')} />
                 <label className="card-foot" style={{ margin: '6px 0 4px', display: 'block' }}>Sensitive topics<InfoDot tip="Dates/topics that should notify you first rather than auto-draft (e.g. tragedies, anniversaries)." /></label>
                 <input className="input" placeholder="sensitive topics/occasions (notify-first) — optional" value={editing.sensitive} onChange={set('sensitive')} />
+                <label className="card-foot" style={{ margin: '10px 0 4px', display: 'block' }}>Visual identity<InfoDot tip="Palette, archetype, mood & art direction — steer AI artwork, the rendered look (caption pills, carousels, previews) and the visual fit-check." /></label>
+                <div className="field-row" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                  {['primary', 'secondary', 'accent', 'bg'].map((k) => (
+                    <label key={k} className="check" style={{ gap: 5 }}>
+                      <input type="color" value={palette[k] || '#888888'} onChange={setPalette(k)} style={{ width: 26, height: 22, padding: 0, border: '1px solid var(--line-2)', borderRadius: 4, background: 'none', cursor: 'pointer' }} />
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--muted)' }}>{k}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="field-row">
+                  <select className="input" style={{ flex: 1 }} value={editing.archetype || ''} onChange={set('archetype')}>
+                    <option value="">archetype (optional)…</option>
+                    {ARCHETYPES.map((a) => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                  <input className="input" style={{ flex: 1 }} placeholder="visual mood (warm, editorial, minimal…)" value={editing.visual_mood || ''} onChange={set('visual_mood')} />
+                </div>
+                <textarea className="ta" rows={2} placeholder="art direction — lighting, composition, photography vs illustration, what to never show" value={editing.art_direction || ''} onChange={set('art_direction')} />
                 <div>
                   <div className="card-foot" style={{ margin: '2px 0 6px' }}>
                     ACCOUNTS THIS BRAND MAY POST TO (§1b)<InfoDot tip="Restrict this brand to specific connected accounts. Leave all unticked = any connected account." />{selectedChannels.length ? <span className="dim"> · {selectedChannels.length} selected</span> : null}

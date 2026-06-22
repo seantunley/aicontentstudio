@@ -148,6 +148,10 @@ CREATE TABLE IF NOT EXISTS brands (
     pillars     TEXT,                     -- content pillars (one per line / comma)
     sensitive   TEXT,                     -- sensitive topics/occasions -> notify-first
     channels    TEXT,                     -- comma-sep Postiz integration ids this brand may post to (§1b hard boundary)
+    palette       TEXT,                   -- visual identity: JSON {primary,secondary,accent,bg} hex — steers art + render theming
+    archetype     TEXT,                   -- brand archetype (e.g. The Sage) — seasons visual mood + voice
+    visual_mood   TEXT,                   -- visual mood/tone keywords (warm, editorial, minimal…) — seasons media prompts
+    art_direction TEXT,                   -- free-text art direction (lighting, composition, never-show) — into media prompts + fit-check
     enabled     INTEGER DEFAULT 1,
     created_at  TEXT,
     updated_at  TEXT
@@ -331,6 +335,11 @@ def init_db():
             conn.execute("ALTER TABLE jobs ADD COLUMN attempts INTEGER DEFAULT 0")  # process_one passes, for the resumable-loop cap (§9b)
         if "direction" not in cols:
             conn.execute("ALTER TABLE jobs ADD COLUMN direction TEXT")  # creative direction the bot agreed with the operator; the worker honours it
+        # brand visual identity (§visual direction): palette/archetype/mood/art-direction steer media gen + render theming + the vision fit-check
+        bcols = [r[1] for r in conn.execute("PRAGMA table_info(brands)").fetchall()]
+        for _bcol in ("palette", "archetype", "visual_mood", "art_direction"):
+            if _bcol not in bcols:
+                conn.execute(f"ALTER TABLE brands ADD COLUMN {_bcol} TEXT")
         # an AI-generated image can be attached to a draft (Phase 2). Uploaded to the publisher at
         # attach-time, so we store the publisher's media reference (id + url), not the local file.
         dcols = [r[1] for r in conn.execute("PRAGMA table_info(drafts)").fetchall()]
@@ -1192,6 +1201,55 @@ def get_brand(slug):
     with _db() as conn:
         r = conn.execute("SELECT * FROM brands WHERE slug=? AND enabled=1", (slug,)).fetchone()
     return dict(r) if r else None
+
+
+def palette_text(palette):
+    """Brand palette (JSON string or dict {primary,secondary,accent,bg}) → readable hex roles,
+    e.g. 'primary #1a1a2e, accent #e94560'. Empty if none/unparseable."""
+    pal = palette
+    if isinstance(pal, str):
+        try:
+            pal = json.loads(pal) if pal.strip() else {}
+        except Exception:  # noqa: BLE001
+            return ""
+    if not isinstance(pal, dict):
+        return ""
+    return ", ".join(f"{k} {v}" for k, v in pal.items() if v)
+
+
+def brand_palette(slug):
+    """The brand's palette as a dict {primary,secondary,accent,bg} (only set keys), or {}. For render theming."""
+    try:
+        b = get_brand(slug)
+    except Exception:  # noqa: BLE001
+        b = None
+    pal = (b or {}).get("palette")
+    if isinstance(pal, str):
+        try:
+            pal = json.loads(pal) if pal.strip() else {}
+        except Exception:  # noqa: BLE001
+            return {}
+    return {k: v for k, v in pal.items() if v} if isinstance(pal, dict) else {}
+
+
+def brand_visual_text(slug):
+    """Brand VISUAL identity (palette/archetype/mood/art-direction) as one prompt block, or ''.
+    Shared by the worker (image prompts) and tools (video motion). Never raises; '' when unset."""
+    try:
+        b = get_brand(slug)
+    except Exception:  # noqa: BLE001
+        b = None
+    if not b:
+        return ""
+    bits = []
+    pal = palette_text(b.get("palette"))
+    if pal:                    bits.append(f"Colour palette (use these hues, in roughly these roles): {pal}.")
+    if b.get("archetype"):     bits.append(f"Brand archetype: {b['archetype']} — let it shape the mood.")
+    if b.get("visual_mood"):   bits.append(f"Visual mood: {b['visual_mood']}.")
+    if b.get("art_direction"): bits.append(f"Art direction (honour strictly): {b['art_direction']}")
+    if not bits:
+        return ""
+    return "BRAND VISUAL IDENTITY — make every image/video unmistakably this brand: " + " ".join(bits) + " "
 
 
 def list_brands():
