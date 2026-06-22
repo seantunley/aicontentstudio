@@ -98,6 +98,7 @@ services:
       - POSTIZ_USER_ID=${POSTIZ_USER_ID}           # operator's Postiz user id (the minted token's subject)
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}   # DM the operator when a post goes live (two-way loop)
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - TELEGRAM_ALLOWED_USERS=${TELEGRAM_ALLOWED_USERS:-}   # so onboarding's "Connect Telegram" readiness check sees the operator allow-list
       # §3d engagement engine — Chatwoot (runs from chatwoot/docker-compose.yml on :4009). Set the
       # token + account id in .env after creating them in the Chatwoot UI; empty = the Engagement
       # page shows setup steps instead of an inbox.
