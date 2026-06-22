@@ -4,7 +4,7 @@ import { costSummary } from '@/lib/db';
 import { zar } from '@/lib/money';
 
 export const dynamic = 'force-dynamic';
-const POSTIZ_UI = 'http://172.18.18.101:4007';
+const POSTIZ_UI = '/api/postiz/open';
 
 export default async function Accounts() {
   const channels = await listIntegrations(); // null = unreachable

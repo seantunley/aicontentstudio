@@ -8,9 +8,9 @@ services:
     restart: always
     environment:
       # === Required Settings
-      MAIN_URL: 'http://172.18.18.101:4007'
-      FRONTEND_URL: 'http://172.18.18.101:4007'
-      NEXT_PUBLIC_BACKEND_URL: 'http://172.18.18.101:4007/api'
+      MAIN_URL: 'https://studio-postiz.tunleyinternational.com'
+      FRONTEND_URL: 'https://studio-postiz.tunleyinternational.com'
+      NEXT_PUBLIC_BACKEND_URL: 'https://studio-postiz.tunleyinternational.com/api'
       JWT_SECRET: '${JWT_SECRET}'
       DATABASE_URL: 'postgresql://postiz-user:${POSTIZ_PG_PASSWORD}@postiz-postgres:5432/postiz-db-local'
       REDIS_URL: 'redis://postiz-redis:6379'

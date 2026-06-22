@@ -13,7 +13,7 @@ const POSTIZ_USER_ID = process.env.POSTIZ_USER_ID || '';
 // Mint the `auth` JWT Postiz's internal API expects: HS256 over {id}, signed with Postiz's JWT_SECRET
 // (matches @gitroom AuthService.signJWT = jsonwebtoken.sign(value, JWT_SECRET), default HS256, no exp).
 // Postiz re-loads the user from its DB by id, so the token only needs a valid signature + the user id.
-function mintAuthToken() {
+export function mintAuthToken() {
   if (!JWT_SECRET || !POSTIZ_USER_ID) throw new Error('POSTIZ_JWT_SECRET / POSTIZ_USER_ID not configured');
   const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
   const head = b64({ alg: 'HS256', typ: 'JWT' });

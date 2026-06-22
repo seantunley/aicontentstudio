@@ -11,6 +11,12 @@ import crypto from 'crypto';
 import { getSetting } from './db';
 
 export const ISSUER = process.env.STUDIO_OIDC_ISSUER || 'http://172.18.18.101:4008/api/oidc';
+// The ISSUER (and so the discovery doc, token, userinfo, jwks) is fetched by the OIDC CLIENT's SERVER,
+// so it must be on a directly-reachable base (LAN) — NOT behind an auth gateway. auth.js derives the
+// discovery URL from the issuer (`{issuer}/.well-known/openid-configuration`), so a public/gated issuer
+// makes the client fetch the Cloudflare Access login page instead of metadata. Only the browser-facing
+// `authorize` uses the PUBLIC base (the one URL the operator's browser must reach).
+const PUBLIC_BASE = (process.env.STUDIO_OIDC_PUBLIC_BASE || ISSUER).replace(/\/$/, '');
 export const CLIENT_ID = process.env.STUDIO_OIDC_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.STUDIO_OIDC_CLIENT_SECRET || '';
 const REDIRECT_URIS = (process.env.STUDIO_OIDC_REDIRECT_URIS || '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -81,7 +87,7 @@ export function operatorClaims(sessionUser) {
 export function discovery() {
   return {
     issuer: ISSUER,
-    authorization_endpoint: `${ISSUER}/authorize`,
+    authorization_endpoint: `${PUBLIC_BASE}/authorize`,
     token_endpoint: `${ISSUER}/token`,
     userinfo_endpoint: `${ISSUER}/userinfo`,
     jwks_uri: `${ISSUER}/jwks`,

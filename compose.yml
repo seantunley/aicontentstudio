@@ -125,6 +125,7 @@ services:
       # §SSO — the studio is the single OIDC identity provider; embedded apps (Typebot now) delegate
       # login here and auto-provision by email. Secrets/keys live in the gitignored root .env.
       - STUDIO_OIDC_ISSUER=${STUDIO_OIDC_ISSUER:-http://172.18.18.101:4008/api/oidc}
+      - STUDIO_OIDC_PUBLIC_BASE=${STUDIO_OIDC_PUBLIC_BASE:-https://console.tunleyinternational.com/api/oidc}  # ONLY the browser-facing authorize endpoint is public; issuer+token+jwks stay internal (LAN), so the client server never hits Cloudflare Access
       - STUDIO_OIDC_CLIENT_ID=${STUDIO_OIDC_CLIENT_ID:-}
       - STUDIO_OIDC_CLIENT_SECRET=${STUDIO_OIDC_CLIENT_SECRET:-}
       - STUDIO_OIDC_REDIRECT_URIS=${STUDIO_OIDC_REDIRECT_URIS:-}

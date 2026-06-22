@@ -4,7 +4,7 @@ import { PLATFORM_META, PLATFORM_ICON } from '@/lib/platforms';
 import { useUI, Tooltip } from './ui';
 import { PlatformChip } from './actions';
 
-const POSTIZ_UI = 'http://172.18.18.101:4007';
+const POSTIZ_UI = '/api/postiz/open';
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const pad = (n) => String(n).padStart(2, '0');
