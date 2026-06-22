@@ -352,12 +352,13 @@ a.desk-card:hover .go { color: var(--accent); transform: translateX(2px); }
   display: grid; place-items: center; padding: 20px; animation: fade 0.15s ease both; }
 .modal { width: 100%; max-width: 460px; border: 1px solid rgba(255,255,255,0.08); border-radius: var(--r-lg);
   background: rgba(20,17,13,0.88); -webkit-backdrop-filter: blur(16px) saturate(1.15); backdrop-filter: blur(16px) saturate(1.15);
-  box-shadow: 0 0 0 1px rgba(227,167,63,0.05), 0 30px 70px -20px #000; animation: pop 0.18s ease both; }
+  box-shadow: 0 0 0 1px rgba(227,167,63,0.05), 0 30px 70px -20px #000; animation: pop 0.18s ease both;
+  max-height: calc(100dvh - 40px); display: flex; flex-direction: column; overflow: hidden; }
 .modal-bar { display: flex; align-items: center; gap: 8px; padding: 11px 16px; border-bottom: 1px solid var(--line);
-  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); flex-shrink: 0; }
 .modal-bar .led { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent); }
 .modal-bar.danger .led { background: var(--red); box-shadow: 0 0 6px var(--red); }
-.modal-body { padding: 18px 16px; }
+.modal-body { padding: 18px 16px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
 .modal-body h3 { font-family: var(--serif); font-size: 20px; font-weight: 550; margin: 0 0 8px; letter-spacing: -0.01em; }
 .modal-body p { color: var(--fg-2); font-size: 13.5px; margin: 0 0 16px; line-height: 1.55; }
 .modal-acts { display: flex; gap: 8px; justify-content: flex-end; }
