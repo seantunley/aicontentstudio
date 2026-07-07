@@ -173,7 +173,7 @@ function _parseTags(raw) {
 // Build a node/link graph of the knowledge base for the dashboard's force-directed view.
 // Nodes = notes (grouped history | voice | note) plus tag hubs; edges = [[wikilinks]] between notes
 // and note→tag membership (so even un-linked imports cluster meaningfully). Capped for readability.
-export function knowledgeGraph({ maxNodes = 300, maxTags = 40 } = {}) {
+export function knowledgeGraph({ maxNodes = 450, maxTags = 40 } = {}) {
   const parsed = [];
   for (const rel of walk(KDIR)) {
     let text = '';
@@ -215,7 +215,7 @@ export function knowledgeGraph({ maxNodes = 300, maxTags = 40 } = {}) {
   // A tag on (nearly) every note is a useless hub: it wires everything to everything and turns
   // the graph into a slow, unreadable hairball. Drop known-generic tags + any tag on >35% of notes.
   const GENERIC = new Set(['chatgpt', 'history', 'conversation', 'imported']);
-  const tooCommon = kept.length * 0.35;
+  const tooCommon = kept.length * 0.6;
   const topTags = new Set([...tagCount.entries()]
     .filter(([t, c]) => c >= 2 && c <= tooCommon && !GENERIC.has(String(t).toLowerCase()))
     .sort((a, b) => b[1] - a[1]).slice(0, maxTags).map(([t]) => t));
