@@ -18,6 +18,7 @@ export function KnowledgeGraph({ data, onOpen }) {
   const drag = useRef(null);
   const hoverRef = useRef(null);
   const neighborsRef = useRef(new Set());
+  const kickRef = useRef(null);
   const [hoverTitle, setHoverTitle] = useState(null);
   const [ready, setReady] = useState(false);
 
@@ -41,6 +42,7 @@ export function KnowledgeGraph({ data, onOpen }) {
     s.scale = 1; s.tx = 0; s.ty = 0; s.alpha = 1;
     hoverRef.current = null; neighborsRef.current = new Set();
     setReady(s.nodes.length > 0);
+    kickRef.current?.(); // if the loop had idle-stopped, new data needs to re-settle
   }, [data]);
 
   // Force simulation + canvas render loop.
@@ -49,7 +51,7 @@ export function KnowledgeGraph({ data, onOpen }) {
     if (!canvas || !wrapRef.current) return undefined;
     const ctx = canvas.getContext('2d');
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    let raf;
+    let raf = null, running = false;
 
     const resize = () => {
       const W = wrapRef.current.clientWidth, H = wrapRef.current.clientHeight;
@@ -105,7 +107,7 @@ export function KnowledgeGraph({ data, onOpen }) {
       const s = sim.current;
       const W = canvas.width / dpr, H = canvas.height / dpr;
       const { nodes, links } = s;
-      if (s.alpha > 0.008) {
+      if (s.alpha > 0.02) {
         // Repulsion via a uniform spatial grid — O(n) instead of O(n^2), so hundreds of
         // nodes (e.g. an imported ChatGPT history) no longer freeze the browser tab. Each
         // node is pushed only by others within ~one cell; distant nodes are ignored (the
@@ -148,12 +150,18 @@ export function KnowledgeGraph({ data, onOpen }) {
           n.vx *= 0.82; n.vy *= 0.82;
           n.x += n.vx * s.alpha; n.y += n.vy * s.alpha;
         }
-        s.alpha *= 0.992;
+        s.alpha *= 0.985;
       }
       draw();
-      raf = requestAnimationFrame(tick);
+      // Idle-stop: once the layout settles (and no node is being dragged) we stop requesting
+      // frames — no permanent 60fps redraw burning the main thread. Any interaction calls
+      // kick() to resume. This is what keeps a few-hundred-node graph smooth once it rests.
+      if (s.alpha > 0.02 || (drag.current && drag.current.node)) raf = requestAnimationFrame(tick);
+      else { running = false; raf = null; }
     };
-    raf = requestAnimationFrame(tick);
+    const kick = () => { if (!running) { running = true; raf = requestAnimationFrame(tick); } };
+    kickRef.current = kick;
+    kick();
 
     // ---- interaction ----
     const toWorld = (e) => {
@@ -177,6 +185,7 @@ export function KnowledgeGraph({ data, onOpen }) {
       if (id) for (const l of sim.current.links) { if (l.s.id === id) nb.add(l.t.id); else if (l.t.id === id) nb.add(l.s.id); }
       neighborsRef.current = nb;
       setHoverTitle(n ? (n.group === 'tag' ? n.title : n.title) : null);
+      kick();
     };
 
     const onDown = (e) => {
@@ -184,6 +193,7 @@ export function KnowledgeGraph({ data, onOpen }) {
       const p = toWorld(e), n = nodeAt(p);
       drag.current = n ? { node: n, moved: false, sx: e.clientX, sy: e.clientY }
         : { pan: true, moved: false, lx: e.clientX, ly: e.clientY };
+      kick();
     };
     const onMove = (e) => {
       const d = drag.current;
@@ -196,6 +206,7 @@ export function KnowledgeGraph({ data, onOpen }) {
         sim.current.tx += e.clientX - d.lx; sim.current.ty += e.clientY - d.ly;
         d.lx = e.clientX; d.ly = e.clientY; d.moved = true;
       }
+      kick();
     };
     const onUp = (e) => {
       const d = drag.current; drag.current = null;
@@ -211,6 +222,7 @@ export function KnowledgeGraph({ data, onOpen }) {
       s.tx = mx - (mx - s.tx) * (ns / s.scale);
       s.ty = my - (my - s.ty) * (ns / s.scale);
       s.scale = ns;
+      kick();
     };
 
     canvas.addEventListener('pointerdown', onDown);
@@ -219,7 +231,7 @@ export function KnowledgeGraph({ data, onOpen }) {
     canvas.addEventListener('pointerleave', onLeave);
     canvas.addEventListener('wheel', onWheel, { passive: false });
     return () => {
-      cancelAnimationFrame(raf); ro.disconnect();
+      if (raf) cancelAnimationFrame(raf); kickRef.current = null; ro.disconnect();
       canvas.removeEventListener('pointerdown', onDown);
       canvas.removeEventListener('pointermove', onMove);
       canvas.removeEventListener('pointerup', onUp);
@@ -228,7 +240,7 @@ export function KnowledgeGraph({ data, onOpen }) {
     };
   }, [ready, onOpen]);
 
-  const reheat = () => { sim.current.alpha = 1; };
+  const reheat = () => { sim.current.alpha = 1; kickRef.current?.(); };
   const present = ORDER.filter((g) => (data?.nodes || []).some((n) => n.group === g));
 
   if (!data || !data.nodes?.length) {
