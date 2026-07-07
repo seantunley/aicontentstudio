@@ -5,11 +5,11 @@
   "type": "module",
   "scripts": { "start": "node server.js" },
   "dependencies": {
-    "@remotion/bundler": "4.0.240",
-    "@remotion/renderer": "4.0.240",
-    "remotion": "4.0.240",
+    "@remotion/bundler": "4.0.486",
+    "@remotion/renderer": "4.0.486",
+    "remotion": "4.0.486",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "express": "4.21.2"
+    "express": "4.22.2"
   }
 }
