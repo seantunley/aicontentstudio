@@ -106,16 +106,33 @@ export function KnowledgeGraph({ data, onOpen }) {
       const W = canvas.width / dpr, H = canvas.height / dpr;
       const { nodes, links } = s;
       if (s.alpha > 0.008) {
-        const k = 100;
-        for (let i = 0; i < nodes.length; i++) {
-          const a = nodes[i];
-          for (let j = i + 1; j < nodes.length; j++) {
-            const b = nodes[j];
-            let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy;
-            if (d2 < 0.01) { dx = (i - j) || 1; dy = 1; d2 = dx * dx + dy * dy; }
-            const d = Math.sqrt(d2), f = (k * k) / d2;
-            const fx = (dx / d) * f, fy = (dy / d) * f;
-            a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+        // Repulsion via a uniform spatial grid — O(n) instead of O(n^2), so hundreds of
+        // nodes (e.g. an imported ChatGPT history) no longer freeze the browser tab. Each
+        // node is pushed only by others within ~one cell; distant nodes are ignored (the
+        // centering + link forces still hold the layout together).
+        const k = 100, cell = 130, R2 = cell * cell;
+        const grid = new Map();
+        for (const n of nodes) {
+          const gk = `${Math.floor(n.x / cell)},${Math.floor(n.y / cell)}`;
+          let arr = grid.get(gk); if (!arr) { arr = []; grid.set(gk, arr); }
+          arr.push(n);
+        }
+        let seed = 1;
+        for (const a of nodes) {
+          const cx = Math.floor(a.x / cell), cy = Math.floor(a.y / cell);
+          for (let gx = cx - 1; gx <= cx + 1; gx++) {
+            for (let gy = cy - 1; gy <= cy + 1; gy++) {
+              const arr = grid.get(`${gx},${gy}`);
+              if (!arr) continue;
+              for (const b of arr) {
+                if (b === a) continue;
+                let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy;
+                if (d2 > R2) continue;
+                if (d2 < 0.01) { seed = (seed * 9301 + 49297) % 233280; dx = seed / 233280 - 0.5; dy = 0.5; d2 = dx * dx + dy * dy; }
+                const d = Math.sqrt(d2), f = (k * k) / d2;
+                a.vx += (dx / d) * f; a.vy += (dy / d) * f; // force applied to `a` only; `b` gets its own turn
+              }
+            }
           }
         }
         for (const l of links) {
