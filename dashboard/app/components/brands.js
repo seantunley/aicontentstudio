@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useUI, Tooltip, InfoDot } from './ui';
 
-const BLANK = { slug: '', name: '', region: '', audience: '', voice: '', safety: '', pillars: '', sensitive: '', channels: '', palette: '', archetype: '', visual_mood: '', art_direction: '' };
+const BLANK = { slug: '', name: '', region: '', audience: '', voice: '', safety: '', pillars: '', sensitive: '', channels: '', palette: '', archetype: '', visual_mood: '', art_direction: '', ref_images: '' };
 
 // 12 brand archetypes — drive visual mood + voice. None fits? Leave blank and use the text fields.
 const ARCHETYPES = ['The Innocent', 'The Sage', 'The Explorer', 'The Rebel', 'The Magician', 'The Hero', 'The Lover', 'The Jester', 'The Everyman', 'The Caregiver', 'The Ruler', 'The Creator'];
@@ -179,6 +179,8 @@ export function BrandManager({ brands, coverage = {} }) {
                   <input className="input" style={{ flex: 1 }} placeholder="visual mood (warm, editorial, minimal…)" value={editing.visual_mood || ''} onChange={set('visual_mood')} />
                 </div>
                 <textarea className="ta" rows={2} placeholder="art direction — lighting, composition, photography vs illustration, what to never show" value={editing.art_direction || ''} onChange={set('art_direction')} />
+                <label className="card-foot" style={{ margin: '8px 0 4px', display: 'block' }}>Reference photos<InfoDot tip="Paste URLs of this brand's REAL photos (one per line). When set, media is built by EDITING these real photos (reference-edit) instead of text-to-image — far higher fidelity for a real product, place or signature look." /></label>
+                <textarea className="ta" rows={2} placeholder="reference photo URLs — one per line (activates the reference-edit path)" value={editing.ref_images || ''} onChange={set('ref_images')} />
                 <div>
                   <div className="card-foot" style={{ margin: '2px 0 6px' }}>
                     ACCOUNTS THIS BRAND MAY POST TO (§1b)<InfoDot tip="Restrict this brand to specific connected accounts. Leave all unticked = any connected account." />{selectedChannels.length ? <span className="dim"> · {selectedChannels.length} selected</span> : null}

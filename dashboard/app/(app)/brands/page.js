@@ -1,4 +1,4 @@
-import { listBrands, pillarCoverage } from '@/lib/db';
+import { listBrands, pillarCoverage, getSetting } from '@/lib/db';
 import { BrandManager } from '@/app/components/brands';
 
 export const dynamic = 'force-dynamic';
@@ -8,7 +8,11 @@ export default function Brands() {
   const coverage = {};
   try {
     brands = listBrands();
-    for (const b of brands) coverage[b.slug] = pillarCoverage(b.slug);
+    for (const b of brands) {
+      coverage[b.slug] = pillarCoverage(b.slug);
+      // reference photos live in settings (brand_ref_images:<slug>) — surface them for the editor
+      try { b.ref_images = (JSON.parse(getSetting('brand_ref_images:' + b.slug) || '[]') || []).join('\n'); } catch { b.ref_images = ''; }
+    }
   } catch {}
   return (
     <>

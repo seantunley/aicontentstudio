@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
-import { upsertBrand, deleteBrand } from '@/lib/db';
+import { upsertBrand, deleteBrand, setSetting } from '@/lib/db';
 
 export async function POST(req) {
   const session = await getSession();
@@ -9,7 +9,13 @@ export async function POST(req) {
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'bad request' }, { status: 400 }); }
   try {
     if (body.action === 'delete') return NextResponse.json(deleteBrand(body.slug));
-    return NextResponse.json(upsertBrand(body));
+    const res = upsertBrand(body);
+    // reference photos are stored per brand as a setting the worker reads (brand_ref_images:<slug>)
+    if (res?.slug && typeof body.ref_images === 'string') {
+      const urls = body.ref_images.split(/[\n,]+/).map((s) => s.trim()).filter((u) => /^https?:\/\//i.test(u));
+      setSetting('brand_ref_images:' + res.slug, JSON.stringify(urls));
+    }
+    return NextResponse.json(res);
   } catch (e) {
     return NextResponse.json({ error: String(e?.message || e) }, { status: 400 });
   }
