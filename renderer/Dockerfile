@@ -22,10 +22,11 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install --no-audit --no-fund
 
-COPY . .
-
-# Pre-download the Remotion Chromium so the first render is fast.
+# Pre-download the Remotion Chromium so the first render is fast. Kept BEFORE `COPY . .` (and node_modules
+# /.remotion are .dockerignored, so it survives the copy) — this way a src-only edit doesn't re-download it.
 RUN node -e "import('@remotion/renderer').then(m => m.ensureBrowser()).catch(e => { console.error(e); process.exit(0); })"
+
+COPY . .
 
 ENV PORT=3100
 EXPOSE 3100

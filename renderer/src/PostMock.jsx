@@ -23,6 +23,18 @@ const FRAME_W = 1080;
 const MARGIN = 50;
 const CARD_W = FRAME_W - MARGIN * 2; // 980
 const FONT = "'Liberation Sans', 'DejaVu Sans', 'Noto Color Emoji', sans-serif";
+const BODY_MAX = 1600; // display ceiling for the mockup; genuinely over-limit copy is caught by the validator
+
+// Clamp for display WITHOUT cutting mid-word: trim to the last word boundary before the ceiling and
+// flag it, so the caption can show a faithful "… more" instead of a broken tail like "This 18 Ju".
+function clampBody(text) {
+  const t = (text || '').replace(/\s+$/, '');
+  if (t.length <= BODY_MAX) return { body: t, truncated: false };
+  let cut = t.slice(0, BODY_MAX);
+  const sp = cut.lastIndexOf(' ');
+  if (sp > BODY_MAX * 0.6) cut = cut.slice(0, sp); // only honour the boundary if it isn't absurdly early
+  return { body: cut.replace(/[\s.,;:!?—-]+$/, ''), truncated: true };
+}
 
 // Shared layout maths — both calculateMetadata (frame height) and the component use it so they agree.
 export function layout(props) {
@@ -32,15 +44,15 @@ export function layout(props) {
   const hasVideo = !!props.video;
   const aspect = ASPECT[platform] ?? 1.0;
   const mediaH = hasImage || hasVideo ? Math.round(CARD_W * aspect) : 0;
-  const body = (props.body || '').slice(0, 800);
+  const { body, truncated } = clampBody(props.body);
   // overestimate caption height so nothing clips (52 chars/line is conservative for a 980px card)
   const lines = body.split('\n').reduce((n, ln) => n + Math.max(1, Math.ceil(ln.length / 52)), 0);
-  const captionH = lines * 46 + 56;
+  const captionH = lines * 46 + 56 + (truncated ? 44 : 0); // extra row for the "… more" line
   const headerH = 128;
   const actionsH = 92;
   const cardH = headerH + mediaH + actionsH + captionH;
   const frameH = 56 + cardH + 56 + 40; // top + card + bottom + safety
-  return { platform, images, hasImage, hasVideo, aspect, mediaH, body, cardH, frameH, width: FRAME_W };
+  return { platform, images, hasImage, hasVideo, aspect, mediaH, body, truncated, cardH, frameH, width: FRAME_W };
 }
 
 export const PostMock = (props) => {
@@ -91,6 +103,7 @@ export const PostMock = (props) => {
   const caption = (
     <div style={{ padding: '4px 24px 24px', color: '#111', fontSize: 30, lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
       {textFirst ? null : <span style={{ fontWeight: 600, marginRight: 8 }}>{name}</span>}{L.body}
+      {L.truncated ? <span style={{ color: '#9aa0a6' }}>… <span style={{ color: '#5b6470', fontWeight: 600 }}>more</span></span> : null}
     </div>
   );
 
@@ -104,12 +117,32 @@ export const PostMock = (props) => {
       <span>💬</span><span>🔁</span><span>♡</span><span>📊</span>
     </div>
   );
+  // Telegram channel posts carry none of X's reply/retweet/like/analytics buttons — just the muted
+  // send-time bottom-right of the message. Faithful chrome, no fabricated engagement counts.
+  const tgFooter = (
+    <div style={{ display: 'flex', alignItems: 'center', padding: '2px 26px 22px', color: '#9aa7b2', fontSize: 22 }}>
+      <span style={{ marginLeft: 'auto' }}>14:30</span>
+    </div>
+  );
+
+  // Media order: X/Bluesky put the caption above the media; Telegram & feeds put media on top. And when
+  // there is NO media, the action row must never float between the header and the caption.
+  let stack;
+  if (L.platform === 'telegram') {
+    stack = <>{media}{caption}{tgFooter}</>;
+  } else if (textFirst) {
+    stack = <>{caption}{media}{xActions}</>;
+  } else if (L.hasImage || L.hasVideo) {
+    stack = <>{media}{feedActions}{caption}</>;
+  } else {
+    stack = <>{caption}{feedActions}</>;
+  }
 
   return (
     <AbsoluteFill style={{ background: '#0c0e10', fontFamily: FONT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ width: CARD_W, background: '#fff', borderRadius: 20, overflow: 'hidden', boxShadow: '0 24px 70px rgba(0,0,0,0.5)' }}>
         {header}
-        {textFirst ? <>{caption}{media}{xActions}</> : <>{media}{feedActions}{caption}</>}
+        {stack}
       </div>
     </AbsoluteFill>
   );
