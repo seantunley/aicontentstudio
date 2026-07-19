@@ -21,6 +21,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 TOKEN = os.environ.get("CLAUDE_BRIDGE_TOKEN", "")
 PORT = int(os.environ.get("CLAUDE_BRIDGE_PORT", "4014"))
+# Bind host. Default stays loopback-only (unchanged posture). Set CLAUDE_BRIDGE_HOST=0.0.0.0 to also serve
+# the Docker gateway so bridge-network containers (e.g. the cockpit) can reach it — still token-gated, and
+# 0.0.0.0 includes 127.0.0.1 so the host-net worker/hermes are unaffected.
+HOST = os.environ.get("CLAUDE_BRIDGE_HOST", "127.0.0.1")
 CLAUDE = os.environ.get("CLAUDE_BIN", "claude")
 
 _EXT = {"image/jpeg": ".jpg", "image/jpg": ".jpg", "image/png": ".png",
@@ -130,4 +134,4 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()

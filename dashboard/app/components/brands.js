@@ -38,6 +38,7 @@ export function BrandManager({ brands, coverage = {} }) {
   const ui = useUI();
   const [editing, setEditing] = useState(null); // brand object or null
   const [busy, setBusy] = useState(false);
+  const [suggesting, setSuggesting] = useState(false); // "✨ Suggest" visual identity in flight
   const [accounts, setAccounts] = useState(null); // connected Postiz channels (null = not loaded)
 
   useEffect(() => {
@@ -67,6 +68,33 @@ export function BrandManager({ brands, coverage = {} }) {
     const { ok: done, data } = await post({ action: 'delete', slug });
     if (done) { ui.toast('Deleted'); window.location.reload(); return; }
     ui.toast(data.error || 'Failed', 'err');
+  }
+  // ✨ Suggest a full visual identity from the brand's voice/pillars/audience (Claude-brain when reachable,
+  // a tasteful archetype-derived starting point otherwise). Populates the fields for review — doesn't save.
+  async function suggestVisual() {
+    if (!editing?.name?.trim() && !editing?.voice?.trim() && !editing?.audience?.trim()) {
+      ui.toast('Add a name and some voice/audience first', 'err'); return;
+    }
+    setSuggesting(true);
+    try {
+      const r = await fetch('/api/brands/suggest-visual', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editing.name, region: editing.region, audience: editing.audience, voice: editing.voice, pillars: editing.pillars, archetype: editing.archetype }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.suggestion) { ui.toast(d.error || 'Could not suggest', 'err'); return; }
+      const s = d.suggestion;
+      setEditing((b) => ({ ...b,
+        palette: JSON.stringify(s.palette || {}),
+        archetype: s.archetype || b.archetype,
+        visual_mood: s.visual_mood || b.visual_mood,
+        art_direction: s.art_direction || b.art_direction }));
+      ui.toast(d.source === 'brain' ? 'Suggested from your brand voice — tweak & save' : 'Suggested a starting point — tweak & save');
+    } catch {
+      ui.toast('Could not suggest', 'err');
+    } finally {
+      setSuggesting(false);
+    }
   }
   const set = (k) => (e) => setEditing((b) => ({ ...b, [k]: e.target.value }));
   // palette stored as a JSON string {primary,secondary,accent,bg}; edit one swatch at a time.
@@ -131,7 +159,10 @@ export function BrandManager({ brands, coverage = {} }) {
                 <textarea className="ta" rows={2} placeholder="content pillars — recurring themes, one per line" value={editing.pillars} onChange={set('pillars')} />
                 <label className="card-foot" style={{ margin: '6px 0 4px', display: 'block' }}>Sensitive topics<InfoDot tip="Dates/topics that should notify you first rather than auto-draft (e.g. tragedies, anniversaries)." /></label>
                 <input className="input" placeholder="sensitive topics/occasions (notify-first) — optional" value={editing.sensitive} onChange={set('sensitive')} />
-                <label className="card-foot" style={{ margin: '10px 0 4px', display: 'block' }}>Visual identity<InfoDot tip="Palette, archetype, mood & art direction — steer AI artwork, the rendered look (caption pills, carousels, previews) and the visual fit-check." /></label>
+                <div className="row-between" style={{ margin: '10px 0 4px', alignItems: 'center' }}>
+                  <label className="card-foot" style={{ margin: 0 }}>Visual identity<InfoDot tip="Palette, archetype, mood & art direction — steer AI artwork, the rendered look (caption pills, carousels, previews) and the visual fit-check." /></label>
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={suggestVisual} disabled={suggesting} title="Draft a palette, archetype, mood & art direction from this brand's voice">{suggesting ? 'Suggesting…' : '✨ Suggest'}</button>
+                </div>
                 <div className="field-row" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
                   {['primary', 'secondary', 'accent', 'bg'].map((k) => (
                     <label key={k} className="check" style={{ gap: 5 }}>
