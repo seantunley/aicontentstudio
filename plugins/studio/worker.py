@@ -366,7 +366,96 @@ def _requeue_or_fail(job, jid, qa, attempts, detail):
         db.log_system_event("error", "worker", f"Job failed: {job.get('topic')}", detail, jid)
 
 
-def _claude_write(job, social_text=""):
+# --- Knowledge base (the operator's imported ChatGPT history / notes) → drafting context -------------
+# Basic Memory stores every note as markdown under <studio-data>/knowledge. The default Claude-writes
+# path can't reach it over MCP, so the worker retrieves the most topic-relevant notes itself and injects
+# them into the prompt (same shape as the social-pulse block). Best-effort; never blocks generation.
+_KB_STOP = {"the", "and", "for", "with", "that", "this", "your", "you", "are", "from", "have", "has",
+            "was", "were", "what", "when", "how", "why", "who", "its", "into", "about", "over", "them",
+            "they", "their", "would", "could", "should", "which", "while", "where", "those", "these",
+            "been", "being", "also", "just", "then", "than", "only", "more", "most", "some", "such",
+            "very", "will", "can", "may", "not", "but", "all", "one", "out",
+            "как", "что", "это", "для", "при", "или", "так", "там", "где", "если", "когда", "чтобы",
+            "все", "него", "неё", "они", "оно", "она", "его", "моя", "мой", "мне", "меня", "вас", "нас",
+            "этот", "эта", "эти", "того", "тому", "быть", "есть", "уже", "ещё", "нет", "под", "над", "про"}
+
+
+def _kw_terms(s, cap=12):
+    out = []
+    for t in re.findall(r"\w{4,}", (s or "").lower(), re.UNICODE):
+        if t in _KB_STOP or t.isdigit() or t in out:
+            continue
+        out.append(t)
+        if len(out) >= cap:
+            break
+    return out
+
+
+def _kb_note_title_body(text):
+    t, title = text, ""
+    if t.startswith("---"):
+        end = t.find("\n---", 3)
+        if end != -1:
+            for line in t[3:end].splitlines():
+                if line.lower().startswith("title:"):
+                    title = line.split(":", 1)[1].strip()
+                    break
+            t = t[end + 4:]
+    if not title:
+        for line in t.splitlines():
+            if line.startswith("# "):
+                title = line[2:].strip()
+                break
+    body = re.sub(r"\s+", " ", re.sub(r"(?m)^#+\s.*$", "", t)).strip()
+    return (title or "note"), body
+
+
+def _knowledge_context(job, limit=4, max_chars=1800):
+    """Top topic-relevant notes from the operator's imported knowledge base, so Claude writes FROM the
+    operator's own brain, not just the open web. Returns (text, count); ('', 0) if nothing relevant or no
+    knowledge dir — never raises, never blocks."""
+    try:
+        kdir = os.path.join(os.path.dirname(db.DB_PATH), "knowledge")
+        if not os.path.isdir(kdir):
+            return "", 0
+        try:
+            pillars = (db.get_brand(job.get("brand")) or {}).get("pillars") or ""
+        except Exception:  # noqa: BLE001
+            pillars = ""
+        terms = _kw_terms(" ".join([job.get("topic") or "", job.get("pillar") or "", pillars]))
+        if not terms:
+            return "", 0
+        scored = []
+        for root, _dirs, files in os.walk(kdir):
+            for fn in files:
+                if not fn.endswith(".md"):
+                    continue
+                try:
+                    with open(os.path.join(root, fn), "r", encoding="utf-8", errors="ignore") as f:
+                        text = f.read(8000)
+                except OSError:
+                    continue
+                lc = text.lower()
+                score = sum(lc.count(t) for t in terms)
+                if score:
+                    scored.append((score, text))
+        if not scored:
+            return "", 0
+        scored.sort(key=lambda x: -x[0])
+        parts, used = [], 0
+        for _score, text in scored[:limit]:
+            title, body = _kb_note_title_body(text)
+            block = f"• {title}: {body[:400].strip()}"
+            if used + len(block) > max_chars and parts:
+                break
+            parts.append(block)
+            used += len(block)
+        return "\n".join(parts), len(parts)
+    except Exception:  # noqa: BLE001
+        return "", 0
+
+
+def _claude_write(job, social_text="", knowledge_text=""):
     """§ intelligence (Path B) — Claude researches + writes the brief + per-platform drafts; the worker
     saves them (db.save_brief still enforces §3c grounding, so weak grounding → fallback). Returns
     {platform: image_brief} on success, else None (caller then runs the standard agent)."""
@@ -386,6 +475,9 @@ def _claude_write(job, social_text=""):
     direction = (job.get("direction") or "").strip()
     _bvis = _brand_visual_block(job)
     social_block = (f"\nCURRENT SOCIAL DISCUSSION (ground the angle here where relevant):\n{social_text[:1500]}\n" if social_text else "")
+    knowledge_block = (f"\nFROM YOUR OWN KNOWLEDGE BASE (the operator's imported history & notes — draw on this "
+                       f"expertise, framing and turns of phrase where relevant; still cite a real source for any hard "
+                       f"fact):\n{knowledge_text[:1800]}\n" if knowledge_text else "")
     prompt = (
         f"You are {job.get('brand') or 'the studio'}'s creative director AND researcher. Produce a complete, "
         "ready-to-review social post package.\n"
@@ -397,6 +489,7 @@ def _claude_write(job, social_text=""):
           "NOT the people depicted); write in the SAME language as the topic; ground EVERY fact in REAL, current, "
           "citable sources (use web search) — never invent facts or URLs.\n"
         + social_block
+        + knowledge_block
         + "\nReply with ONLY strict JSON (no prose, no code fences):\n"
           '{"brief":{"facts":[{"claim":"<specific claim>","source_url":"<real https URL>","snippet":"<short verbatim evidence from that source>"}],'
           '"angles":[{"name":"<angle>","hook":"<one-line hook>"}],"recency":"<how current>"},'
@@ -460,7 +553,10 @@ def _fetch_media_bytes(url_or_path, cap=26_214_400):
         candidates = [url_or_path]
         m = re.match(r"(https?://)([^/]+)(/.*)", url_or_path)
         if m and "127.0.0.1" not in m.group(2):
-            candidates.append(m.group(1) + "127.0.0.1:4007" + m.group(3))
+            # The published Postiz port serves plain HTTP (TLS is terminated at the Cloudflare tunnel),
+            # so the local retry MUST be http:// — https://127.0.0.1:4007 fails the handshake and the
+            # fit-check then silently can't SEE the media (falls back to spec-only on every image).
+            candidates.append("http://127.0.0.1:4007" + m.group(3))
         for u in candidates:
             try:
                 with urllib.request.urlopen(u, timeout=20) as r:
@@ -798,7 +894,12 @@ def process_one(job):
     claude_briefs = None
     if not with_script and not resume_note and claude.configured() and db.get_setting_bool("claude_writes", True):
         try:
-            claude_briefs = _claude_write(job, social_text)
+            kb_text, kb_n = _knowledge_context(job)
+            if kb_n:
+                db.record_build_step(jid, "knowledge", model=f"{kb_n} note(s)", provider="knowledge base",
+                                     params={"source": "imported history/notes"})
+                db.record_event(jid, f"worker: grounded the draft in {kb_n} note(s) from your knowledge base", actor="claude")
+            claude_briefs = _claude_write(job, social_text, kb_text)
         except Exception as e:  # noqa: BLE001
             db.record_event(jid, f"worker: Claude write errored → standard pipeline ({e})", actor="system")
             claude_briefs = None
