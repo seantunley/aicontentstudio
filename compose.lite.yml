@@ -1,0 +1,41 @@
+# AI Content Studio — LITE stack (2 containers instead of 10).
+#
+# The lighter build (see LITE.md): n8n is the conveyor; Postiz is publishing.
+# The intelligence seams (plugins/studio/{claude,humanize,llm,scout}.py, _brand_block)
+# are CALLED by n8n as steps — they are NOT deleted, just no longer wrapped in Hermes.
+#
+# Postiz keeps running via its OWN stack (unchanged) — see OPERATING.md:
+#   docker compose --env-file postiz/.env -f postiz/docker-compose.yml up -d
+#
+# This file adds only n8n. Bring it up with:
+#   docker compose -f compose.lite.yml up -d
+#
+# The full heavy stack is preserved verbatim at deferred/compose.full.yml and on `main`.
+
+services:
+  n8n:
+    image: n8nio/n8n:1.130.0            # pin a release; bump deliberately after reading notes
+    restart: unless-stopped              # §9b resilience — comes back after crash/reboot
+    ports:
+      - "127.0.0.1:5678:5678"            # bind localhost only; reach it over Tailscale (§2c), never a public port
+    environment:
+      - GENERIC_TIMEZONE=Africa/Johannesburg
+      - TZ=Africa/Johannesburg
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_SECURE_COOKIE=false          # true once behind HTTPS/Tailscale Funnel
+      # Basic auth for the editor UI (single operator). Set these in .env.
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+      # Encryption key for stored credentials — set once, keep stable, back it up.
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+    volumes:
+      - n8n_data:/home/node/.n8n         # workflows + credentials (encrypted) live here — back this up (§9a)
+      - ./plugins/studio:/opt/studio:ro  # the intelligence seams, mounted read-only for n8n Execute-Command / script nodes
+    # A host cron can also run the seams directly, e.g. the scout:
+    #   docker compose -f compose.lite.yml exec -T n8n python /opt/studio/scout.py --once
+
+volumes:
+  n8n_data:
