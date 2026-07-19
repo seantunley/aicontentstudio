@@ -55,16 +55,18 @@ def _download(url, out_path, timeout=180):
 
 
 def _img_prompt(art_direction, people=True):
-    p = ("Use the attached photo(s) as the EXACT product reference. Create an exciting product-LAUNCH hero image. "
-         "Keep the product IDENTICAL to the reference in every way — same shape, length, colour, configuration, "
-         "wheels, seats and details; do NOT restyle, lengthen, or add/remove parts. It is the hero, well lit and "
+    # Brand-NEUTRAL by default — the subject can be a product, a place, a person or a scene. The brand's
+    # look comes from `art_direction` (its palette/mood/art-direction + the post's brief), never hardcoded.
+    p = ("Use the attached photo(s) as the reference. Create a striking, editorial hero image. "
+         "Keep whatever real subject the reference shows FAITHFUL to it — same form, colour, materials, "
+         "proportions and details; do NOT restyle or add/remove parts. It is the hero, well lit and "
          "razor sharp. ")
     if people:
-        p += ("Surround it with natural CANDID excitement — people genuinely reacting (laughing, pointing, chatting), "
-              "NO arms raised to the sky and no stiff posing; realistic, well-proportioned faces and hands. ")
+        p += ("Include natural, CANDID people — genuinely engaged, not posing; realistic and well-proportioned "
+              "faces and hands, no arms-raised-to-the-sky clichés. ")
     else:
-        p += "NO people and no figures at all — the product is the sole star. "
-    p += "Vibrant, premium launch atmosphere, photorealistic, sharp, high resolution."
+        p += "NO people and no figures at all — the subject is the sole star. "
+    p += "Polished, premium, photorealistic, sharp, high resolution."
     if art_direction:
         p += f" ART DIRECTION FOR THIS POST: {art_direction}"
     return p
@@ -86,14 +88,17 @@ def edit_image(reference_urls, art_direction, out_path, people=True, timeout=240
         return None, None
 
 
-def animate(image_url, out_path, timeout=560):
-    """Animate a (people-free) launch image into a reveal video via the video model (Veo 3). image_url
-    must be a public URL. Returns local_path or None."""
+def animate(image_url, out_path, motion="", timeout=560):
+    """Animate a (people-free) hero image into a short reveal via the video model (Veo 3). image_url must be
+    a public URL; `motion` carries the brand/post art-direction so the movement fits the brand (defaults to a
+    neutral, tasteful reveal — NOT hardcoded to any one product category). Returns local_path or None."""
     if not (FAL_KEY and image_url):
         return None
-    prompt = ("Cinematic product launch reveal. A slow, dramatic camera push-in toward the vehicle as warm "
-              "golden-hour light flares; subtle drifting atmosphere and light, premium polished automotive "
-              "advertising look. The product stays exactly as shown.")
+    prompt = ("Cinematic reveal with gentle, tasteful motion — a slow camera push-in or subtle parallax drift, "
+              "soft light and a hint of drifting atmosphere; premium, polished and photoreal. The subject stays "
+              "exactly as shown, unchanged.")
+    if motion:
+        prompt += f" ART DIRECTION: {motion}"
     try:
         d = _post(video_model(), {"image_url": image_url, "prompt": prompt, "generate_audio": True}, timeout)
         url = (d.get("video") or (d.get("videos") or [{}])[0] or {}).get("url")

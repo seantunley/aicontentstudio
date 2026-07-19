@@ -744,7 +744,7 @@ def _fal_launch_media(job, image_briefs, with_video):
             hero_url, _hero = falimg.edit_image(refs, art, hp, people=False, timeout=RUN_TIMEOUT_SECONDS)
             if hero_url:
                 fd, vp = tempfile.mkstemp(suffix=".mp4"); os.close(fd)
-                vid = falimg.animate(hero_url, vp, timeout=RUN_TIMEOUT_SECONDS)
+                vid = falimg.animate(hero_url, vp, motion=art, timeout=RUN_TIMEOUT_SECONDS)
                 if vid:
                     vmedia = postiz.upload_video(vid)
                     for d in drafts:
